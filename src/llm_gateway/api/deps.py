@@ -12,6 +12,7 @@ from llm_gateway.keys.cache import KeyStatusCache
 from llm_gateway.keys.repository import APIKeyRepository
 from llm_gateway.keys.selector import KeySelector, RoundRobinSelector
 from llm_gateway.keys.service import KeyPoolService
+from llm_gateway.monitoring.publisher import RequestEventPublisher
 
 
 def get_key_repository(session: Annotated[AsyncSession, Depends(get_db)]) -> APIKeyRepository:
@@ -37,8 +38,13 @@ def get_key_pool_service(
     return KeyPoolService(repository, cache, selector)
 
 
+def get_event_publisher(redis: Annotated[Redis, Depends(get_redis)]) -> RequestEventPublisher:
+    return RequestEventPublisher(redis)
+
+
 def get_gateway_service(
     key_pool: Annotated[KeyPoolService, Depends(get_key_pool_service)],
     settings: Annotated[Settings, Depends(get_settings)],
+    events: Annotated[RequestEventPublisher, Depends(get_event_publisher)],
 ) -> GatewayService:
-    return GatewayService(key_pool, max_attempts=settings.GATEWAY_MAX_RETRY_ATTEMPTS)
+    return GatewayService(key_pool, max_attempts=settings.GATEWAY_MAX_RETRY_ATTEMPTS, event_publisher=events)

@@ -39,13 +39,50 @@ async def key_repo(db_session: AsyncSession) -> APIKeyRepository:
     return APIKeyRepository(db_session)
 
 
+class FakePipeline:
+    """Minimal stand-in for redis.asyncio.Redis.pipeline(transaction=False).
+
+    Just queues (method_name, args) tuples and replays them against the
+    parent FakeRedis on execute() — enough for RequestEventPublisher, which
+    only needs publish/lpush/ltrim batched together.
+    """
+
+    def __init__(self, redis: "FakeRedis") -> None:
+        self._redis = redis
+        self._ops: list[tuple[str, tuple]] = []
+
+    def publish(self, channel: str, message: str) -> None:
+        self._ops.append(("publish", (channel, message)))
+
+    def lpush(self, key: str, value: str) -> None:
+        self._ops.append(("lpush", (key, value)))
+
+    def ltrim(self, key: str, start: int, end: int) -> None:
+        self._ops.append(("ltrim", (key, start, end)))
+
+    async def execute(self) -> list:
+        results = []
+        for name, args in self._ops:
+            results.append(await getattr(self._redis, name)(*args))
+        return results
+
+    async def __aenter__(self) -> "FakePipeline":
+        return self
+
+    async def __aexit__(self, *exc_info) -> None:
+        return None
+
+
 class FakeRedis:
     """Minimal in-memory stand-in for redis.asyncio.Redis, covering just
-    the operations our code actually uses (get/set/delete/incr).
+    the operations our code actually uses (get/set/delete/incr, plus
+    pub/sub-adjacent list ops for the live monitoring feature).
     """
 
     def __init__(self) -> None:
         self._store: dict[str, str] = {}
+        self._lists: dict[str, list[str]] = {}
+        self.published: list[tuple[str, str]] = []
 
     async def get(self, key: str) -> str | None:
         return self._store.get(key)
@@ -60,6 +97,26 @@ class FakeRedis:
         current = int(self._store.get(key, "0")) + 1
         self._store[key] = str(current)
         return current
+
+    async def publish(self, channel: str, message: str) -> None:
+        self.published.append((channel, message))
+
+    async def lpush(self, key: str, value: str) -> None:
+        self._lists.setdefault(key, []).insert(0, value)
+
+    async def ltrim(self, key: str, start: int, end: int) -> None:
+        items = self._lists.get(key, [])
+        # Redis LTRIM end index is inclusive.
+        self._lists[key] = items[start : end + 1]
+
+    async def lrange(self, key: str, start: int, end: int) -> list[str]:
+        items = self._lists.get(key, [])
+        if end == -1:
+            return items[start:]
+        return items[start : end + 1]
+
+    def pipeline(self, transaction: bool = True) -> FakePipeline:
+        return FakePipeline(self)
 
 
 @pytest.fixture

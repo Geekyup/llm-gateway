@@ -57,6 +57,35 @@ Gateway сам выберет активный ключ (round-robin), при 42
 (до `GATEWAY_MAX_RETRY_ATTEMPTS` попыток). Если все ключи исчерпаны —
 вернёт `503` с телом вида `{"error": "upstream_exhausted", ...}`.
 
+## Живой мониторинг запросов
+
+Каждый хоп проксирования (выбор ключа → вызов апстрима → success/429/403)
+публикуется как событие в Redis Pub/Sub и дублируется в короткую историю
+(последние 200 событий), не блокируя основной поток — сбой публикации
+никогда не роняет сам запрос.
+
+Снимок последних событий (для первичной отрисовки дашборда):
+```bash
+curl http://localhost:8000/admin/monitor/recent?limit=50 \
+  -H "Authorization: Bearer $ADMIN_API_KEY"
+```
+
+Живой поток через Server-Sent Events:
+```bash
+curl -N http://localhost:8000/admin/monitor/stream \
+  -H "Authorization: Bearer $ADMIN_API_KEY"
+```
+
+Каждое событие (`RequestEvent`) содержит: `request_id` (общий для всех
+попыток одного клиентского запроса — так фронтенд может собрать цепочку
+retry в одну карточку), `attempt`, `provider`, `key_id`/`key_label`,
+`upstream_status`, `outcome` (`success` / `rate_limited` / `exhausted` /
+`no_keys` / `upstream_exhausted`), `latency_ms`, `is_retry`.
+
+Пример цепочки failover для одного клиентского запроса — два события с
+одним `request_id`: `attempt=1 outcome=rate_limited` (ключ A получил 429),
+`attempt=2 outcome=success` (ключ B ответил 200).
+
 ## Локальная разработка без Docker
 
 ```bash
@@ -98,6 +127,10 @@ src/llm_gateway/
 │   ├── proxy_service.py      # GatewayService: select -> forward -> retry on 429
 │   └── router.py              # POST/GET /v1/{provider}/{path}
 ├── admin/                    # CRUD для ключей (Bearer-токен из ADMIN_API_KEY)
+├── monitoring/                # живой мониторинг запросов
+│   ├── schemas.py              # RequestEvent — одна попытка проксирования
+│   ├── publisher.py             # Redis Pub/Sub + capped-list история, best-effort
+│   └── router.py                 # GET /admin/monitor/recent, GET /admin/monitor/stream (SSE)
 └── housekeeping/               # ARQ cron: сброс дневных лимитов, разморозка cooldown
 ```
 

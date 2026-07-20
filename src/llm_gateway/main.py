@@ -4,6 +4,7 @@ from llm_gateway.admin.router import router as admin_router
 from llm_gateway.config import get_settings
 from llm_gateway.core.logging import configure_logging
 from llm_gateway.gateway.router import router as gateway_router
+from llm_gateway.monitoring.router import router as monitoring_router
 
 
 def create_app() -> FastAPI:
@@ -18,6 +19,7 @@ def create_app() -> FastAPI:
 
     app.include_router(gateway_router)
     app.include_router(admin_router)
+    app.include_router(monitoring_router)
 
     @app.get("/health", tags=["meta"])
     async def health() -> dict[str, str]:
