@@ -16,4 +16,6 @@ COPY alembic ./alembic
 
 EXPOSE 8000
 
-CMD ["uvicorn", "llm_gateway.main:app", "--host", "0.0.0.0", "--port", "8000"]
+# Railway (and most PaaS) inject $PORT and expect the app to bind to it;
+# docker-compose doesn't set it, so we default to 8000 for local use.
+CMD uvicorn llm_gateway.main:app --host 0.0.0.0 --port ${PORT:-8000}
