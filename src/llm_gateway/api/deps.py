@@ -13,10 +13,22 @@ from llm_gateway.keys.repository import APIKeyRepository
 from llm_gateway.keys.selector import KeySelector, RoundRobinSelector
 from llm_gateway.keys.service import KeyPoolService
 from llm_gateway.monitoring.publisher import RequestEventPublisher
+from llm_gateway.tokens.repository import GatewayTokenRepository
+from llm_gateway.tokens.service import GatewayTokenService
 
 
 def get_key_repository(session: Annotated[AsyncSession, Depends(get_db)]) -> APIKeyRepository:
     return APIKeyRepository(session)
+
+
+def get_gateway_token_repository(session: Annotated[AsyncSession, Depends(get_db)]) -> GatewayTokenRepository:
+    return GatewayTokenRepository(session)
+
+
+def get_gateway_token_service(
+    repository: Annotated[GatewayTokenRepository, Depends(get_gateway_token_repository)],
+) -> GatewayTokenService:
+    return GatewayTokenService(repository)
 
 
 def get_key_cache(

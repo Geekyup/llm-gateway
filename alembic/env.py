@@ -11,6 +11,7 @@ from llm_gateway.db.base import Base
 # Import all ORM models here so Base.metadata is fully populated for
 # autogenerate. Add new domains' models to this list as they're created.
 from llm_gateway.keys.models import APIKey  # noqa: F401
+from llm_gateway.tokens.models import GatewayToken  # noqa: F401
 
 config = context.config
 

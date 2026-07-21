@@ -65,6 +65,21 @@ export interface RequestEvent {
   error_detail: string | null;
 }
 
+export interface GatewayTokenRead {
+  id: number;
+  label: string;
+  token_preview: string;
+  is_active: boolean;
+  last_used_at: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface GatewayTokenCreated {
+  token: GatewayTokenRead;
+  plaintext: string;
+}
+
 export class ApiError extends Error {
   status: number;
   constructor(status: number, message: string) {
@@ -132,6 +147,29 @@ export const api = {
       `/admin/monitor/recent?limit=${limit}`
     );
     return data.events;
+  },
+
+  async listGatewayTokens(): Promise<GatewayTokenRead[]> {
+    return request<GatewayTokenRead[]>("/admin/gateway-tokens");
+  },
+
+  async createGatewayToken(label: string): Promise<GatewayTokenCreated> {
+    return request<GatewayTokenCreated>("/admin/gateway-tokens", {
+      method: "POST",
+      body: JSON.stringify({ label }),
+    });
+  },
+
+  async revokeGatewayToken(id: number): Promise<GatewayTokenRead> {
+    return request<GatewayTokenRead>(`/admin/gateway-tokens/${id}/revoke`, { method: "POST" });
+  },
+
+  async activateGatewayToken(id: number): Promise<GatewayTokenRead> {
+    return request<GatewayTokenRead>(`/admin/gateway-tokens/${id}/activate`, { method: "POST" });
+  },
+
+  async deleteGatewayToken(id: number): Promise<void> {
+    return request<void>(`/admin/gateway-tokens/${id}`, { method: "DELETE" });
   },
 
   /** Verifies the stored token actually works against the backend. */

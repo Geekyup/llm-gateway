@@ -27,6 +27,12 @@ class KeyNotFoundError(LLMGatewayError):
         super().__init__(f"API key with id={key_id} not found")
 
 
+class GatewayTokenNotFoundError(LLMGatewayError):
+    def __init__(self, token_id: int) -> None:
+        self.token_id = token_id
+        super().__init__(f"Gateway token with id={token_id} not found")
+
+
 class ProviderNotSupportedError(LLMGatewayError):
     def __init__(self, provider: str) -> None:
         self.provider = provider

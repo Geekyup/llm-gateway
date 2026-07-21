@@ -7,6 +7,11 @@ FROM nginx:1.27-alpine
 # сам хост в интернет выходит нормально.
 
 COPY dist /usr/share/nginx/html
-COPY nginx.conf /etc/nginx/conf.d/default.conf
+
+# Templated so $PORT (Railway injects this) picks the listen port; nginx's
+# entrypoint runs envsubst on any *.template file automatically. Defaults
+# to 80 for plain `docker run`/docker-compose, where $PORT isn't set.
+ENV PORT=80
+COPY nginx.conf.template /etc/nginx/templates/default.conf.template
 
 EXPOSE 80

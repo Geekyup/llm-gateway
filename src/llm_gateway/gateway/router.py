@@ -3,12 +3,13 @@ from fastapi.responses import JSONResponse
 
 from llm_gateway.api.deps import get_gateway_service
 from llm_gateway.core.exceptions import NoAvailableKeysError, ProviderNotSupportedError, UpstreamExhaustedError
+from llm_gateway.gateway.dependencies import require_gateway_token
 from llm_gateway.gateway.proxy_service import GatewayService
 from llm_gateway.gateway.schemas import GatewayErrorBody
 from llm_gateway.keys.enums import ProviderType
 from llm_gateway.providers.registry import get_provider
 
-router = APIRouter(prefix="/v1", tags=["gateway"])
+router = APIRouter(prefix="/v1", tags=["gateway"], dependencies=[Depends(require_gateway_token)])
 
 
 async def _proxy_impl(
