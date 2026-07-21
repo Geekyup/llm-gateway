@@ -27,6 +27,6 @@ COPY --from=build /app/dist /usr/share/nginx/html
 
 # Templated so $PORT (Railway injects this) picks the listen port.
 ENV PORT=80
-COPY nginx.conf.template /etc/nginx/templates/default.conf.template
+COPY --from=build /app/nginx.conf.template /etc/nginx/templates/default.conf.template
 
 EXPOSE 80
