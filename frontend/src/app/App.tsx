@@ -162,38 +162,47 @@ function TopBar({ view, onView, onAdd, operational, onLogout }: {
   view: View; onView: (v: View) => void; onAdd: () => void; operational: boolean; onLogout: () => void;
 }) {
   return (
-    <header className="h-14 flex items-center justify-between px-6 shrink-0"
+    <header className="flex flex-col md:flex-row md:items-center md:justify-between md:h-14 shrink-0 px-3 sm:px-6 gap-2 md:gap-5 py-2.5 md:py-0"
       style={{ borderBottom: "1px solid rgba(255,255,255,0.06)", background: "#0A0A0B" }}>
-      <div className="flex items-center gap-5">
-        <div className="flex items-center gap-2.5">
-          <div className="w-7 h-7 rounded-lg flex items-center justify-center"
+      <div className="flex items-center justify-between md:justify-start gap-2.5 md:gap-5">
+        <div className="flex items-center gap-2.5 min-w-0">
+          <div className="w-7 h-7 rounded-lg flex items-center justify-center shrink-0"
             style={{ background: "rgba(0,214,143,0.12)", border: "1px solid rgba(0,214,143,0.2)" }}>
             <KeyRound size={14} color="#00D68F" />
           </div>
-          <span className="font-mono text-sm font-medium tracking-tight text-zinc-100">keypool</span>
-          <span className="text-[10px] font-mono px-1.5 py-0.5 rounded"
+          <span className="font-mono text-sm font-medium tracking-tight text-zinc-100 truncate">keypool</span>
+          <span className="hidden sm:inline text-[10px] font-mono px-1.5 py-0.5 rounded shrink-0"
             style={{ color: "#52525B", background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.06)" }}>
             v0.4.1
           </span>
         </div>
-        <div className="h-4 w-px" style={{ background: "rgba(255,255,255,0.08)" }} />
-        <nav className="flex gap-0.5">
-          {(["dashboard", "monitor", "access"] as View[]).map(v => (
-            <button key={v} onClick={() => onView(v)}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-all"
-              style={{
-                color: view === v ? "#ECECF0" : "#52525B",
-                background: view === v ? "rgba(255,255,255,0.07)" : "transparent",
-                border: view === v ? "1px solid rgba(255,255,255,0.08)" : "1px solid transparent",
-              }}>
-              {v === "dashboard" ? <LayoutDashboard size={12} /> : v === "monitor" ? <Activity size={12} /> : <Shield size={12} />}
-              {v === "dashboard" ? "Dashboard" : v === "monitor" ? "Live Monitor" : "Gateway Access"}
-            </button>
-          ))}
-        </nav>
+        <div className="hidden md:block h-4 w-px" style={{ background: "rgba(255,255,255,0.08)" }} />
+        <div className="flex md:hidden items-center gap-2">
+          <span className="w-2 h-2 rounded-full"
+            style={{
+              background: operational ? "#00D68F" : "#EF4444",
+              boxShadow: operational ? "0 0 7px rgba(0,214,143,0.8)" : "0 0 7px rgba(239,68,68,0.8)",
+            }} />
+        </div>
       </div>
-      <div className="flex items-center gap-4">
-        <div className="flex items-center gap-2">
+
+      <nav className="flex gap-0.5 overflow-x-auto -mx-3 px-3 sm:mx-0 sm:px-0">
+        {(["dashboard", "monitor", "access"] as View[]).map(v => (
+          <button key={v} onClick={() => onView(v)}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-all shrink-0 whitespace-nowrap"
+            style={{
+              color: view === v ? "#ECECF0" : "#52525B",
+              background: view === v ? "rgba(255,255,255,0.07)" : "transparent",
+              border: view === v ? "1px solid rgba(255,255,255,0.08)" : "1px solid transparent",
+            }}>
+            {v === "dashboard" ? <LayoutDashboard size={12} /> : v === "monitor" ? <Activity size={12} /> : <Shield size={12} />}
+            {v === "dashboard" ? "Dashboard" : v === "monitor" ? "Live Monitor" : "Gateway Access"}
+          </button>
+        ))}
+      </nav>
+
+      <div className="flex items-center justify-between md:justify-end gap-4">
+        <div className="hidden md:flex items-center gap-2">
           <span className="w-2 h-2 rounded-full"
             style={{
               background: operational ? "#00D68F" : "#EF4444",
@@ -285,62 +294,31 @@ function KeysTable({ keys, filter, onFilter, onSelect, onEdit, onToggle, now }: 
         </div>
       </div>
 
-      <div className="overflow-x-auto" style={{ background: "#111113" }}>
-        <table className="w-full min-w-[760px]">
-          <thead>
-            <tr style={{ borderBottom: "1px solid rgba(255,255,255,0.04)" }}>
-              {["Label", "Provider", "Status", "Usage", "Cooldown", "Last Used", ""].map((h, i) => (
-                <th key={i}
-                  className="px-4 py-2.5 text-left text-[10px] font-semibold text-zinc-600 uppercase tracking-widest">
-                  {h}
-                </th>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
-            {filtered.length === 0 ? (
-              <tr>
-                <td colSpan={7} className="px-4 py-16 text-center">
-                  <div className="flex flex-col items-center gap-3">
-                    <div className="w-10 h-10 rounded-xl flex items-center justify-center"
-                      style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.06)" }}>
-                      <KeyRound size={18} color="#3F3F46" />
-                    </div>
-                    <p className="text-sm text-zinc-500">No keys found</p>
-                    <p className="text-xs text-zinc-600">Add your first API key to get started</p>
-                  </div>
-                </td>
-              </tr>
-            ) : filtered.map((k, i) => (
-              <tr key={k.id} className="group cursor-pointer"
+      {filtered.length === 0 ? (
+        <div className="px-4 py-16 text-center" style={{ background: "#111113" }}>
+          <div className="flex flex-col items-center gap-3">
+            <div className="w-10 h-10 rounded-xl flex items-center justify-center"
+              style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.06)" }}>
+              <KeyRound size={18} color="#3F3F46" />
+            </div>
+            <p className="text-sm text-zinc-500">No keys found</p>
+            <p className="text-xs text-zinc-600">Add your first API key to get started</p>
+          </div>
+        </div>
+      ) : (
+        <>
+          {/* Mobile: stacked cards */}
+          <div className="sm:hidden" style={{ background: "#111113" }}>
+            {filtered.map((k, i) => (
+              <div key={k.id} className="px-4 py-3.5 active:bg-white/[0.02]"
                 style={{ borderBottom: i < filtered.length - 1 ? "1px solid rgba(255,255,255,0.03)" : "none" }}
-                onClick={() => onSelect(k.id)}
-                onMouseEnter={e => (e.currentTarget.style.background = "rgba(255,255,255,0.02)")}
-                onMouseLeave={e => (e.currentTarget.style.background = "transparent")}>
-                <td className="px-4 py-3">
-                  <div className="text-sm font-medium text-zinc-200 leading-none">{k.label}</div>
-                  <div className="text-[11px] font-mono text-zinc-600 mt-1">{k.masked}</div>
-                </td>
-                <td className="px-4 py-3"><PBadge provider={k.provider} /></td>
-                <td className="px-4 py-3"><SBadge status={k.status} /></td>
-                <td className="px-4 py-3"><UBar used={k.used} limit={k.limit} status={k.status} /></td>
-                <td className="px-4 py-3">
-                  {k.cooldownUntil ? (
-                    <span className="text-xs font-mono" style={{ color: "#F59E0B" }}>
-                      {cd(k.cooldownUntil, now)}
-                    </span>
-                  ) : (
-                    <span className="text-xs text-zinc-700">—</span>
-                  )}
-                </td>
-                <td className="px-4 py-3">
-                  <span className="text-xs font-mono text-zinc-500">
-                    {k.lastUsed ? rel(k.lastUsed, now) : "—"}
-                  </span>
-                </td>
-                <td className="px-4 py-3">
-                  <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity"
-                    onClick={e => e.stopPropagation()}>
+                onClick={() => onSelect(k.id)}>
+                <div className="flex items-start justify-between gap-2 mb-2">
+                  <div className="min-w-0">
+                    <div className="text-sm font-medium text-zinc-200 leading-none truncate">{k.label}</div>
+                    <div className="text-[11px] font-mono text-zinc-600 mt-1">{k.masked}</div>
+                  </div>
+                  <div className="flex items-center gap-1 shrink-0" onClick={e => e.stopPropagation()}>
                     <button onClick={() => onEdit(k.id)}
                       className="p-1.5 rounded-md transition-colors hover:bg-white/5" title="Edit">
                       <Edit2 size={13} color="#71717A" />
@@ -351,12 +329,88 @@ function KeysTable({ keys, filter, onFilter, onSelect, onEdit, onToggle, now }: 
                       <Power size={13} color={k.status === "disabled" ? "#ECECF0" : "#71717A"} />
                     </button>
                   </div>
-                </td>
-              </tr>
+                </div>
+                <div className="flex items-center gap-2 mb-2.5">
+                  <PBadge provider={k.provider} />
+                  <SBadge status={k.status} />
+                </div>
+                <UBar used={k.used} limit={k.limit} status={k.status} />
+                <div className="flex items-center justify-between mt-2.5">
+                  <span className="text-[11px] text-zinc-600">
+                    Last used: <span className="font-mono text-zinc-500">{k.lastUsed ? rel(k.lastUsed, now) : "—"}</span>
+                  </span>
+                  {k.cooldownUntil ? (
+                    <span className="text-[11px] font-mono" style={{ color: "#F59E0B" }}>
+                      {cd(k.cooldownUntil, now)}
+                    </span>
+                  ) : null}
+                </div>
+              </div>
             ))}
-          </tbody>
-        </table>
-      </div>
+          </div>
+
+          {/* Desktop / tablet: table */}
+          <div className="hidden sm:block overflow-x-auto" style={{ background: "#111113" }}>
+            <table className="w-full min-w-[760px]">
+              <thead>
+                <tr style={{ borderBottom: "1px solid rgba(255,255,255,0.04)" }}>
+                  {["Label", "Provider", "Status", "Usage", "Cooldown", "Last Used", ""].map((h, i) => (
+                    <th key={i}
+                      className="px-4 py-2.5 text-left text-[10px] font-semibold text-zinc-600 uppercase tracking-widest">
+                      {h}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {filtered.map((k, i) => (
+                  <tr key={k.id} className="group cursor-pointer"
+                    style={{ borderBottom: i < filtered.length - 1 ? "1px solid rgba(255,255,255,0.03)" : "none" }}
+                    onClick={() => onSelect(k.id)}
+                    onMouseEnter={e => (e.currentTarget.style.background = "rgba(255,255,255,0.02)")}
+                    onMouseLeave={e => (e.currentTarget.style.background = "transparent")}>
+                    <td className="px-4 py-3">
+                      <div className="text-sm font-medium text-zinc-200 leading-none">{k.label}</div>
+                      <div className="text-[11px] font-mono text-zinc-600 mt-1">{k.masked}</div>
+                    </td>
+                    <td className="px-4 py-3"><PBadge provider={k.provider} /></td>
+                    <td className="px-4 py-3"><SBadge status={k.status} /></td>
+                    <td className="px-4 py-3"><UBar used={k.used} limit={k.limit} status={k.status} /></td>
+                    <td className="px-4 py-3">
+                      {k.cooldownUntil ? (
+                        <span className="text-xs font-mono" style={{ color: "#F59E0B" }}>
+                          {cd(k.cooldownUntil, now)}
+                        </span>
+                      ) : (
+                        <span className="text-xs text-zinc-700">—</span>
+                      )}
+                    </td>
+                    <td className="px-4 py-3">
+                      <span className="text-xs font-mono text-zinc-500">
+                        {k.lastUsed ? rel(k.lastUsed, now) : "—"}
+                      </span>
+                    </td>
+                    <td className="px-4 py-3">
+                      <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity"
+                        onClick={e => e.stopPropagation()}>
+                        <button onClick={() => onEdit(k.id)}
+                          className="p-1.5 rounded-md transition-colors hover:bg-white/5" title="Edit">
+                          <Edit2 size={13} color="#71717A" />
+                        </button>
+                        <button onClick={() => onToggle(k.id)}
+                          className="p-1.5 rounded-md transition-colors hover:bg-white/5"
+                          title={k.status === "disabled" ? "Enable" : "Disable"}>
+                          <Power size={13} color={k.status === "disabled" ? "#ECECF0" : "#71717A"} />
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </>
+      )}
     </div>
   );
 }
@@ -397,10 +451,10 @@ function AddEditModal({ editKey, onSave, onClose, error, saving }: {
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center"
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center"
       style={{ background: "rgba(0,0,0,0.72)", backdropFilter: "blur(4px)" }}
       onClick={e => { if (e.target === e.currentTarget) onClose(); }}>
-      <div className="w-full max-w-md rounded-2xl p-6"
+      <div className="w-full sm:max-w-md rounded-t-2xl sm:rounded-2xl p-5 sm:p-6 max-h-[92vh] overflow-y-auto"
         style={{ background: "#141416", border: "1px solid rgba(255,255,255,0.09)", boxShadow: "0 32px 80px rgba(0,0,0,0.6)" }}>
         <div className="flex items-center justify-between mb-6">
           <h2 className="text-sm font-semibold text-zinc-100">{editKey ? "Edit Key" : "Add API Key"}</h2>
@@ -526,7 +580,7 @@ function KeyDetailDrawer({ keyData, now, onClose, onDisable, onReset, onDelete }
     <>
       <div className="fixed inset-0 z-40" onClick={onClose}
         style={{ background: "rgba(0,0,0,0.5)", backdropFilter: "blur(2px)" }} />
-      <aside className="fixed right-0 top-0 bottom-0 z-50 w-96 flex flex-col overflow-y-auto"
+      <aside className="fixed right-0 top-0 bottom-0 z-50 w-full sm:w-96 flex flex-col overflow-y-auto"
         style={{ background: "#111113", borderLeft: "1px solid rgba(255,255,255,0.07)", boxShadow: "-24px 0 60px rgba(0,0,0,0.4)" }}>
         <div className="flex items-start justify-between p-5"
           style={{ borderBottom: "1px solid rgba(255,255,255,0.05)" }}>
@@ -636,8 +690,8 @@ function LiveMonitor({ reqs, now }: { reqs: LR[]; now: number }) {
       </div>
 
       <div style={{ background: "#111113" }}>
-        {/* Header row */}
-        <div className="grid px-4 py-2"
+        {/* Header row — desktop/tablet only */}
+        <div className="hidden sm:grid px-4 py-2"
           style={{ gridTemplateColumns: "72px 60px 1fr 52px 56px", borderBottom: "1px solid rgba(255,255,255,0.04)" }}>
           {["Time", "Provider", "Key / Chain", "Status", "Latency"].map(h => (
             <span key={h} className="text-[10px] font-semibold text-zinc-600 uppercase tracking-widest">{h}</span>
@@ -647,33 +701,69 @@ function LiveMonitor({ reqs, now }: { reqs: LR[]; now: number }) {
         {[...reqs].reverse().map(r => {
           const cColor = r.code === 200 ? "#00D68F" : r.code === 429 ? "#F59E0B" : "#EF4444";
           return (
-            <div key={r.id} className="grid items-center px-4 py-2.5 transition-colors"
-              style={{
-                gridTemplateColumns: "72px 60px 1fr 52px 56px",
-                borderBottom: "1px solid rgba(255,255,255,0.03)",
-              }}
-              onMouseEnter={e => (e.currentTarget.style.background = "rgba(255,255,255,0.015)")}
-              onMouseLeave={e => (e.currentTarget.style.background = "transparent")}>
-              <span className="text-[11px] font-mono text-zinc-600">
-                {new Date(r.ts).toLocaleTimeString("en-US", { hour12: false, hour: "2-digit", minute: "2-digit", second: "2-digit" })}
-              </span>
-              <PBadge provider={r.provider} />
-              <div className="flex items-center gap-1.5 min-w-0">
-                {r.chain?.map((c, i) => (
-                  <div key={i} className="flex items-center gap-1.5 shrink-0">
-                    <span className="text-[11px] font-mono text-zinc-500 truncate max-w-[100px]">{c.label}</span>
-                    <span className="text-[11px] font-mono px-1 py-0.5 rounded shrink-0"
-                      style={{ color: "#F59E0B", background: "rgba(245,158,11,0.1)" }}>{c.code}</span>
-                    <ArrowRight size={10} color="#3F3F46" className="shrink-0" />
+            <div key={r.id}>
+              {/* Mobile: stacked row */}
+              <div className="sm:hidden px-4 py-2.5"
+                style={{ borderBottom: "1px solid rgba(255,255,255,0.03)" }}>
+                <div className="flex items-center justify-between gap-2 mb-1.5">
+                  <div className="flex items-center gap-2 min-w-0">
+                    <PBadge provider={r.provider} />
+                    <span className="text-[11px] font-mono text-zinc-300 truncate">{r.keyLabel}</span>
                   </div>
-                ))}
-                <span className="text-[11px] font-mono text-zinc-300 truncate">{r.keyLabel}</span>
+                  <span className="text-[11px] font-mono px-1.5 py-0.5 rounded shrink-0"
+                    style={{ color: cColor, background: `${cColor}12`, border: `1px solid ${cColor}22` }}>
+                    {r.code}
+                  </span>
+                </div>
+                {r.chain && r.chain.length > 0 && (
+                  <div className="flex items-center gap-1.5 flex-wrap mb-1.5">
+                    {r.chain.map((c, i) => (
+                      <div key={i} className="flex items-center gap-1.5 shrink-0">
+                        <span className="text-[11px] font-mono text-zinc-500 truncate max-w-[100px]">{c.label}</span>
+                        <span className="text-[11px] font-mono px-1 py-0.5 rounded shrink-0"
+                          style={{ color: "#F59E0B", background: "rgba(245,158,11,0.1)" }}>{c.code}</span>
+                        <ArrowRight size={10} color="#3F3F46" className="shrink-0" />
+                      </div>
+                    ))}
+                  </div>
+                )}
+                <div className="flex items-center justify-between">
+                  <span className="text-[11px] font-mono text-zinc-600">
+                    {new Date(r.ts).toLocaleTimeString("en-US", { hour12: false, hour: "2-digit", minute: "2-digit", second: "2-digit" })}
+                  </span>
+                  <span className="text-[11px] font-mono text-zinc-600">{r.latency}ms</span>
+                </div>
               </div>
-              <span className="text-[11px] font-mono px-1.5 py-0.5 rounded justify-self-start"
-                style={{ color: cColor, background: `${cColor}12`, border: `1px solid ${cColor}22` }}>
-                {r.code}
-              </span>
-              <span className="text-[11px] font-mono text-zinc-600 justify-self-end">{r.latency}ms</span>
+
+              {/* Desktop/tablet: grid row */}
+              <div className="hidden sm:grid items-center px-4 py-2.5 transition-colors"
+                style={{
+                  gridTemplateColumns: "72px 60px 1fr 52px 56px",
+                  borderBottom: "1px solid rgba(255,255,255,0.03)",
+                }}
+                onMouseEnter={e => (e.currentTarget.style.background = "rgba(255,255,255,0.015)")}
+                onMouseLeave={e => (e.currentTarget.style.background = "transparent")}>
+                <span className="text-[11px] font-mono text-zinc-600">
+                  {new Date(r.ts).toLocaleTimeString("en-US", { hour12: false, hour: "2-digit", minute: "2-digit", second: "2-digit" })}
+                </span>
+                <PBadge provider={r.provider} />
+                <div className="flex items-center gap-1.5 min-w-0">
+                  {r.chain?.map((c, i) => (
+                    <div key={i} className="flex items-center gap-1.5 shrink-0">
+                      <span className="text-[11px] font-mono text-zinc-500 truncate max-w-[100px]">{c.label}</span>
+                      <span className="text-[11px] font-mono px-1 py-0.5 rounded shrink-0"
+                        style={{ color: "#F59E0B", background: "rgba(245,158,11,0.1)" }}>{c.code}</span>
+                      <ArrowRight size={10} color="#3F3F46" className="shrink-0" />
+                    </div>
+                  ))}
+                  <span className="text-[11px] font-mono text-zinc-300 truncate">{r.keyLabel}</span>
+                </div>
+                <span className="text-[11px] font-mono px-1.5 py-0.5 rounded justify-self-start"
+                  style={{ color: cColor, background: `${cColor}12`, border: `1px solid ${cColor}22` }}>
+                  {r.code}
+                </span>
+                <span className="text-[11px] font-mono text-zinc-600 justify-self-end">{r.latency}ms</span>
+              </div>
             </div>
           );
         })}
@@ -863,9 +953,9 @@ function GatewayAccessPanel() {
           именно ключ из пула был использован, приложение не знает и знать не должно: ротацию и failover гейтвей делает сам.
         </p>
 
-        <div className="flex gap-2">
+        <div className="flex flex-col sm:flex-row gap-2">
           <input
-            className="flex-1 px-3 py-2 rounded-lg text-sm outline-none"
+            className="flex-1 px-3 py-2 rounded-lg text-sm outline-none min-w-0"
             style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)", color: "#ECECF0" }}
             placeholder="Label, e.g. kitroom-backend"
             value={label}
@@ -873,7 +963,7 @@ function GatewayAccessPanel() {
             onKeyDown={e => e.key === "Enter" && handleCreate()}
           />
           <button onClick={handleCreate} disabled={creating || !label.trim()}
-            className="flex items-center gap-1.5 px-4 py-2 rounded-lg text-xs font-semibold transition-all"
+            className="flex items-center justify-center gap-1.5 px-4 py-2 rounded-lg text-xs font-semibold transition-all shrink-0"
             style={{ background: "#00D68F", color: "#0A0A0B", opacity: creating || !label.trim() ? 0.6 : 1 }}>
             {creating ? <Loader2 size={13} className="animate-spin" /> : <Plus size={13} />}
             Generate Token
@@ -919,36 +1009,15 @@ function GatewayAccessPanel() {
         ) : tokens.length === 0 ? (
           <div className="py-16 text-center text-xs text-zinc-600">Токенов ещё нет — сгенерируй первый выше.</div>
         ) : (
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="text-left text-[11px] uppercase tracking-wide text-zinc-600"
-                style={{ borderBottom: "1px solid rgba(255,255,255,0.06)" }}>
-                <th className="px-4 py-2.5 font-medium">Label</th>
-                <th className="px-4 py-2.5 font-medium">Token</th>
-                <th className="px-4 py-2.5 font-medium">Status</th>
-                <th className="px-4 py-2.5 font-medium">Last used</th>
-                <th className="px-4 py-2.5 font-medium text-right">Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {tokens.map(t => (
-                <tr key={t.id} style={{ borderBottom: "1px solid rgba(255,255,255,0.04)" }}>
-                  <td className="px-4 py-3 text-zinc-200">{t.label}</td>
-                  <td className="px-4 py-3 font-mono text-xs text-zinc-500">{t.token_preview}</td>
-                  <td className="px-4 py-3">
-                    <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md text-[11px] font-mono font-medium"
-                      style={t.is_active
-                        ? { color: "#00D68F", background: "rgba(0,214,143,0.1)", border: "1px solid rgba(0,214,143,0.25)" }
-                        : { color: "#71717A", background: "rgba(113,113,122,0.1)", border: "1px solid rgba(113,113,122,0.2)" }}>
-                      <span className="w-1.5 h-1.5 rounded-full" style={{ background: t.is_active ? "#00D68F" : "#71717A" }} />
-                      {t.is_active ? "active" : "revoked"}
-                    </span>
-                  </td>
-                  <td className="px-4 py-3 text-xs text-zinc-500">
-                    {t.last_used_at ? new Date(t.last_used_at).toLocaleString() : "never"}
-                  </td>
-                  <td className="px-4 py-3 text-right">
-                    <div className="flex justify-end gap-1.5">
+          <>
+            {/* Mobile: stacked cards */}
+            <div className="sm:hidden">
+              {tokens.map((t, i) => (
+                <div key={t.id} className="px-4 py-3"
+                  style={{ borderBottom: i < tokens.length - 1 ? "1px solid rgba(255,255,255,0.04)" : "none" }}>
+                  <div className="flex items-start justify-between gap-2 mb-1.5">
+                    <span className="text-sm text-zinc-200 truncate">{t.label}</span>
+                    <div className="flex items-center gap-1 shrink-0">
                       <button onClick={() => toggle(t)}
                         className="p-1.5 rounded-md transition-colors hover:bg-white/5" title={t.is_active ? "Revoke" : "Reactivate"}>
                         <Power size={13} color={t.is_active ? "#F59E0B" : "#00D68F"} />
@@ -958,11 +1027,70 @@ function GatewayAccessPanel() {
                         <Trash2 size={13} color="#EF4444" />
                       </button>
                     </div>
-                  </td>
-                </tr>
+                  </div>
+                  <div className="font-mono text-xs text-zinc-500 mb-2">{t.token_preview}</div>
+                  <div className="flex items-center justify-between">
+                    <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md text-[11px] font-mono font-medium"
+                      style={t.is_active
+                        ? { color: "#00D68F", background: "rgba(0,214,143,0.1)", border: "1px solid rgba(0,214,143,0.25)" }
+                        : { color: "#71717A", background: "rgba(113,113,122,0.1)", border: "1px solid rgba(113,113,122,0.2)" }}>
+                      <span className="w-1.5 h-1.5 rounded-full" style={{ background: t.is_active ? "#00D68F" : "#71717A" }} />
+                      {t.is_active ? "active" : "revoked"}
+                    </span>
+                    <span className="text-[11px] text-zinc-500">
+                      {t.last_used_at ? new Date(t.last_used_at).toLocaleString() : "never"}
+                    </span>
+                  </div>
+                </div>
               ))}
-            </tbody>
-          </table>
+            </div>
+
+            {/* Desktop/tablet: table */}
+            <table className="hidden sm:table w-full text-sm">
+              <thead>
+                <tr className="text-left text-[11px] uppercase tracking-wide text-zinc-600"
+                  style={{ borderBottom: "1px solid rgba(255,255,255,0.06)" }}>
+                  <th className="px-4 py-2.5 font-medium">Label</th>
+                  <th className="px-4 py-2.5 font-medium">Token</th>
+                  <th className="px-4 py-2.5 font-medium">Status</th>
+                  <th className="px-4 py-2.5 font-medium">Last used</th>
+                  <th className="px-4 py-2.5 font-medium text-right">Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {tokens.map(t => (
+                  <tr key={t.id} style={{ borderBottom: "1px solid rgba(255,255,255,0.04)" }}>
+                    <td className="px-4 py-3 text-zinc-200">{t.label}</td>
+                    <td className="px-4 py-3 font-mono text-xs text-zinc-500">{t.token_preview}</td>
+                    <td className="px-4 py-3">
+                      <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md text-[11px] font-mono font-medium"
+                        style={t.is_active
+                          ? { color: "#00D68F", background: "rgba(0,214,143,0.1)", border: "1px solid rgba(0,214,143,0.25)" }
+                          : { color: "#71717A", background: "rgba(113,113,122,0.1)", border: "1px solid rgba(113,113,122,0.2)" }}>
+                        <span className="w-1.5 h-1.5 rounded-full" style={{ background: t.is_active ? "#00D68F" : "#71717A" }} />
+                        {t.is_active ? "active" : "revoked"}
+                      </span>
+                    </td>
+                    <td className="px-4 py-3 text-xs text-zinc-500">
+                      {t.last_used_at ? new Date(t.last_used_at).toLocaleString() : "never"}
+                    </td>
+                    <td className="px-4 py-3 text-right">
+                      <div className="flex justify-end gap-1.5">
+                        <button onClick={() => toggle(t)}
+                          className="p-1.5 rounded-md transition-colors hover:bg-white/5" title={t.is_active ? "Revoke" : "Reactivate"}>
+                          <Power size={13} color={t.is_active ? "#F59E0B" : "#00D68F"} />
+                        </button>
+                        <button onClick={() => remove(t.id)}
+                          className="p-1.5 rounded-md transition-colors hover:bg-white/5" title="Delete">
+                          <Trash2 size={13} color="#EF4444" />
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </>
         )}
       </div>
     </div>
@@ -1090,7 +1218,7 @@ function Dashboard({ onLogout }: { onLogout: () => void }) {
     <div className="min-h-screen flex flex-col" style={{ background: "#0A0A0B", fontFamily: "Inter, sans-serif" }}>
       <TopBar view={view} onView={setView} onAdd={() => setAddOpen(true)} operational={operational} onLogout={onLogout} />
 
-      <main className="flex-1 px-6 py-5 w-full max-w-[1400px] mx-auto space-y-4">
+      <main className="flex-1 px-3 sm:px-6 py-4 sm:py-5 w-full max-w-[1400px] mx-auto space-y-4">
         {loadError && (
           <div className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs"
             style={{ background: "rgba(239,68,68,0.08)", color: "#EF4444", border: "1px solid rgba(239,68,68,0.2)" }}>
