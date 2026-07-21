@@ -5,7 +5,7 @@ from llm_gateway.core.security import decrypt_key, encrypt_key
 from llm_gateway.keys.cache import KeyStatusCache
 from llm_gateway.keys.enums import KeyStatus, ProviderType
 from llm_gateway.keys.repository import APIKeyRepository
-from llm_gateway.keys.schemas import APIKeyCreate, APIKeyDTO
+from llm_gateway.keys.schemas import APIKeyCreate, APIKeyDTO, APIKeyUpdate
 from llm_gateway.keys.selector import KeySelector
 
 logger = logging.getLogger(__name__)
@@ -49,6 +49,30 @@ class KeyPoolService:
         key = await self._repo.mark_status(key_id, status)
         await self._cache.invalidate(key.provider.value)
         return key  # ORM row
+
+    async def update_key(self, key_id: int, payload: APIKeyUpdate):
+        fields = payload.model_dump(exclude_unset=True)
+        if not fields:
+            return await self._repo.get(key_id)
+
+        # Clear an explicit cooldown timestamp whenever status moves away
+        # from COOLDOWN via a plain update (e.g. admin re-activating a key).
+        if fields.get("status") is not None and fields["status"] != KeyStatus.COOLDOWN:
+            fields.setdefault("cooldown_until", None)
+
+        key = await self._repo.update_fields(key_id, **fields)
+        await self._cache.invalidate(key.provider.value)
+        return key  # ORM row
+
+    async def reset_cooldown(self, key_id: int):
+        key = await self._repo.mark_status(key_id, KeyStatus.ACTIVE, cooldown_until=None)
+        await self._cache.invalidate(key.provider.value)
+        return key  # ORM row
+
+    async def delete_key(self, key_id: int) -> None:
+        key = await self._repo.get(key_id)
+        await self._cache.invalidate(key.provider.value)
+        await self._repo.delete(key_id)
 
     # --- gateway-facing hot path --------------------------------------------
 

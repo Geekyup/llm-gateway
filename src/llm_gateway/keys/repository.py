@@ -60,6 +60,11 @@ class APIKeyRepository:
         await self._session.refresh(key)
         return key
 
+    async def delete(self, key_id: int) -> None:
+        key = await self.get(key_id)
+        await self._session.delete(key)
+        await self._session.commit()
+
     async def mark_status(
         self,
         key_id: int,

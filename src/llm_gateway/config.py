@@ -16,6 +16,15 @@ class Settings(BaseSettings):
     ENV: str = "local"
     DEBUG: bool = False
 
+    # --- CORS ---
+    # Comma-separated list of allowed origins for the admin frontend, e.g.
+    # "http://localhost:5173,https://admin.example.com"
+    CORS_ORIGINS_RAW: str = Field(default="http://localhost:5173", alias="CORS_ORIGINS")
+
+    @property
+    def CORS_ORIGINS(self) -> list[str]:  # noqa: N802
+        return [origin.strip() for origin in self.CORS_ORIGINS_RAW.split(",") if origin.strip()]
+
     # --- Database ---
     DATABASE_URL: PostgresDsn = Field(
         default="postgresql+asyncpg://llm_gateway:llm_gateway@localhost:5432/llm_gateway"

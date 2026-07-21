@@ -1,4 +1,5 @@
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 
 from llm_gateway.admin.router import router as admin_router
 from llm_gateway.config import get_settings
@@ -15,6 +16,14 @@ def create_app() -> FastAPI:
         title=settings.APP_NAME,
         description="Gateway API with a rotating pool of Gemini API keys and automatic 429 failover.",
         version="0.1.0",
+    )
+
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=settings.CORS_ORIGINS,
+        allow_credentials=True,
+        allow_methods=["*"],
+        allow_headers=["*"],
     )
 
     app.include_router(gateway_router)

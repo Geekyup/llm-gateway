@@ -16,14 +16,16 @@ docker compose up --build
 ```
 
 Поднимутся: `api` (FastAPI, :8000), `worker` (ARQ housekeeping), `postgres`,
-`redis`, плюс одноразовый `migrate` (применяет Alembic-миграции перед стартом
-api/worker).
+`redis`, `frontend` (админ-панель, :5173), плюс одноразовый `migrate`
+(применяет Alembic-миграции перед стартом api/worker).
 
 Проверка:
 ```bash
 curl http://localhost:8000/health
 # {"status": "ok"}
 ```
+Панель управления — http://localhost:5173 (подробности в разделе
+[Frontend](#frontend-админ-панель) ниже).
 
 ## Добавить ключ в пул
 
@@ -85,6 +87,72 @@ retry в одну карточку), `attempt`, `provider`, `key_id`/`key_label`
 Пример цепочки failover для одного клиентского запроса — два события с
 одним `request_id`: `attempt=1 outcome=rate_limited` (ключ A получил 429),
 `attempt=2 outcome=success` (ключ B ответил 200).
+
+## Frontend (админ-панель)
+
+В `frontend/` лежит React + Vite панель управления пулом ключей: таблица
+ключей с статусами/квотами, добавление/редактирование/удаление, ручной
+сброс cooldown, вкладка Live Monitor с потоком событий из `/admin/monitor/stream`.
+
+### Запуск через Docker Compose
+
+Важно: `frontend`-образ **не собирает** фронтенд внутри Docker (на
+некоторых Windows/WSL2 машинах Docker не может достучаться до npm-реестра,
+даже если сам хост — может, и `npm install` внутри контейнера зависает
+намертво). Вместо этого фронтенд собирается один раз на хосте, а Docker
+просто раздаёт готовые файлы через nginx.
+
+**Шаг 1 — собери фронтенд на хосте** (нужен Node.js 18+, ставится с
+[nodejs.org](https://nodejs.org)):
+```bash
+cd frontend
+cp .env.example .env       # VITE_API_URL=http://localhost:8000 по умолчанию
+npm install
+npm run build               # создаст frontend/dist/
+cd ..
+```
+
+**Шаг 2 — подними всё через Docker Compose:**
+```bash
+docker compose up --build
+# фронтенд:  http://localhost:5173
+# API:       http://localhost:8000
+```
+
+При первом входе панель попросит `ADMIN_API_KEY` — тот же токен, что в
+`.env` бэкенда. Он сохраняется только в localStorage браузера.
+
+Если поменял `VITE_API_URL` в `frontend/.env` — пересобери:
+```bash
+cd frontend && npm run build && cd ..
+docker compose build frontend && docker compose up -d frontend
+```
+
+**Если у тебя Docker нормально резолвит npm-реестр** (проверить: `docker
+run --rm node:20-slim npm ping` не виснет) — можно вместо ручной сборки
+собрать фронтенд полностью внутри Docker:
+```bash
+docker build -f frontend/Dockerfile.docker-build -t llm-gateway-frontend ./frontend
+docker run -p 5173:80 llm-gateway-frontend
+```
+
+### Локальная разработка фронтенда (с hot-reload, без Docker)
+```bash
+cd frontend
+cp .env.example .env       # VITE_API_URL=http://localhost:8000 по умолчанию
+npm install
+npm run dev                # http://localhost:5173
+```
+Бэкенд при этом должен быть поднят отдельно (`docker compose up -d postgres redis migrate api`
+или `uvicorn llm_gateway.main:app --reload`), и в `.env` бэкенда должен быть
+указан адрес фронтенда в `CORS_ORIGINS` (по умолчанию уже включает
+`http://localhost:5173`).
+
+**Сборка статики без Docker:**
+```bash
+cd frontend
+npm run build      # результат в frontend/dist/, раздавать любым статик-сервером
+```
 
 ## Локальная разработка без Docker
 

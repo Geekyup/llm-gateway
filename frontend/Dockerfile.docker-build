@@ -1,0 +1,29 @@
+# Альтернативный Dockerfile: собирает фронтенд полностью внутри Docker.
+# Используй, если у тебя Docker нормально резолвит npm-реестр (проверить:
+# `docker run --rm node:20-slim npm ping` не виснет). Иначе используй
+# основной Dockerfile — он раздаёт заранее собранный на хосте frontend/dist/.
+#
+# Сборка:
+#   docker build -f frontend/Dockerfile.docker-build -t llm-gateway-frontend ./frontend
+#   docker run -p 5173:80 llm-gateway-frontend
+
+FROM node:20-slim AS build
+
+WORKDIR /app
+
+COPY package.json ./
+RUN npm install --no-audit --no-fund
+
+COPY . .
+
+ARG VITE_API_URL=http://localhost:8000
+ENV VITE_API_URL=${VITE_API_URL}
+
+RUN npm run build
+
+FROM nginx:1.27-alpine AS runtime
+
+COPY --from=build /app/dist /usr/share/nginx/html
+COPY nginx.conf /etc/nginx/conf.d/default.conf
+
+EXPOSE 80

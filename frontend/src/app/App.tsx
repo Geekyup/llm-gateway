@@ -1,0 +1,956 @@
+import { useState, useEffect, useCallback } from "react";
+import {
+  Plus, Eye, EyeOff, X, Activity, RefreshCw, Trash2, Edit2,
+  Power, Clock, ArrowRight, CheckCircle2, Shield, AlertTriangle,
+  LayoutDashboard, KeyRound, Zap, LogOut, Loader2,
+} from "lucide-react";
+import { AreaChart, Area, XAxis, Tooltip, ResponsiveContainer } from "recharts";
+import {
+  api, streamEvents, getAdminToken, setAdminToken, clearAdminToken,
+  ApiError, type ApiKeyRead, type RequestEvent as ApiRequestEvent,
+} from "./lib/api";
+
+// ─── Types ────────────────────────────────────────────────────────────────────
+type Status = "active" | "cooldown" | "exhausted" | "disabled";
+type Provider = "gemini";
+type View = "dashboard" | "monitor";
+type PF = "all" | Provider;
+
+interface AK {
+  id: string; label: string; provider: Provider; status: Status;
+  masked: string; used: number; limit: number;
+  cooldownUntil?: number; lastUsed?: number; created: number; updated: number;
+}
+
+interface LR {
+  id: string; provider: string; keyLabel: string;
+  code: number; latency: number; ts: number;
+  chain?: { label: string; code: number }[];
+}
+
+interface FormState { label: string; provider: Provider; rawKey: string; limit: string }
+
+// ─── Mapping between backend schema and UI view-model ─────────────────────────
+function toAK(k: ApiKeyRead): AK {
+  return {
+    id: String(k.id),
+    label: k.label,
+    provider: k.provider,
+    status: k.status,
+    masked: `#${k.id}`,
+    used: k.requests_today,
+    limit: k.daily_limit,
+    cooldownUntil: k.cooldown_until ? new Date(k.cooldown_until).getTime() : undefined,
+    lastUsed: k.last_used_at ? new Date(k.last_used_at).getTime() : undefined,
+    created: new Date(k.created_at).getTime(),
+    updated: new Date(k.updated_at).getTime(),
+  };
+}
+
+function toLR(e: ApiRequestEvent): LR {
+  return {
+    id: `${e.request_id}-${e.attempt}`,
+    provider: e.provider,
+    keyLabel: e.key_label ?? "—",
+    code: e.upstream_status ?? (e.outcome === "no_keys" ? 503 : 0),
+    latency: e.latency_ms ?? 0,
+    ts: new Date(e.timestamp).getTime(),
+  };
+}
+
+// ─── Constants ────────────────────────────────────────────────────────────────
+const S: Record<Status, { text: string; color: string; bg: string; bd: string }> = {
+  active:    { text: "Active",    color: "#00D68F", bg: "rgba(0,214,143,0.08)",  bd: "rgba(0,214,143,0.22)"  },
+  cooldown:  { text: "Cooldown",  color: "#F59E0B", bg: "rgba(245,158,11,0.08)", bd: "rgba(245,158,11,0.22)" },
+  exhausted: { text: "Exhausted", color: "#EF4444", bg: "rgba(239,68,68,0.08)",  bd: "rgba(239,68,68,0.22)"  },
+  disabled:  { text: "Disabled",  color: "#52525B", bg: "rgba(82,82,91,0.08)",   bd: "rgba(82,82,91,0.18)"   },
+};
+
+const P: Record<string, { name: string; color: string; bg: string }> = {
+  gemini: { name: "Gemini", color: "#4F8EF7", bg: "rgba(79,142,247,0.1)"  },
+};
+function providerMeta(provider: string) {
+  return P[provider] ?? { name: provider, color: "#71717A", bg: "rgba(113,113,122,0.1)" };
+}
+
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+const HOURLY_W = [0,0,0,0,0,0.3,0.8,1.5,2,2.5,2.8,2.6,2.2,2,1.8,1.5,1.2,0.9,0.6,0.3,0.1,0,0,0];
+function makeHourly(total: number) {
+  const sum = HOURLY_W.reduce((a, b) => a + b, 0);
+  return HOURLY_W.map((w, i) => ({ h: `${i}h`, r: Math.round((w / sum) * total) }));
+}
+
+function rel(ts: number, now: number) {
+  const d = now - ts;
+  if (d < 60000)   return `${Math.floor(d / 1000)}s ago`;
+  if (d < 3600000) return `${Math.floor(d / 60000)}m ago`;
+  if (d < 86400000)return `${Math.floor(d / 3600000)}h ago`;
+  return `${Math.floor(d / 86400000)}d ago`;
+}
+
+function cd(until: number, now: number) {
+  const d = until - now;
+  if (d <= 0) return "Ready";
+  const h = Math.floor(d / 3600000);
+  const m = Math.floor((d % 3600000) / 60000);
+  const s = Math.floor((d % 60000) / 1000);
+  if (h > 0) return `${h}h ${String(m).padStart(2, "0")}m`;
+  return `${m}:${String(s).padStart(2, "0")}`;
+}
+
+// ─── Atom components ──────────────────────────────────────────────────────────
+function SBadge({ status }: { status: Status }) {
+  const s = S[status];
+  return (
+    <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md text-[11px] font-mono font-medium whitespace-nowrap"
+      style={{ color: s.color, background: s.bg, border: `1px solid ${s.bd}` }}>
+      <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${status === "active" ? "animate-pulse" : ""}`}
+        style={{ background: s.color }} />
+      {s.text}
+    </span>
+  );
+}
+
+function PBadge({ provider }: { provider: string }) {
+  const p = providerMeta(provider);
+  return (
+    <span className="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-medium"
+      style={{ color: p.color, background: p.bg }}>
+      {p.name}
+    </span>
+  );
+}
+
+function UBar({ used, limit, status }: { used: number; limit: number; status: Status }) {
+  const pct = Math.min(100, (used / limit) * 100);
+  const color = S[status].color;
+  return (
+    <div className="min-w-[140px]">
+      <div className="flex justify-between mb-1.5">
+        <span className="text-[11px] font-mono text-zinc-300">{used.toLocaleString()}</span>
+        <span className="text-[11px] font-mono text-zinc-600">/ {limit.toLocaleString()}</span>
+      </div>
+      <div className="h-[3px] rounded-full overflow-hidden" style={{ background: "rgba(255,255,255,0.06)" }}>
+        <div className="h-full rounded-full transition-all duration-500"
+          style={{ width: `${pct}%`, background: color, boxShadow: pct > 80 ? `0 0 8px ${color}60` : "none" }} />
+      </div>
+    </div>
+  );
+}
+
+function CircP({ used, limit, color }: { used: number; limit: number; color: string }) {
+  const r = 48, circ = 2 * Math.PI * r, pct = Math.min(1, used / limit), dash = pct * circ;
+  return (
+    <div className="relative inline-flex items-center justify-center shrink-0">
+      <svg width={120} height={120} style={{ transform: "rotate(-90deg)" }}>
+        <circle cx={60} cy={60} r={r} fill="none" strokeWidth={7} stroke="rgba(255,255,255,0.05)" />
+        <circle cx={60} cy={60} r={r} fill="none" strokeWidth={7} stroke={color}
+          strokeDasharray={`${dash} ${circ - dash}`} strokeLinecap="round"
+          style={{ filter: `drop-shadow(0 0 6px ${color}70)`, transition: "stroke-dasharray 0.5s ease" }} />
+      </svg>
+      <div className="absolute flex flex-col items-center">
+        <span className="text-xl font-mono font-medium" style={{ color }}>{Math.round(pct * 100)}%</span>
+        <span className="text-[10px] text-zinc-600 font-mono">used</span>
+      </div>
+    </div>
+  );
+}
+
+// ─── TopBar ───────────────────────────────────────────────────────────────────
+function TopBar({ view, onView, onAdd, operational, onLogout }: {
+  view: View; onView: (v: View) => void; onAdd: () => void; operational: boolean; onLogout: () => void;
+}) {
+  return (
+    <header className="h-14 flex items-center justify-between px-6 shrink-0"
+      style={{ borderBottom: "1px solid rgba(255,255,255,0.06)", background: "#0A0A0B" }}>
+      <div className="flex items-center gap-5">
+        <div className="flex items-center gap-2.5">
+          <div className="w-7 h-7 rounded-lg flex items-center justify-center"
+            style={{ background: "rgba(0,214,143,0.12)", border: "1px solid rgba(0,214,143,0.2)" }}>
+            <KeyRound size={14} color="#00D68F" />
+          </div>
+          <span className="font-mono text-sm font-medium tracking-tight text-zinc-100">keypool</span>
+          <span className="text-[10px] font-mono px-1.5 py-0.5 rounded"
+            style={{ color: "#52525B", background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.06)" }}>
+            v0.4.1
+          </span>
+        </div>
+        <div className="h-4 w-px" style={{ background: "rgba(255,255,255,0.08)" }} />
+        <nav className="flex gap-0.5">
+          {(["dashboard", "monitor"] as View[]).map(v => (
+            <button key={v} onClick={() => onView(v)}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-all"
+              style={{
+                color: view === v ? "#ECECF0" : "#52525B",
+                background: view === v ? "rgba(255,255,255,0.07)" : "transparent",
+                border: view === v ? "1px solid rgba(255,255,255,0.08)" : "1px solid transparent",
+              }}>
+              {v === "dashboard" ? <LayoutDashboard size={12} /> : <Activity size={12} />}
+              {v === "dashboard" ? "Dashboard" : "Live Monitor"}
+            </button>
+          ))}
+        </nav>
+      </div>
+      <div className="flex items-center gap-4">
+        <div className="flex items-center gap-2">
+          <span className="w-2 h-2 rounded-full"
+            style={{
+              background: operational ? "#00D68F" : "#EF4444",
+              boxShadow: operational ? "0 0 7px rgba(0,214,143,0.8)" : "0 0 7px rgba(239,68,68,0.8)",
+            }} />
+          <span className="text-xs font-mono" style={{ color: operational ? "#00D68F" : "#EF4444" }}>
+            {operational ? "Operational" : "Degraded"}
+          </span>
+        </div>
+        <button onClick={onAdd}
+          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all"
+          style={{ background: "#00D68F", color: "#0A0A0B", boxShadow: "0 0 16px rgba(0,214,143,0.3)" }}
+          onMouseEnter={e => (e.currentTarget.style.boxShadow = "0 0 28px rgba(0,214,143,0.55)")}
+          onMouseLeave={e => (e.currentTarget.style.boxShadow = "0 0 16px rgba(0,214,143,0.3)")}>
+          <Plus size={13} /> Add Key
+        </button>
+        <button onClick={onLogout} title="Sign out"
+          className="p-1.5 rounded-lg transition-colors hover:bg-white/5">
+          <LogOut size={14} color="#52525B" />
+        </button>
+      </div>
+    </header>
+  );
+}
+
+// ─── MetricCards ──────────────────────────────────────────────────────────────
+function MetricCards({ keys }: { keys: AK[] }) {
+  const total  = keys.length;
+  const active = keys.filter(k => k.status === "active").length;
+  const cool   = keys.filter(k => k.status === "cooldown").length;
+  const req    = keys.reduce((a, k) => a + k.used, 0);
+
+  const cards = [
+    { label: "Total Keys",       val: String(total),           color: "#71717A", Icon: KeyRound,      glow: false },
+    { label: "Active Keys",      val: String(active),          color: "#00D68F", Icon: CheckCircle2,  glow: true  },
+    { label: "Requests Today",   val: req.toLocaleString(),    color: "#4F8EF7", Icon: Zap,           glow: false },
+    { label: "Keys in Cooldown", val: String(cool),            color: "#F59E0B", Icon: Clock,         glow: false },
+  ] as const;
+
+  return (
+    <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+      {cards.map(c => (
+        <div key={c.label} className="rounded-xl p-4"
+          style={{
+            background: "#111113",
+            border: "1px solid rgba(255,255,255,0.06)",
+            boxShadow: c.glow ? "0 0 24px rgba(0,214,143,0.05)" : "none",
+          }}>
+          <div className="flex items-center justify-between mb-3">
+            <span className="text-[11px] text-zinc-500 uppercase tracking-wider font-medium">{c.label}</span>
+            <div className="w-6 h-6 rounded-md flex items-center justify-center"
+              style={{ background: `${c.color}14` }}>
+              <c.Icon size={12} color={c.color} />
+            </div>
+          </div>
+          <span className="text-2xl font-mono font-medium" style={{ color: c.glow ? c.color : "#ECECF0" }}>
+            {c.val}
+          </span>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+// ─── KeysTable ────────────────────────────────────────────────────────────────
+function KeysTable({ keys, filter, onFilter, onSelect, onEdit, onToggle, now }: {
+  keys: AK[]; filter: PF; onFilter: (f: PF) => void; now: number;
+  onSelect: (id: string) => void; onEdit: (id: string) => void; onToggle: (id: string) => void;
+}) {
+  const filtered = filter === "all" ? keys : keys.filter(k => k.provider === filter);
+
+  return (
+    <div className="rounded-xl overflow-hidden" style={{ border: "1px solid rgba(255,255,255,0.06)" }}>
+      <div className="flex items-center justify-between px-4 py-2.5"
+        style={{ borderBottom: "1px solid rgba(255,255,255,0.05)", background: "#0F0F11" }}>
+        <span className="text-xs font-medium text-zinc-400">API Keys</span>
+        <div className="flex gap-1">
+          {(["all", "gemini"] as PF[]).map(f => (
+            <button key={f} onClick={() => onFilter(f)}
+              className="px-2.5 py-1 rounded-md text-[11px] font-medium capitalize transition-all"
+              style={{
+                color: filter === f ? "#ECECF0" : "#52525B",
+                background: filter === f ? "rgba(255,255,255,0.08)" : "transparent",
+                border: filter === f ? "1px solid rgba(255,255,255,0.1)" : "1px solid transparent",
+              }}>
+              {f}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <div className="overflow-x-auto" style={{ background: "#111113" }}>
+        <table className="w-full min-w-[760px]">
+          <thead>
+            <tr style={{ borderBottom: "1px solid rgba(255,255,255,0.04)" }}>
+              {["Label", "Provider", "Status", "Usage", "Cooldown", "Last Used", ""].map((h, i) => (
+                <th key={i}
+                  className="px-4 py-2.5 text-left text-[10px] font-semibold text-zinc-600 uppercase tracking-widest">
+                  {h}
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {filtered.length === 0 ? (
+              <tr>
+                <td colSpan={7} className="px-4 py-16 text-center">
+                  <div className="flex flex-col items-center gap-3">
+                    <div className="w-10 h-10 rounded-xl flex items-center justify-center"
+                      style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.06)" }}>
+                      <KeyRound size={18} color="#3F3F46" />
+                    </div>
+                    <p className="text-sm text-zinc-500">No keys found</p>
+                    <p className="text-xs text-zinc-600">Add your first API key to get started</p>
+                  </div>
+                </td>
+              </tr>
+            ) : filtered.map((k, i) => (
+              <tr key={k.id} className="group cursor-pointer"
+                style={{ borderBottom: i < filtered.length - 1 ? "1px solid rgba(255,255,255,0.03)" : "none" }}
+                onClick={() => onSelect(k.id)}
+                onMouseEnter={e => (e.currentTarget.style.background = "rgba(255,255,255,0.02)")}
+                onMouseLeave={e => (e.currentTarget.style.background = "transparent")}>
+                <td className="px-4 py-3">
+                  <div className="text-sm font-medium text-zinc-200 leading-none">{k.label}</div>
+                  <div className="text-[11px] font-mono text-zinc-600 mt-1">{k.masked}</div>
+                </td>
+                <td className="px-4 py-3"><PBadge provider={k.provider} /></td>
+                <td className="px-4 py-3"><SBadge status={k.status} /></td>
+                <td className="px-4 py-3"><UBar used={k.used} limit={k.limit} status={k.status} /></td>
+                <td className="px-4 py-3">
+                  {k.cooldownUntil ? (
+                    <span className="text-xs font-mono" style={{ color: "#F59E0B" }}>
+                      {cd(k.cooldownUntil, now)}
+                    </span>
+                  ) : (
+                    <span className="text-xs text-zinc-700">—</span>
+                  )}
+                </td>
+                <td className="px-4 py-3">
+                  <span className="text-xs font-mono text-zinc-500">
+                    {k.lastUsed ? rel(k.lastUsed, now) : "—"}
+                  </span>
+                </td>
+                <td className="px-4 py-3">
+                  <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity"
+                    onClick={e => e.stopPropagation()}>
+                    <button onClick={() => onEdit(k.id)}
+                      className="p-1.5 rounded-md transition-colors hover:bg-white/5" title="Edit">
+                      <Edit2 size={13} color="#71717A" />
+                    </button>
+                    <button onClick={() => onToggle(k.id)}
+                      className="p-1.5 rounded-md transition-colors hover:bg-white/5"
+                      title={k.status === "disabled" ? "Enable" : "Disable"}>
+                      <Power size={13} color={k.status === "disabled" ? "#ECECF0" : "#71717A"} />
+                    </button>
+                  </div>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
+// ─── AddEditModal ─────────────────────────────────────────────────────────────
+function AddEditModal({ editKey, onSave, onClose, error, saving }: {
+  editKey: AK | null; onSave: (f: FormState) => void; onClose: () => void;
+  error?: string | null; saving?: boolean;
+}) {
+  const [form, setForm] = useState<FormState>({
+    label: editKey?.label ?? "",
+    provider: editKey?.provider ?? "gemini",
+    rawKey: "",
+    limit: String(editKey?.limit ?? 15000),
+  });
+  const [showKey, setShowKey] = useState(false);
+
+  useEffect(() => {
+    const h = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
+    window.addEventListener("keydown", h);
+    return () => window.removeEventListener("keydown", h);
+  }, [onClose]);
+
+  const baseInp: React.CSSProperties = {
+    background: "rgba(255,255,255,0.04)",
+    border: "1px solid rgba(255,255,255,0.08)",
+    color: "#ECECF0",
+  };
+
+  function focus(e: React.FocusEvent<HTMLInputElement>) {
+    e.target.style.borderColor = "rgba(0,214,143,0.4)";
+    e.target.style.boxShadow = "0 0 0 3px rgba(0,214,143,0.07)";
+  }
+
+  function blur(e: React.FocusEvent<HTMLInputElement>) {
+    e.target.style.borderColor = "rgba(255,255,255,0.08)";
+    e.target.style.boxShadow = "none";
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center"
+      style={{ background: "rgba(0,0,0,0.72)", backdropFilter: "blur(4px)" }}
+      onClick={e => { if (e.target === e.currentTarget) onClose(); }}>
+      <div className="w-full max-w-md rounded-2xl p-6"
+        style={{ background: "#141416", border: "1px solid rgba(255,255,255,0.09)", boxShadow: "0 32px 80px rgba(0,0,0,0.6)" }}>
+        <div className="flex items-center justify-between mb-6">
+          <h2 className="text-sm font-semibold text-zinc-100">{editKey ? "Edit Key" : "Add API Key"}</h2>
+          <button onClick={onClose} className="p-1.5 rounded-lg transition-colors hover:bg-white/5">
+            <X size={16} color="#52525B" />
+          </button>
+        </div>
+
+        <div className="space-y-4">
+          <div>
+            <label className="block text-xs font-medium text-zinc-400 mb-1.5">Label</label>
+            <input className="w-full px-3 py-2 rounded-lg text-sm outline-none transition-all"
+              style={baseInp}
+              placeholder="Production Primary"
+              value={form.label}
+              onChange={e => setForm({ ...form, label: e.target.value })}
+              onFocus={focus} onBlur={blur}
+              autoFocus />
+          </div>
+
+          <div>
+            <label className="block text-xs font-medium text-zinc-400 mb-1.5">Provider</label>
+            <div className="flex gap-2">
+              {(["gemini"] as Provider[]).map(p => (
+                <button key={p} onClick={() => setForm({ ...form, provider: p })}
+                  className="flex-1 py-2 rounded-lg text-xs font-medium transition-all"
+                  style={{
+                    color: form.provider === p ? P[p].color : "#52525B",
+                    background: form.provider === p ? P[p].bg : "rgba(255,255,255,0.03)",
+                    border: form.provider === p ? `1px solid ${P[p].color}30` : "1px solid rgba(255,255,255,0.06)",
+                  }}>
+                  {P[p].name}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-xs font-medium text-zinc-400 mb-1.5">API Key</label>
+            <div className="relative">
+              <input className="w-full px-3 py-2 pr-9 rounded-lg text-sm font-mono outline-none transition-all"
+                style={baseInp}
+                type={showKey ? "text" : "password"}
+                placeholder={editKey ? "Leave blank to keep current" : "sk-… or AIza…"}
+                value={form.rawKey}
+                onChange={e => setForm({ ...form, rawKey: e.target.value })}
+                onFocus={focus} onBlur={blur} />
+              <button onClick={() => setShowKey(!showKey)}
+                className="absolute right-2.5 top-1/2 -translate-y-1/2 p-0.5 rounded transition-colors hover:bg-white/5">
+                {showKey ? <EyeOff size={14} color="#52525B" /> : <Eye size={14} color="#52525B" />}
+              </button>
+            </div>
+            <p className="mt-1.5 text-[11px] text-zinc-600 flex items-center gap-1.5">
+              <Shield size={10} color="#52525B" className="shrink-0" />
+              Encrypted before storage — never shown in plaintext
+            </p>
+          </div>
+
+          <div>
+            <label className="block text-xs font-medium text-zinc-400 mb-1.5">Daily Limit</label>
+            <input className="w-full px-3 py-2 rounded-lg text-sm font-mono outline-none transition-all"
+              style={baseInp}
+              type="number"
+              placeholder="15000"
+              value={form.limit}
+              onChange={e => setForm({ ...form, limit: e.target.value })}
+              onFocus={focus} onBlur={blur} />
+          </div>
+        </div>
+
+        {error && (
+          <div className="mt-4 flex items-start gap-2 px-3 py-2 rounded-lg text-xs"
+            style={{ background: "rgba(239,68,68,0.08)", color: "#EF4444", border: "1px solid rgba(239,68,68,0.2)" }}>
+            <AlertTriangle size={13} className="shrink-0 mt-0.5" />
+            <span>{error}</span>
+          </div>
+        )}
+
+        <div className="flex gap-2 mt-6">
+          <button onClick={onClose}
+            className="flex-1 py-2 rounded-lg text-sm font-medium transition-colors"
+            style={{ background: "rgba(255,255,255,0.04)", color: "#71717A", border: "1px solid rgba(255,255,255,0.06)" }}>
+            Cancel
+          </button>
+          <button onClick={() => !saving && onSave(form)} disabled={saving}
+            className="flex-1 py-2 rounded-lg text-sm font-semibold transition-all flex items-center justify-center gap-1.5"
+            style={{ background: "#00D68F", color: "#0A0A0B", boxShadow: "0 0 16px rgba(0,214,143,0.3)", opacity: saving ? 0.7 : 1 }}
+            onMouseEnter={e => (e.currentTarget.style.boxShadow = "0 0 28px rgba(0,214,143,0.55)")}
+            onMouseLeave={e => (e.currentTarget.style.boxShadow = "0 0 16px rgba(0,214,143,0.3)")}>
+            {saving && <Loader2 size={13} className="animate-spin" />}
+            {editKey ? "Save Changes" : "Add Key"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── KeyDetailDrawer ──────────────────────────────────────────────────────────
+function KeyDetailDrawer({ keyData, now, onClose, onDisable, onReset, onDelete }: {
+  keyData: AK; now: number;
+  onClose: () => void; onDisable: () => void; onReset: () => void; onDelete: () => void;
+}) {
+  const s = S[keyData.status];
+  const chartData = makeHourly(keyData.used);
+
+  useEffect(() => {
+    const h = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
+    window.addEventListener("keydown", h);
+    return () => window.removeEventListener("keydown", h);
+  }, [onClose]);
+
+  const meta = [
+    { label: "Provider",   val: P[keyData.provider].name,                                           mono: false },
+    { label: "Masked Key", val: keyData.masked,                                                      mono: true  },
+    { label: "Created",    val: new Date(keyData.created).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }), mono: false },
+    { label: "Updated",    val: new Date(keyData.updated).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }), mono: false },
+    { label: "Last Used",  val: keyData.lastUsed ? rel(keyData.lastUsed, now) : "—",                mono: false },
+    { label: "Cooldown",   val: keyData.cooldownUntil ? cd(keyData.cooldownUntil, now) : "—",       mono: true  },
+  ];
+
+  return (
+    <>
+      <div className="fixed inset-0 z-40" onClick={onClose}
+        style={{ background: "rgba(0,0,0,0.5)", backdropFilter: "blur(2px)" }} />
+      <aside className="fixed right-0 top-0 bottom-0 z-50 w-96 flex flex-col overflow-y-auto"
+        style={{ background: "#111113", borderLeft: "1px solid rgba(255,255,255,0.07)", boxShadow: "-24px 0 60px rgba(0,0,0,0.4)" }}>
+        <div className="flex items-start justify-between p-5"
+          style={{ borderBottom: "1px solid rgba(255,255,255,0.05)" }}>
+          <div>
+            <h2 className="text-sm font-semibold text-zinc-100">{keyData.label}</h2>
+            <div className="flex items-center gap-2 mt-1">
+              <span className="text-[11px] font-mono text-zinc-600">{keyData.masked}</span>
+              <PBadge provider={keyData.provider} />
+            </div>
+          </div>
+          <button onClick={onClose} className="p-1.5 rounded-lg transition-colors hover:bg-white/5 shrink-0 mt-0.5">
+            <X size={16} color="#52525B" />
+          </button>
+        </div>
+
+        <div className="p-5 space-y-5 flex-1">
+          <div className="flex items-center gap-4">
+            <CircP used={keyData.used} limit={keyData.limit} color={s.color} />
+            <div className="space-y-3">
+              <SBadge status={keyData.status} />
+              <div>
+                <p className="text-[11px] text-zinc-600 mb-0.5">Daily quota</p>
+                <p className="text-sm font-mono text-zinc-200">{keyData.limit.toLocaleString()} req</p>
+              </div>
+              <div>
+                <p className="text-[11px] text-zinc-600 mb-0.5">Remaining</p>
+                <p className="text-sm font-mono" style={{ color: s.color }}>
+                  {Math.max(0, keyData.limit - keyData.used).toLocaleString()} req
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <div>
+            <p className="text-[10px] text-zinc-600 mb-2.5 uppercase tracking-widest font-semibold">Hourly Usage Today</p>
+            <div style={{ height: 88 }}>
+              <ResponsiveContainer width="100%" height="100%">
+                <AreaChart data={chartData} margin={{ top: 4, right: 0, left: -32, bottom: 0 }}>
+                  <defs>
+                    <linearGradient id="agrad" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%"  stopColor={s.color} stopOpacity={0.22} />
+                      <stop offset="95%" stopColor={s.color} stopOpacity={0}    />
+                    </linearGradient>
+                  </defs>
+                  <XAxis dataKey="h"
+                    tick={{ fontSize: 9, fill: "#52525B", fontFamily: "JetBrains Mono, monospace" }}
+                    tickLine={false} axisLine={false} interval={3} />
+                  <Tooltip
+                    contentStyle={{ background: "#1C1C1E", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 8, fontSize: 11, fontFamily: "JetBrains Mono, monospace" }}
+                    labelStyle={{ color: "#71717A" }} itemStyle={{ color: s.color }}
+                    formatter={(v: number) => [v.toLocaleString(), "req"]} />
+                  <Area type="monotone" dataKey="r" stroke={s.color} strokeWidth={1.5}
+                    fill="url(#agrad)" dot={false} />
+                </AreaChart>
+              </ResponsiveContainer>
+            </div>
+          </div>
+
+          <div className="rounded-xl overflow-hidden" style={{ border: "1px solid rgba(255,255,255,0.06)" }}>
+            {meta.map((m, i) => (
+              <div key={m.label} className="flex items-center justify-between px-3.5 py-2.5"
+                style={{
+                  borderBottom: i < meta.length - 1 ? "1px solid rgba(255,255,255,0.04)" : "none",
+                  background: i % 2 === 0 ? "transparent" : "rgba(255,255,255,0.01)",
+                }}>
+                <span className="text-[11px] text-zinc-600">{m.label}</span>
+                <span className={`text-[11px] text-zinc-300 ${m.mono ? "font-mono" : ""}`}>{m.val}</span>
+              </div>
+            ))}
+          </div>
+
+          <div className="space-y-2">
+            <button onClick={onReset}
+              className="w-full flex items-center justify-center gap-2 py-2 rounded-lg text-xs font-medium transition-colors"
+              style={{ background: "rgba(79,142,247,0.08)", color: "#4F8EF7", border: "1px solid rgba(79,142,247,0.16)" }}>
+              <RefreshCw size={12} /> Reset Cooldown
+            </button>
+            <button onClick={onDisable}
+              className="w-full flex items-center justify-center gap-2 py-2 rounded-lg text-xs font-medium transition-colors"
+              style={{ background: "rgba(255,255,255,0.04)", color: "#71717A", border: "1px solid rgba(255,255,255,0.07)" }}>
+              <Power size={12} />
+              {keyData.status === "disabled" ? "Enable Key" : "Disable Key"}
+            </button>
+            <button onClick={onDelete}
+              className="w-full flex items-center justify-center gap-2 py-2 rounded-lg text-xs font-medium transition-colors"
+              style={{ background: "rgba(239,68,68,0.07)", color: "#EF4444", border: "1px solid rgba(239,68,68,0.16)" }}>
+              <Trash2 size={12} /> Delete Key
+            </button>
+          </div>
+        </div>
+      </aside>
+    </>
+  );
+}
+
+// ─── LiveMonitor ──────────────────────────────────────────────────────────────
+function LiveMonitor({ reqs, now }: { reqs: LR[]; now: number }) {
+  return (
+    <div className="rounded-xl overflow-hidden" style={{ border: "1px solid rgba(255,255,255,0.06)" }}>
+      <div className="flex items-center justify-between px-4 py-2.5"
+        style={{ borderBottom: "1px solid rgba(255,255,255,0.05)", background: "#0F0F11" }}>
+        <div className="flex items-center gap-2">
+          <span className="w-2 h-2 rounded-full animate-pulse" style={{ background: "#00D68F", boxShadow: "0 0 6px rgba(0,214,143,0.7)" }} />
+          <span className="text-xs font-medium text-zinc-400">Live Request Feed</span>
+        </div>
+        <span className="text-[11px] font-mono text-zinc-600">{reqs.length} captured</span>
+      </div>
+
+      <div style={{ background: "#111113" }}>
+        {/* Header row */}
+        <div className="grid px-4 py-2"
+          style={{ gridTemplateColumns: "72px 60px 1fr 52px 56px", borderBottom: "1px solid rgba(255,255,255,0.04)" }}>
+          {["Time", "Provider", "Key / Chain", "Status", "Latency"].map(h => (
+            <span key={h} className="text-[10px] font-semibold text-zinc-600 uppercase tracking-widest">{h}</span>
+          ))}
+        </div>
+
+        {[...reqs].reverse().map(r => {
+          const cColor = r.code === 200 ? "#00D68F" : r.code === 429 ? "#F59E0B" : "#EF4444";
+          return (
+            <div key={r.id} className="grid items-center px-4 py-2.5 transition-colors"
+              style={{
+                gridTemplateColumns: "72px 60px 1fr 52px 56px",
+                borderBottom: "1px solid rgba(255,255,255,0.03)",
+              }}
+              onMouseEnter={e => (e.currentTarget.style.background = "rgba(255,255,255,0.015)")}
+              onMouseLeave={e => (e.currentTarget.style.background = "transparent")}>
+              <span className="text-[11px] font-mono text-zinc-600">
+                {new Date(r.ts).toLocaleTimeString("en-US", { hour12: false, hour: "2-digit", minute: "2-digit", second: "2-digit" })}
+              </span>
+              <PBadge provider={r.provider} />
+              <div className="flex items-center gap-1.5 min-w-0">
+                {r.chain?.map((c, i) => (
+                  <div key={i} className="flex items-center gap-1.5 shrink-0">
+                    <span className="text-[11px] font-mono text-zinc-500 truncate max-w-[100px]">{c.label}</span>
+                    <span className="text-[11px] font-mono px-1 py-0.5 rounded shrink-0"
+                      style={{ color: "#F59E0B", background: "rgba(245,158,11,0.1)" }}>{c.code}</span>
+                    <ArrowRight size={10} color="#3F3F46" className="shrink-0" />
+                  </div>
+                ))}
+                <span className="text-[11px] font-mono text-zinc-300 truncate">{r.keyLabel}</span>
+              </div>
+              <span className="text-[11px] font-mono px-1.5 py-0.5 rounded justify-self-start"
+                style={{ color: cColor, background: `${cColor}12`, border: `1px solid ${cColor}22` }}>
+                {r.code}
+              </span>
+              <span className="text-[11px] font-mono text-zinc-600 justify-self-end">{r.latency}ms</span>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+// ─── LoginGate ──────────────────────────────────────────────────────────────
+function LoginGate({ onAuthenticated }: { onAuthenticated: () => void }) {
+  const [token, setToken] = useState("");
+  const [checking, setChecking] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function submit() {
+    if (!token.trim()) return;
+    setChecking(true);
+    setError(null);
+    setAdminToken(token.trim());
+    const ok = await api.verifyToken();
+    setChecking(false);
+    if (ok) {
+      onAuthenticated();
+    } else {
+      clearAdminToken();
+      setError("Invalid admin token, or the API is unreachable.");
+    }
+  }
+
+  return (
+    <div className="min-h-screen flex items-center justify-center px-4"
+      style={{ background: "#0A0A0B", fontFamily: "Inter, sans-serif" }}>
+      <div className="w-full max-w-sm rounded-2xl p-6"
+        style={{ background: "#141416", border: "1px solid rgba(255,255,255,0.09)", boxShadow: "0 32px 80px rgba(0,0,0,0.6)" }}>
+        <div className="flex items-center gap-2.5 mb-6">
+          <div className="w-8 h-8 rounded-lg flex items-center justify-center"
+            style={{ background: "rgba(0,214,143,0.12)", border: "1px solid rgba(0,214,143,0.2)" }}>
+            <KeyRound size={16} color="#00D68F" />
+          </div>
+          <div>
+            <p className="font-mono text-sm font-medium text-zinc-100">keypool</p>
+            <p className="text-[11px] text-zinc-600">Sign in to the admin dashboard</p>
+          </div>
+        </div>
+
+        <label className="block text-xs font-medium text-zinc-400 mb-1.5">Admin API Token</label>
+        <input
+          className="w-full px-3 py-2 rounded-lg text-sm font-mono outline-none transition-all"
+          style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)", color: "#ECECF0" }}
+          type="password"
+          placeholder="ADMIN_API_KEY from your .env"
+          value={token}
+          onChange={e => setToken(e.target.value)}
+          onKeyDown={e => e.key === "Enter" && submit()}
+          autoFocus
+        />
+        {error && (
+          <p className="mt-2 text-xs flex items-center gap-1.5" style={{ color: "#EF4444" }}>
+            <AlertTriangle size={12} className="shrink-0" /> {error}
+          </p>
+        )}
+
+        <button onClick={submit} disabled={checking || !token.trim()}
+          className="w-full mt-4 py-2 rounded-lg text-sm font-semibold transition-all flex items-center justify-center gap-1.5"
+          style={{ background: "#00D68F", color: "#0A0A0B", opacity: checking || !token.trim() ? 0.6 : 1 }}>
+          {checking && <Loader2 size={14} className="animate-spin" />}
+          {checking ? "Checking…" : "Continue"}
+        </button>
+
+        <p className="mt-4 text-[11px] text-zinc-600 leading-relaxed">
+          This is the same value as <span className="font-mono text-zinc-500">ADMIN_API_KEY</span> in
+          the backend's <span className="font-mono text-zinc-500">.env</span>. It's stored only in
+          this browser's local storage.
+        </p>
+      </div>
+    </div>
+  );
+}
+
+// ─── App ──────────────────────────────────────────────────────────────────────
+export default function App() {
+  const [authed, setAuthed] = useState(false);
+  const [checkingAuth, setCheckingAuth] = useState(true);
+
+  useEffect(() => {
+    (async () => {
+      if (getAdminToken()) {
+        const ok = await api.verifyToken();
+        setAuthed(ok);
+      }
+      setCheckingAuth(false);
+    })();
+  }, []);
+
+  if (checkingAuth) {
+    return (
+      <div className="min-h-screen flex items-center justify-center" style={{ background: "#0A0A0B" }}>
+        <Loader2 size={20} className="animate-spin" color="#52525B" />
+      </div>
+    );
+  }
+
+  if (!authed) {
+    return <LoginGate onAuthenticated={() => setAuthed(true)} />;
+  }
+
+  return <Dashboard onLogout={() => { clearAdminToken(); setAuthed(false); }} />;
+}
+
+// ─── Dashboard (authenticated app) ─────────────────────────────────────────────
+function Dashboard({ onLogout }: { onLogout: () => void }) {
+  const [keys, setKeys]           = useState<AK[]>([]);
+  const [loading, setLoading]     = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [view, setView]           = useState<View>("dashboard");
+  const [filter, setFilter]       = useState<PF>("all");
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [editId, setEditId]       = useState<string | null>(null);
+  const [addOpen, setAddOpen]     = useState(false);
+  const [formError, setFormError] = useState<string | null>(null);
+  const [saving, setSaving]       = useState(false);
+  const [reqs, setReqs]           = useState<LR[]>([]);
+  const [now, setNow]             = useState(Date.now());
+
+  useEffect(() => {
+    const id = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(id);
+  }, []);
+
+  const refreshKeys = useCallback(async () => {
+    try {
+      const data = await api.listKeys();
+      setKeys(data.map(toAK));
+      setLoadError(null);
+    } catch (err) {
+      setLoadError(err instanceof ApiError ? err.message : "Failed to reach the API");
+      if (err instanceof ApiError && err.status === 401) onLogout();
+    } finally {
+      setLoading(false);
+    }
+  }, [onLogout]);
+
+  useEffect(() => {
+    refreshKeys();
+    const id = setInterval(refreshKeys, 15000);
+    return () => clearInterval(id);
+  }, [refreshKeys]);
+
+  // Live request feed via SSE, plus an initial snapshot so the monitor isn't empty on load.
+  useEffect(() => {
+    api.recentEvents(50).then(events => setReqs(events.map(toLR))).catch(() => {});
+    const stop = streamEvents(
+      evt => setReqs(prev => [...prev.slice(-99), toLR(evt)]),
+      () => {}
+    );
+    return stop;
+  }, []);
+
+  const selectedKey = selectedId ? (keys.find(k => k.id === selectedId) ?? null) : null;
+  const editKey     = editId     ? (keys.find(k => k.id === editId)     ?? null) : null;
+  const operational = keys.some(k => k.status === "active");
+
+  async function handleSave(form: FormState) {
+    setSaving(true);
+    setFormError(null);
+    try {
+      if (editId) {
+        await api.updateKey(Number(editId), {
+          label: form.label || undefined,
+          daily_limit: Number(form.limit) || undefined,
+        });
+        setEditId(null);
+      } else {
+        if (!form.rawKey.trim()) {
+          setFormError("API key is required.");
+          setSaving(false);
+          return;
+        }
+        await api.createKey({
+          label: form.label || "New Key",
+          provider: form.provider,
+          raw_key: form.rawKey.trim(),
+          daily_limit: Number(form.limit) || 15000,
+        });
+        setAddOpen(false);
+      }
+      await refreshKeys();
+    } catch (err) {
+      setFormError(err instanceof ApiError ? err.message : "Request failed");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function toggleKey(id: string) {
+    const key = keys.find(k => k.id === id);
+    if (!key) return;
+    setKeys(prev => prev.map(k => k.id === id
+      ? { ...k, status: k.status === "disabled" ? "active" : "disabled" }
+      : k));
+    try {
+      await api.updateKey(Number(id), { status: key.status === "disabled" ? "active" : "disabled" });
+      await refreshKeys();
+    } catch {
+      await refreshKeys(); // revert optimistic update on failure
+    }
+  }
+
+  async function resetCooldown(id: string) {
+    try {
+      await api.resetCooldown(Number(id));
+      await refreshKeys();
+    } catch {
+      // surfaced via loadError on next refresh
+    }
+  }
+
+  async function deleteKey(id: string) {
+    setSelectedId(null);
+    try {
+      await api.deleteKey(Number(id));
+      await refreshKeys();
+    } catch {
+      await refreshKeys();
+    }
+  }
+
+  return (
+    <div className="min-h-screen flex flex-col" style={{ background: "#0A0A0B", fontFamily: "Inter, sans-serif" }}>
+      <TopBar view={view} onView={setView} onAdd={() => setAddOpen(true)} operational={operational} onLogout={onLogout} />
+
+      <main className="flex-1 px-6 py-5 w-full max-w-[1400px] mx-auto space-y-4">
+        {loadError && (
+          <div className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs"
+            style={{ background: "rgba(239,68,68,0.08)", color: "#EF4444", border: "1px solid rgba(239,68,68,0.2)" }}>
+            <AlertTriangle size={13} className="shrink-0" />
+            Could not reach the API: {loadError}
+          </div>
+        )}
+
+        {loading ? (
+          <div className="flex items-center justify-center py-24">
+            <Loader2 size={20} className="animate-spin" color="#52525B" />
+          </div>
+        ) : view === "dashboard" ? (
+          <>
+            <MetricCards keys={keys} />
+            <KeysTable
+              keys={keys} filter={filter} onFilter={setFilter} now={now}
+              onSelect={setSelectedId}
+              onEdit={id => { setEditId(id); setSelectedId(null); }}
+              onToggle={toggleKey}
+            />
+          </>
+        ) : (
+          <LiveMonitor reqs={reqs} now={now} />
+        )}
+      </main>
+
+      {(addOpen || !!editId) && (
+        <AddEditModal
+          editKey={editId ? editKey : null}
+          onSave={handleSave}
+          onClose={() => { setAddOpen(false); setEditId(null); setFormError(null); }}
+          error={formError}
+          saving={saving}
+        />
+      )}
+
+      {selectedKey && (
+        <KeyDetailDrawer
+          keyData={selectedKey} now={now}
+          onClose={() => setSelectedId(null)}
+          onDisable={() => toggleKey(selectedKey.id)}
+          onReset={() => resetCooldown(selectedKey.id)}
+          onDelete={() => deleteKey(selectedKey.id)}
+        />
+      )}
+    </div>
+  );
+}
