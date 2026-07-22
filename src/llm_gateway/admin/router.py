@@ -3,7 +3,7 @@ from fastapi import APIRouter, Depends, status
 from llm_gateway.admin.dependencies import require_admin
 from llm_gateway.api.deps import get_key_pool_service
 from llm_gateway.keys.enums import ProviderType
-from llm_gateway.keys.schemas import APIKeyCreate, APIKeyRead, APIKeyUpdate
+from llm_gateway.keys.schemas import APIKeyCreate, APIKeyHealthCheckResult, APIKeyRead, APIKeyUpdate
 from llm_gateway.keys.service import KeyPoolService
 
 router = APIRouter(prefix="/admin/keys", tags=["admin"], dependencies=[Depends(require_admin)])
@@ -57,3 +57,23 @@ async def delete_key(
     service: KeyPoolService = Depends(get_key_pool_service),
 ) -> None:
     await service.delete_key(key_id)
+
+
+@router.post("/{key_id}/check", response_model=APIKeyHealthCheckResult)
+async def check_key(
+    key_id: int,
+    service: KeyPoolService = Depends(get_key_pool_service),
+) -> APIKeyHealthCheckResult:
+    """On-demand probe: makes a cheap upstream call with this key and updates
+    its status based on the result (see KeyPoolService.check_key_health).
+    """
+    return await service.check_key_health(key_id)
+
+
+@router.post("/check-all", response_model=list[APIKeyHealthCheckResult])
+async def check_all_keys(
+    provider: ProviderType | None = None,
+    service: KeyPoolService = Depends(get_key_pool_service),
+) -> list[APIKeyHealthCheckResult]:
+    """Health-check every non-disabled key (optionally scoped to one provider)."""
+    return await service.check_all_keys(provider=provider)

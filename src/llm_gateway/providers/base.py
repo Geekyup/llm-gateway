@@ -4,6 +4,21 @@ from typing import ClassVar
 import httpx
 
 
+class HealthCheckResult:
+    """Outcome of a single Provider.health_check call.
+
+    `ok` is the simple yes/no an admin cares about; `detail` is a short,
+    human-readable reason (never includes the key itself) for the cases
+    where `ok` is False, e.g. "HTTP 401: API key not valid".
+    """
+
+    __slots__ = ("ok", "detail")
+
+    def __init__(self, ok: bool, detail: str | None = None) -> None:
+        self.ok = ok
+        self.detail = detail
+
+
 class Provider(ABC):
     """Adapter to one upstream LLM API.
 
@@ -29,4 +44,15 @@ class Provider(ABC):
         Distinct from is_rate_limited: exhausted keys are parked until the
         next housekeeping reset (or manual admin action), cooldown keys
         recover on their own after `cooldown_seconds`.
+        """
+
+    @abstractmethod
+    async def health_check(self, key: str) -> HealthCheckResult:
+        """Make a cheap, quota-friendly call to verify the key actually works.
+
+        Unlike is_rate_limited/is_key_exhausted (which classify a response
+        that already happened as part of real client traffic), this makes
+        its own lightweight request on demand — e.g. for an admin "Test"
+        button or a periodic sweep — and should avoid billed/heavy
+        endpoints (no completions/generation calls).
         """

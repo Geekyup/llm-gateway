@@ -35,6 +35,16 @@ class APIKeyRead(BaseModel):
     updated_at: datetime
 
 
+class APIKeyHealthCheckResult(BaseModel):
+    """Response for a health-check probe — either a single POST /{id}/check
+    or one entry in the list returned by POST /check-all.
+    """
+
+    key_id: int
+    ok: bool
+    detail: str | None = Field(default=None, description="Reason for failure; never set when ok=True")
+
+
 class APIKeyDTO(BaseModel):
     """Internal, in-process transfer object used by selector/cache/service.
 

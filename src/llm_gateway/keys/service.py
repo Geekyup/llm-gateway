@@ -5,8 +5,9 @@ from llm_gateway.core.security import decrypt_key, encrypt_key
 from llm_gateway.keys.cache import KeyStatusCache
 from llm_gateway.keys.enums import KeyStatus, ProviderType
 from llm_gateway.keys.repository import APIKeyRepository
-from llm_gateway.keys.schemas import APIKeyCreate, APIKeyDTO, APIKeyUpdate
+from llm_gateway.keys.schemas import APIKeyCreate, APIKeyDTO, APIKeyHealthCheckResult, APIKeyUpdate
 from llm_gateway.keys.selector import KeySelector
+from llm_gateway.providers.registry import get_provider
 
 logger = logging.getLogger(__name__)
 
@@ -125,3 +126,55 @@ class KeyPoolService:
         await self._repo.mark_status(key_id, KeyStatus.EXHAUSTED)
         await self._cache.invalidate(provider.value)
         logger.warning("key_id=%s provider=%s -> EXHAUSTED", key_id, provider)
+
+    # --- health checks -------------------------------------------------------
+
+    async def check_key_health(self, key_id: int) -> APIKeyHealthCheckResult:
+        """On-demand, quota-friendly probe of a single key against its upstream.
+
+        Unlike record_success/record_rate_limited/record_exhausted (which
+        react to real client traffic), this makes its own lightweight call
+        via Provider.health_check. It only ever *upgrades* a key back to
+        ACTIVE or *downgrades* it to EXHAUSTED — it never touches a manual
+        DISABLED status, and never invents a COOLDOWN window (that's a
+        429-specific signal from real traffic, not something a health
+        check should guess at).
+        """
+        key_row = await self._repo.get(key_id)
+        provider = get_provider(key_row.provider.value)
+        decrypted = decrypt_key(key_row.key_encrypted)
+
+        result = await provider.health_check(decrypted)
+
+        if result.ok:
+            if key_row.status != KeyStatus.DISABLED:
+                await self._repo.mark_status(key_id, KeyStatus.ACTIVE, cooldown_until=None)
+                await self._cache.invalidate(key_row.provider.value)
+            logger.info("health_check key_id=%s provider=%s -> ok", key_id, key_row.provider.value)
+        else:
+            if key_row.status not in (KeyStatus.DISABLED, KeyStatus.COOLDOWN):
+                # A hard failure (bad key, revoked, permission denied) is
+                # distinct from a temporary 429 seen on the hot path — park
+                # it as EXHAUSTED so an admin notices, but leave an existing
+                # COOLDOWN alone since that already has its own recovery time.
+                await self._repo.mark_status(key_id, KeyStatus.EXHAUSTED)
+                await self._cache.invalidate(key_row.provider.value)
+            logger.warning(
+                "health_check key_id=%s provider=%s -> failed: %s", key_id, key_row.provider.value, result.detail
+            )
+
+        return APIKeyHealthCheckResult(key_id=key_id, ok=result.ok, detail=result.detail)
+
+    async def check_all_keys(self, *, provider: ProviderType | None = None) -> list[APIKeyHealthCheckResult]:
+        """Health-check every non-disabled key, e.g. for a periodic housekeeping sweep.
+
+        DISABLED keys are skipped — an admin turned those off on purpose,
+        so there's no reason to spend a request probing them.
+        """
+        keys = await self._repo.list_all(provider=provider)
+        results: list[APIKeyHealthCheckResult] = []
+        for key in keys:
+            if key.status == KeyStatus.DISABLED:
+                continue
+            results.append(await self.check_key_health(key.id))
+        return results

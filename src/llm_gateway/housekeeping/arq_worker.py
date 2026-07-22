@@ -3,7 +3,11 @@ from arq.connections import RedisSettings
 
 from llm_gateway.config import get_settings
 from llm_gateway.core.logging import configure_logging
-from llm_gateway.housekeeping.tasks import clear_expired_cooldowns, reset_daily_limits
+from llm_gateway.housekeeping.tasks import (
+    clear_expired_cooldowns,
+    health_check_exhausted_keys,
+    reset_daily_limits,
+)
 
 
 async def startup(ctx: dict) -> None:
@@ -30,4 +34,7 @@ class WorkerSettings:
         # Daily reset of requests_today / EXHAUSTED status at the top of the hour
         # configured in settings (default: hour boundary, minute 0).
         cron(reset_daily_limits, hour=0, minute=0),
+        # Probe EXHAUSTED keys every 30 min in case they recovered upstream
+        # (unrevoked, quota reset out of band) before the daily reset.
+        cron(health_check_exhausted_keys, minute={0, 30}, run_at_startup=True),
     ]

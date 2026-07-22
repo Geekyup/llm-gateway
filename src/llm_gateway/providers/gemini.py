@@ -3,7 +3,7 @@ from typing import ClassVar
 import httpx
 
 from llm_gateway.config import get_settings
-from llm_gateway.providers.base import Provider
+from llm_gateway.providers.base import HealthCheckResult, Provider
 
 
 class GeminiProvider(Provider):
@@ -55,3 +55,28 @@ class GeminiProvider(Provider):
         # in the free tier — 403 with PERMISSION_DENIED/quota language is
         # the closest signal. Treated conservatively: only explicit 403.
         return response.status_code == 403
+
+    async def health_check(self, key: str) -> HealthCheckResult:
+        # GET v1beta/models just lists available models — it's authenticated
+        # by the key but doesn't run a generation, so it doesn't touch the
+        # per-key request quota the way generateContent would.
+        try:
+            response = await self.forward(key=key, path="v1beta/models", method="GET", payload=None, headers={})
+        except httpx.HTTPError as exc:
+            return HealthCheckResult(ok=False, detail=f"Network error: {exc}")
+
+        if response.status_code == 200:
+            return HealthCheckResult(ok=True)
+
+        # Pull Gemini's structured error message when present, e.g.
+        # {"error": {"message": "API key not valid. Please pass a valid API key."}}
+        # rather than dumping the raw (possibly large/HTML) body.
+        detail = f"HTTP {response.status_code}"
+        try:
+            body = response.json()
+            message = body.get("error", {}).get("message")
+            if message:
+                detail = f"HTTP {response.status_code}: {message}"
+        except Exception:  # noqa: BLE001 - best-effort detail extraction only
+            pass
+        return HealthCheckResult(ok=False, detail=detail)

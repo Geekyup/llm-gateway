@@ -65,6 +65,12 @@ export interface RequestEvent {
   error_detail: string | null;
 }
 
+export interface ApiKeyHealthCheckResult {
+  key_id: number;
+  ok: boolean;
+  detail: string | null;
+}
+
 export interface GatewayTokenRead {
   id: number;
   label: string;
@@ -140,6 +146,14 @@ export const api = {
 
   async deleteKey(id: number): Promise<void> {
     return request<void>(`/admin/keys/${id}`, { method: "DELETE" });
+  },
+
+  async checkKey(id: number): Promise<ApiKeyHealthCheckResult> {
+    return request<ApiKeyHealthCheckResult>(`/admin/keys/${id}/check`, { method: "POST" });
+  },
+
+  async checkAllKeys(): Promise<ApiKeyHealthCheckResult[]> {
+    return request<ApiKeyHealthCheckResult[]>("/admin/keys/check-all", { method: "POST" });
   },
 
   async recentEvents(limit = 50): Promise<RequestEvent[]> {

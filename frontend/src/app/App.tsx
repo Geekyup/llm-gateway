@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from "react";
 import {
   Plus, Eye, EyeOff, X, Activity, RefreshCw, Trash2, Edit2,
   Power, Clock, ArrowRight, CheckCircle2, Shield, AlertTriangle,
-  LayoutDashboard, KeyRound, Zap, LogOut, Loader2,
+  LayoutDashboard, KeyRound, Zap, LogOut, Loader2, Stethoscope,
 } from "lucide-react";
 import { AreaChart, Area, XAxis, Tooltip, ResponsiveContainer } from "recharts";
 import {
@@ -268,9 +268,10 @@ function MetricCards({ keys }: { keys: AK[] }) {
 }
 
 // ─── KeysTable ────────────────────────────────────────────────────────────────
-function KeysTable({ keys, filter, onFilter, onSelect, onEdit, onToggle, now }: {
+function KeysTable({ keys, filter, onFilter, onSelect, onEdit, onToggle, onCheck, checkingIds, now }: {
   keys: AK[]; filter: PF; onFilter: (f: PF) => void; now: number;
   onSelect: (id: string) => void; onEdit: (id: string) => void; onToggle: (id: string) => void;
+  onCheck: (id: string) => void; checkingIds: Set<string>;
 }) {
   const filtered = filter === "all" ? keys : keys.filter(k => k.provider === filter);
 
@@ -319,6 +320,12 @@ function KeysTable({ keys, filter, onFilter, onSelect, onEdit, onToggle, now }: 
                     <div className="text-[11px] font-mono text-zinc-600 mt-1">{k.masked}</div>
                   </div>
                   <div className="flex items-center gap-1 shrink-0" onClick={e => e.stopPropagation()}>
+                    <button onClick={() => onCheck(k.id)} disabled={checkingIds.has(k.id)}
+                      className="p-1.5 rounded-md transition-colors hover:bg-white/5 disabled:opacity-50" title="Test key">
+                      {checkingIds.has(k.id)
+                        ? <Loader2 size={13} color="#71717A" className="animate-spin" />
+                        : <Stethoscope size={13} color="#71717A" />}
+                    </button>
                     <button onClick={() => onEdit(k.id)}
                       className="p-1.5 rounded-md transition-colors hover:bg-white/5" title="Edit">
                       <Edit2 size={13} color="#71717A" />
@@ -393,6 +400,12 @@ function KeysTable({ keys, filter, onFilter, onSelect, onEdit, onToggle, now }: 
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity"
                         onClick={e => e.stopPropagation()}>
+                        <button onClick={() => onCheck(k.id)} disabled={checkingIds.has(k.id)}
+                          className="p-1.5 rounded-md transition-colors hover:bg-white/5 disabled:opacity-50" title="Test key">
+                          {checkingIds.has(k.id)
+                            ? <Loader2 size={13} color="#71717A" className="animate-spin" />
+                            : <Stethoscope size={13} color="#71717A" />}
+                        </button>
                         <button onClick={() => onEdit(k.id)}
                           className="p-1.5 rounded-md transition-colors hover:bg-white/5" title="Edit">
                           <Edit2 size={13} color="#71717A" />
@@ -554,9 +567,10 @@ function AddEditModal({ editKey, onSave, onClose, error, saving }: {
 }
 
 // ─── KeyDetailDrawer ──────────────────────────────────────────────────────────
-function KeyDetailDrawer({ keyData, now, onClose, onDisable, onReset, onDelete }: {
+function KeyDetailDrawer({ keyData, now, onClose, onDisable, onReset, onDelete, onCheck, checking }: {
   keyData: AK; now: number;
   onClose: () => void; onDisable: () => void; onReset: () => void; onDelete: () => void;
+  onCheck: () => void; checking: boolean;
 }) {
   const s = S[keyData.status];
   const chartData = makeHourly(keyData.used);
@@ -653,6 +667,12 @@ function KeyDetailDrawer({ keyData, now, onClose, onDisable, onReset, onDelete }
           </div>
 
           <div className="space-y-2">
+            <button onClick={onCheck} disabled={checking}
+              className="w-full flex items-center justify-center gap-2 py-2 rounded-lg text-xs font-medium transition-colors disabled:opacity-50"
+              style={{ background: "rgba(0,214,143,0.08)", color: "#00D68F", border: "1px solid rgba(0,214,143,0.16)" }}>
+              {checking ? <Loader2 size={12} className="animate-spin" /> : <Stethoscope size={12} />}
+              {checking ? "Checking..." : "Test Key"}
+            </button>
             <button onClick={onReset}
               className="w-full flex items-center justify-center gap-2 py-2 rounded-lg text-xs font-medium transition-colors"
               style={{ background: "rgba(79,142,247,0.08)", color: "#4F8EF7", border: "1px solid rgba(79,142,247,0.16)" }}>
@@ -698,7 +718,7 @@ function LiveMonitor({ reqs, now }: { reqs: LR[]; now: number }) {
           ))}
         </div>
 
-        {[...reqs].reverse().map(r => {
+        {reqs.map(r => {
           const cColor = r.code === 200 ? "#00D68F" : r.code === 429 ? "#F59E0B" : "#EF4444";
           return (
             <div key={r.id}>
@@ -1110,6 +1130,8 @@ function Dashboard({ onLogout }: { onLogout: () => void }) {
   const [saving, setSaving]       = useState(false);
   const [reqs, setReqs]           = useState<LR[]>([]);
   const [now, setNow]             = useState(Date.now());
+  const [checkingIds, setCheckingIds] = useState<Set<string>>(new Set());
+  const [checkResult, setCheckResult] = useState<{ id: string; ok: boolean; detail: string | null } | null>(null);
 
   useEffect(() => {
     const id = setInterval(() => setNow(Date.now()), 1000);
@@ -1137,9 +1159,11 @@ function Dashboard({ onLogout }: { onLogout: () => void }) {
 
   // Live request feed via SSE, plus an initial snapshot so the monitor isn't empty on load.
   useEffect(() => {
-    api.recentEvents(50).then(events => setReqs(events.map(toLR))).catch(() => {});
+    // recentEvents comes back oldest-first, so reverse it once here — the
+    // rest of the app (state + render) then treats index 0 as "newest".
+    api.recentEvents(50).then(events => setReqs(events.map(toLR).reverse())).catch(() => {});
     const stop = streamEvents(
-      evt => setReqs(prev => [...prev.slice(-99), toLR(evt)]),
+      evt => setReqs(prev => [toLR(evt), ...prev.slice(0, 99)]),
       () => {}
     );
     return stop;
@@ -1214,6 +1238,28 @@ function Dashboard({ onLogout }: { onLogout: () => void }) {
     }
   }
 
+  async function checkKey(id: string) {
+    setCheckingIds(prev => new Set(prev).add(id));
+    try {
+      const result = await api.checkKey(Number(id));
+      setCheckResult({ id, ok: result.ok, detail: result.detail });
+      await refreshKeys();
+    } catch (err) {
+      setCheckResult({
+        id,
+        ok: false,
+        detail: err instanceof ApiError ? err.message : "Check failed — couldn't reach the API",
+      });
+    } finally {
+      setCheckingIds(prev => {
+        const next = new Set(prev);
+        next.delete(id);
+        return next;
+      });
+      setTimeout(() => setCheckResult(r => (r?.id === id ? null : r)), 5000);
+    }
+  }
+
   return (
     <div className="min-h-screen flex flex-col" style={{ background: "#0A0A0B", fontFamily: "Inter, sans-serif" }}>
       <TopBar view={view} onView={setView} onAdd={() => setAddOpen(true)} operational={operational} onLogout={onLogout} />
@@ -1239,6 +1285,8 @@ function Dashboard({ onLogout }: { onLogout: () => void }) {
               onSelect={setSelectedId}
               onEdit={id => { setEditId(id); setSelectedId(null); }}
               onToggle={toggleKey}
+              onCheck={checkKey}
+              checkingIds={checkingIds}
             />
           </>
         ) : view === "monitor" ? (
@@ -1247,6 +1295,27 @@ function Dashboard({ onLogout }: { onLogout: () => void }) {
           <GatewayAccessPanel />
         )}
       </main>
+
+      {checkResult && (
+        <div className="fixed bottom-4 right-4 z-50 flex items-center gap-2 px-4 py-3 rounded-lg shadow-lg"
+          style={{
+            background: "#18181B",
+            border: `1px solid ${checkResult.ok ? "rgba(0,214,143,0.3)" : "rgba(239,68,68,0.3)"}`,
+            maxWidth: 360,
+          }}>
+          {checkResult.ok
+            ? <CheckCircle2 size={16} color="#00D68F" className="shrink-0" />
+            : <AlertTriangle size={16} color="#EF4444" className="shrink-0" />}
+          <div className="min-w-0">
+            <div className="text-xs font-medium text-zinc-200">
+              {checkResult.ok ? "Key is working" : "Key check failed"}
+            </div>
+            {checkResult.detail && (
+              <div className="text-[11px] text-zinc-500 truncate">{checkResult.detail}</div>
+            )}
+          </div>
+        </div>
+      )}
 
       {(addOpen || !!editId) && (
         <AddEditModal
@@ -1265,6 +1334,8 @@ function Dashboard({ onLogout }: { onLogout: () => void }) {
           onDisable={() => toggleKey(selectedKey.id)}
           onReset={() => resetCooldown(selectedKey.id)}
           onDelete={() => deleteKey(selectedKey.id)}
+          onCheck={() => checkKey(selectedKey.id)}
+          checking={checkingIds.has(selectedKey.id)}
         />
       )}
     </div>
