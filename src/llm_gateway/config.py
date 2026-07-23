@@ -55,6 +55,24 @@ class Settings(BaseSettings):
     # --- ARQ / housekeeping ---
     HOUSEKEEPING_RESET_CRON_MINUTE: int = 0  # runs at minute 0 of every hour by default
 
+    # --- Auth (Google-only login) ---
+    JWT_SECRET_KEY: str = Field(
+        description="Signing key for access/refresh JWTs. Required, keep separate from ENCRYPTION_KEY.",
+    )
+    JWT_ALGORITHM: str = "HS256"
+    ACCESS_TOKEN_EXPIRE_MINUTES: int = 15
+    REFRESH_TOKEN_EXPIRE_DAYS: int = 30
+
+    GOOGLE_CLIENT_ID: str = Field(default="", description="OAuth client ID from Google Cloud Console.")
+    GOOGLE_CLIENT_SECRET: str = Field(default="", description="OAuth client secret from Google Cloud Console.")
+    GOOGLE_REDIRECT_URI: str = Field(
+        default="http://localhost:8000/auth/google/callback",
+        description="Must exactly match a redirect URI registered in the Google OAuth client.",
+    )
+    # Signs the short-lived state/session cookie used only to carry the
+    # OAuth nonce between /login and /callback — unrelated to JWT_SECRET_KEY.
+    SESSION_SECRET_KEY: str = Field(description="Signing key for the OAuth state cookie. Required.")
+
 
 @lru_cache
 def get_settings() -> Settings:

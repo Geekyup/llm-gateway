@@ -37,3 +37,17 @@ class ProviderNotSupportedError(LLMGatewayError):
     def __init__(self, provider: str) -> None:
         self.provider = provider
         super().__init__(f"Provider '{provider}' is not registered")
+
+
+class InactiveUserError(LLMGatewayError):
+    """Raised when a login attempt targets a user marked is_active=False."""
+
+    def __init__(self) -> None:
+        super().__init__("This account has been deactivated")
+
+
+class TokenRevokedError(LLMGatewayError):
+    """Raised when a refresh token is unknown or was already revoked/rotated."""
+
+    def __init__(self) -> None:
+        super().__init__("Refresh token has been revoked")

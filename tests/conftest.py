@@ -5,11 +5,14 @@ import os
 os.environ.setdefault("ENCRYPTION_KEY", "kQ80G5wq1v3o2r7m6b8p3s5t9u1w4y6a8c0e2g4i6k8=")
 os.environ.setdefault("ADMIN_API_KEY", "test-admin-key")
 os.environ.setdefault("DATABASE_URL", "postgresql+asyncpg://test:test@localhost/test")
+os.environ.setdefault("JWT_SECRET_KEY", "test-jwt-secret-key")
+os.environ.setdefault("SESSION_SECRET_KEY", "test-session-secret-key")
 
 import pytest
 import pytest_asyncio
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
+from llm_gateway.auth.repository import RefreshTokenRepository, UserRepository
 from llm_gateway.db.base import Base
 from llm_gateway.keys.repository import APIKeyRepository
 
@@ -37,6 +40,16 @@ async def db_session() -> AsyncSession:
 @pytest_asyncio.fixture
 async def key_repo(db_session: AsyncSession) -> APIKeyRepository:
     return APIKeyRepository(db_session)
+
+
+@pytest_asyncio.fixture
+async def user_repo(db_session: AsyncSession) -> UserRepository:
+    return UserRepository(db_session)
+
+
+@pytest_asyncio.fixture
+async def refresh_token_repo(db_session: AsyncSession) -> RefreshTokenRepository:
+    return RefreshTokenRepository(db_session)
 
 
 class FakePipeline:
