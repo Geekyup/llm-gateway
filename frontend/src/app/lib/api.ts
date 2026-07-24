@@ -4,12 +4,8 @@
 // /auth/google/callback, which lands back on the frontend with the
 // pair in the URL fragment (#access_token=...&refresh_token=...).
 
-// Normalized to never end in a trailing slash, so every call site below can
-// safely do `${API_BASE_URL}/some/path` without risking `//` or a missing
-// separator depending on how VITE_API_URL happens to be configured.
-export const API_BASE_URL: string = (
-  (import.meta as any).env?.VITE_API_URL ?? "http://localhost:8000"
-).replace(/\/+$/, "");
+export const API_BASE_URL: string =
+  (import.meta as any).env?.VITE_API_URL ?? "http://localhost:8000";
 
 const ACCESS_TOKEN_KEY = "llm_gateway_access_token";
 const REFRESH_TOKEN_KEY = "llm_gateway_refresh_token";
@@ -151,7 +147,7 @@ async function tryRefresh(): Promise<boolean> {
 }
 
 async function request<T>(path: string, init?: RequestInit, _retried = false): Promise<T> {
-  const res = await fetch(`${API_BASE_URL}/${path.replace(/^\/+/, "")}`, {
+  const res = await fetch(`${API_BASE_URL}${path}`, {
     ...init,
     headers: {
       "Content-Type": "application/json",
@@ -183,81 +179,81 @@ async function request<T>(path: string, init?: RequestInit, _retried = false): P
 
 export const api = {
   async listKeys(): Promise<ApiKeyRead[]> {
-    return request<ApiKeyRead[]>("me/keys");
+    return request<ApiKeyRead[]>("/me/keys");
   },
 
   async createKey(payload: ApiKeyCreate): Promise<ApiKeyRead> {
-    return request<ApiKeyRead>("me/keys", {
+    return request<ApiKeyRead>("/me/keys", {
       method: "POST",
       body: JSON.stringify(payload),
     });
   },
 
   async updateKey(id: number, payload: ApiKeyUpdate): Promise<ApiKeyRead> {
-    return request<ApiKeyRead>(`me/keys/${id}`, {
+    return request<ApiKeyRead>(`/me/keys/${id}`, {
       method: "PATCH",
       body: JSON.stringify(payload),
     });
   },
 
   async resetCooldown(id: number): Promise<ApiKeyRead> {
-    return request<ApiKeyRead>(`me/keys/${id}/reset-cooldown`, {
+    return request<ApiKeyRead>(`/me/keys/${id}/reset-cooldown`, {
       method: "POST",
     });
   },
 
   async deleteKey(id: number): Promise<void> {
-    return request<void>(`me/keys/${id}`, { method: "DELETE" });
+    return request<void>(`/me/keys/${id}`, { method: "DELETE" });
   },
 
   async checkKey(id: number): Promise<ApiKeyHealthCheckResult> {
-    return request<ApiKeyHealthCheckResult>(`me/keys/${id}/check`, { method: "POST" });
+    return request<ApiKeyHealthCheckResult>(`/me/keys/${id}/check`, { method: "POST" });
   },
 
   async checkAllKeys(): Promise<ApiKeyHealthCheckResult[]> {
-    return request<ApiKeyHealthCheckResult[]>("me/keys/check-all", { method: "POST" });
+    return request<ApiKeyHealthCheckResult[]>("/me/keys/check-all", { method: "POST" });
   },
 
   async recentEvents(limit = 50): Promise<RequestEvent[]> {
     const data = await request<{ events: RequestEvent[] }>(
-      `me/monitor/recent?limit=${limit}`
+      `/me/monitor/recent?limit=${limit}`
     );
     return data.events;
   },
 
   async listGatewayTokens(): Promise<GatewayTokenRead[]> {
-    return request<GatewayTokenRead[]>("me/gateway-tokens");
+    return request<GatewayTokenRead[]>("/me/gateway-tokens");
   },
 
   async createGatewayToken(label: string): Promise<GatewayTokenCreated> {
-    return request<GatewayTokenCreated>("me/gateway-tokens", {
+    return request<GatewayTokenCreated>("/me/gateway-tokens", {
       method: "POST",
       body: JSON.stringify({ label }),
     });
   },
 
   async revokeGatewayToken(id: number): Promise<GatewayTokenRead> {
-    return request<GatewayTokenRead>(`me/gateway-tokens/${id}/revoke`, { method: "POST" });
+    return request<GatewayTokenRead>(`/me/gateway-tokens/${id}/revoke`, { method: "POST" });
   },
 
   async activateGatewayToken(id: number): Promise<GatewayTokenRead> {
-    return request<GatewayTokenRead>(`me/gateway-tokens/${id}/activate`, { method: "POST" });
+    return request<GatewayTokenRead>(`/me/gateway-tokens/${id}/activate`, { method: "POST" });
   },
 
   async deleteGatewayToken(id: number): Promise<void> {
-    return request<void>(`me/gateway-tokens/${id}`, { method: "DELETE" });
+    return request<void>(`/me/gateway-tokens/${id}`, { method: "DELETE" });
   },
 
   /** Fetches the signed-in user's profile — also doubles as an auth check. */
   async me(): Promise<UserRead> {
-    return request<UserRead>("auth/me");
+    return request<UserRead>("/auth/me");
   },
 
   async logout(): Promise<void> {
     const refreshToken = getRefreshToken();
     if (!refreshToken) return;
     try {
-      await request<void>("auth/logout", {
+      await request<void>("/auth/logout", {
         method: "POST",
         body: JSON.stringify({ refresh_token: refreshToken }),
       });
