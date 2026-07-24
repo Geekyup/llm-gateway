@@ -1,22 +1,36 @@
 // ─── API client for llm-gateway backend ────────────────────────────────────
-// Talks to /admin/keys* and /admin/monitor* on the FastAPI backend.
-// Base URL and admin bearer token come from Vite env vars / localStorage.
+// Talks to /api/v1/me/keys* and /api/v1/me/monitor* on the FastAPI backend.
+// Auth is Google OAuth: the backend issues a JWT access/refresh pair after
+// /api/v1/auth/google/callback, which lands back on the frontend with the
+// pair in the URL fragment (#access_token=...&refresh_token=...).
 
 export const API_BASE_URL: string =
   (import.meta as any).env?.VITE_API_URL ?? "http://localhost:8000";
 
-const TOKEN_STORAGE_KEY = "llm_gateway_admin_token";
+const ACCESS_TOKEN_KEY = "llm_gateway_access_token";
+const REFRESH_TOKEN_KEY = "llm_gateway_refresh_token";
 
-export function getAdminToken(): string {
-  return localStorage.getItem(TOKEN_STORAGE_KEY) ?? "";
+export function getAccessToken(): string {
+  return localStorage.getItem(ACCESS_TOKEN_KEY) ?? "";
 }
 
-export function setAdminToken(token: string): void {
-  localStorage.setItem(TOKEN_STORAGE_KEY, token);
+export function getRefreshToken(): string {
+  return localStorage.getItem(REFRESH_TOKEN_KEY) ?? "";
 }
 
-export function clearAdminToken(): void {
-  localStorage.removeItem(TOKEN_STORAGE_KEY);
+export function setTokenPair(accessToken: string, refreshToken: string): void {
+  localStorage.setItem(ACCESS_TOKEN_KEY, accessToken);
+  localStorage.setItem(REFRESH_TOKEN_KEY, refreshToken);
+}
+
+export function clearTokenPair(): void {
+  localStorage.removeItem(ACCESS_TOKEN_KEY);
+  localStorage.removeItem(REFRESH_TOKEN_KEY);
+}
+
+/** Redirects the whole page to Google's consent screen via the backend. */
+export function startGoogleLogin(): void {
+  window.location.href = `${API_BASE_URL}/api/v1/auth/google/login`;
 }
 
 // ─── Types mirroring backend Pydantic schemas ──────────────────────────────
@@ -50,6 +64,7 @@ export interface ApiKeyUpdate {
 }
 
 export interface RequestEvent {
+  user_id: number;
   request_id: string;
   attempt: number;
   timestamp: string;
@@ -86,6 +101,13 @@ export interface GatewayTokenCreated {
   plaintext: string;
 }
 
+export interface UserRead {
+  id: number;
+  email: string;
+  display_name: string | null;
+  avatar_url: string | null;
+}
+
 export class ApiError extends Error {
   status: number;
   constructor(status: number, message: string) {
@@ -94,15 +116,51 @@ export class ApiError extends Error {
   }
 }
 
-async function request<T>(path: string, init?: RequestInit): Promise<T> {
+let refreshInFlight: Promise<boolean> | null = null;
+
+/** Exchanges the stored refresh token for a new pair. Single-flight so
+ * concurrent 401s don't each fire their own refresh call.
+ */
+async function tryRefresh(): Promise<boolean> {
+  if (!refreshInFlight) {
+    refreshInFlight = (async () => {
+      const refreshToken = getRefreshToken();
+      if (!refreshToken) return false;
+      try {
+        const res = await fetch(`${API_BASE_URL}/api/v1/auth/refresh`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ refresh_token: refreshToken }),
+        });
+        if (!res.ok) return false;
+        const pair = await res.json();
+        setTokenPair(pair.access_token, pair.refresh_token);
+        return true;
+      } catch {
+        return false;
+      } finally {
+        refreshInFlight = null;
+      }
+    })();
+  }
+  return refreshInFlight;
+}
+
+async function request<T>(path: string, init?: RequestInit, _retried = false): Promise<T> {
   const res = await fetch(`${API_BASE_URL}${path}`, {
     ...init,
     headers: {
       "Content-Type": "application/json",
-      Authorization: `Bearer ${getAdminToken()}`,
+      Authorization: `Bearer ${getAccessToken()}`,
       ...(init?.headers ?? {}),
     },
   });
+
+  if (res.status === 401 && !_retried) {
+    const refreshed = await tryRefresh();
+    if (refreshed) return request<T>(path, init, true);
+    clearTokenPair();
+  }
 
   if (!res.ok) {
     let detail = res.statusText;
@@ -121,88 +179,94 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
 
 export const api = {
   async listKeys(): Promise<ApiKeyRead[]> {
-    return request<ApiKeyRead[]>("/admin/keys");
+    return request<ApiKeyRead[]>("/api/v1/me/keys");
   },
 
   async createKey(payload: ApiKeyCreate): Promise<ApiKeyRead> {
-    return request<ApiKeyRead>("/admin/keys", {
+    return request<ApiKeyRead>("/api/v1/me/keys", {
       method: "POST",
       body: JSON.stringify(payload),
     });
   },
 
   async updateKey(id: number, payload: ApiKeyUpdate): Promise<ApiKeyRead> {
-    return request<ApiKeyRead>(`/admin/keys/${id}`, {
+    return request<ApiKeyRead>(`/api/v1/me/keys/${id}`, {
       method: "PATCH",
       body: JSON.stringify(payload),
     });
   },
 
   async resetCooldown(id: number): Promise<ApiKeyRead> {
-    return request<ApiKeyRead>(`/admin/keys/${id}/reset-cooldown`, {
+    return request<ApiKeyRead>(`/api/v1/me/keys/${id}/reset-cooldown`, {
       method: "POST",
     });
   },
 
   async deleteKey(id: number): Promise<void> {
-    return request<void>(`/admin/keys/${id}`, { method: "DELETE" });
+    return request<void>(`/api/v1/me/keys/${id}`, { method: "DELETE" });
   },
 
   async checkKey(id: number): Promise<ApiKeyHealthCheckResult> {
-    return request<ApiKeyHealthCheckResult>(`/admin/keys/${id}/check`, { method: "POST" });
+    return request<ApiKeyHealthCheckResult>(`/api/v1/me/keys/${id}/check`, { method: "POST" });
   },
 
   async checkAllKeys(): Promise<ApiKeyHealthCheckResult[]> {
-    return request<ApiKeyHealthCheckResult[]>("/admin/keys/check-all", { method: "POST" });
+    return request<ApiKeyHealthCheckResult[]>("/api/v1/me/keys/check-all", { method: "POST" });
   },
 
   async recentEvents(limit = 50): Promise<RequestEvent[]> {
     const data = await request<{ events: RequestEvent[] }>(
-      `/admin/monitor/recent?limit=${limit}`
+      `/api/v1/me/monitor/recent?limit=${limit}`
     );
     return data.events;
   },
 
   async listGatewayTokens(): Promise<GatewayTokenRead[]> {
-    return request<GatewayTokenRead[]>("/admin/gateway-tokens");
+    return request<GatewayTokenRead[]>("/api/v1/me/gateway-tokens");
   },
 
   async createGatewayToken(label: string): Promise<GatewayTokenCreated> {
-    return request<GatewayTokenCreated>("/admin/gateway-tokens", {
+    return request<GatewayTokenCreated>("/api/v1/me/gateway-tokens", {
       method: "POST",
       body: JSON.stringify({ label }),
     });
   },
 
   async revokeGatewayToken(id: number): Promise<GatewayTokenRead> {
-    return request<GatewayTokenRead>(`/admin/gateway-tokens/${id}/revoke`, { method: "POST" });
+    return request<GatewayTokenRead>(`/api/v1/me/gateway-tokens/${id}/revoke`, { method: "POST" });
   },
 
   async activateGatewayToken(id: number): Promise<GatewayTokenRead> {
-    return request<GatewayTokenRead>(`/admin/gateway-tokens/${id}/activate`, { method: "POST" });
+    return request<GatewayTokenRead>(`/api/v1/me/gateway-tokens/${id}/activate`, { method: "POST" });
   },
 
   async deleteGatewayToken(id: number): Promise<void> {
-    return request<void>(`/admin/gateway-tokens/${id}`, { method: "DELETE" });
+    return request<void>(`/api/v1/me/gateway-tokens/${id}`, { method: "DELETE" });
   },
 
-  /** Verifies the stored token actually works against the backend. */
-  async verifyToken(): Promise<boolean> {
+  /** Fetches the signed-in user's profile — also doubles as an auth check. */
+  async me(): Promise<UserRead> {
+    return request<UserRead>("/api/v1/auth/me");
+  },
+
+  async logout(): Promise<void> {
+    const refreshToken = getRefreshToken();
+    if (!refreshToken) return;
     try {
-      await request("/admin/keys");
-      return true;
+      await request<void>("/api/v1/auth/logout", {
+        method: "POST",
+        body: JSON.stringify({ refresh_token: refreshToken }),
+      });
     } catch {
-      return false;
+      // best-effort — clear local tokens regardless of server response
     }
   },
 };
 
 /**
- * Opens a Server-Sent Events connection to /admin/monitor/stream.
- * Native EventSource can't send custom headers, so the admin token is
- * passed as a query parameter — the backend's require_admin dependency
- * only checks the Authorization header, so we proxy this through fetch's
- * streaming body instead of EventSource for auth to work uniformly.
+ * Opens a Server-Sent Events connection to /api/v1/me/monitor/stream.
+ * Native EventSource can't send custom headers, so this is proxied through
+ * fetch's streaming body instead, same as the rest of the client.
  */
 export function streamEvents(
   onEvent: (evt: RequestEvent) => void,
@@ -212,8 +276,8 @@ export function streamEvents(
 
   (async () => {
     try {
-      const res = await fetch(`${API_BASE_URL}/admin/monitor/stream`, {
-        headers: { Authorization: `Bearer ${getAdminToken()}` },
+      const res = await fetch(`${API_BASE_URL}/api/v1/me/monitor/stream`, {
+        headers: { Authorization: `Bearer ${getAccessToken()}` },
         signal: controller.signal,
       });
       if (!res.ok || !res.body) throw new Error(`stream failed: ${res.status}`);

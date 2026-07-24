@@ -6,9 +6,10 @@ import {
 } from "lucide-react";
 import { AreaChart, Area, XAxis, Tooltip, ResponsiveContainer } from "recharts";
 import {
-  api, streamEvents, getAdminToken, setAdminToken, clearAdminToken,
+  api, streamEvents, getAccessToken, getRefreshToken, setTokenPair, clearTokenPair,
+  startGoogleLogin,
   ApiError, type ApiKeyRead, type RequestEvent as ApiRequestEvent,
-  type GatewayTokenRead, type GatewayTokenCreated,
+  type GatewayTokenRead, type GatewayTokenCreated, type UserRead,
 } from "./lib/api";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -158,8 +159,9 @@ function CircP({ used, limit, color }: { used: number; limit: number; color: str
 }
 
 // ─── TopBar ───────────────────────────────────────────────────────────────────
-function TopBar({ view, onView, onAdd, operational, onLogout }: {
+function TopBar({ view, onView, onAdd, operational, onLogout, userEmail }: {
   view: View; onView: (v: View) => void; onAdd: () => void; operational: boolean; onLogout: () => void;
+  userEmail?: string | null;
 }) {
   return (
     <header className="flex flex-col md:flex-row md:items-center md:justify-between md:h-14 shrink-0 px-3 sm:px-6 gap-2 md:gap-5 py-2.5 md:py-0"
@@ -219,6 +221,11 @@ function TopBar({ view, onView, onAdd, operational, onLogout }: {
           onMouseLeave={e => (e.currentTarget.style.boxShadow = "0 0 16px rgba(0,214,143,0.3)")}>
           <Plus size={13} /> Add Key
         </button>
+        {userEmail && (
+          <span className="hidden lg:inline text-[11px] font-mono truncate max-w-[160px]" style={{ color: "#52525B" }}>
+            {userEmail}
+          </span>
+        )}
         <button onClick={onLogout} title="Sign out"
           className="p-1.5 rounded-lg transition-colors hover:bg-white/5">
           <LogOut size={14} color="#52525B" />
@@ -793,26 +800,7 @@ function LiveMonitor({ reqs, now }: { reqs: LR[]; now: number }) {
 }
 
 // ─── LoginGate ──────────────────────────────────────────────────────────────
-function LoginGate({ onAuthenticated }: { onAuthenticated: () => void }) {
-  const [token, setToken] = useState("");
-  const [checking, setChecking] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
-  async function submit() {
-    if (!token.trim()) return;
-    setChecking(true);
-    setError(null);
-    setAdminToken(token.trim());
-    const ok = await api.verifyToken();
-    setChecking(false);
-    if (ok) {
-      onAuthenticated();
-    } else {
-      clearAdminToken();
-      setError("Invalid admin token, or the API is unreachable.");
-    }
-  }
-
+function LoginGate({ error }: { error?: string | null }) {
   return (
     <div className="min-h-screen flex items-center justify-center px-4"
       style={{ background: "#0A0A0B", fontFamily: "Inter, sans-serif" }}>
@@ -825,38 +813,28 @@ function LoginGate({ onAuthenticated }: { onAuthenticated: () => void }) {
           </div>
           <div>
             <p className="font-mono text-sm font-medium text-zinc-100">keypool</p>
-            <p className="text-[11px] text-zinc-600">Sign in to the admin dashboard</p>
+            <p className="text-[11px] text-zinc-600">Sign in to manage your keys</p>
           </div>
         </div>
 
-        <label className="block text-xs font-medium text-zinc-400 mb-1.5">Admin API Token</label>
-        <input
-          className="w-full px-3 py-2 rounded-lg text-sm font-mono outline-none transition-all"
-          style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)", color: "#ECECF0" }}
-          type="password"
-          placeholder="ADMIN_API_KEY from your .env"
-          value={token}
-          onChange={e => setToken(e.target.value)}
-          onKeyDown={e => e.key === "Enter" && submit()}
-          autoFocus
-        />
         {error && (
-          <p className="mt-2 text-xs flex items-center gap-1.5" style={{ color: "#EF4444" }}>
+          <p className="mb-4 text-xs flex items-center gap-1.5" style={{ color: "#EF4444" }}>
             <AlertTriangle size={12} className="shrink-0" /> {error}
           </p>
         )}
 
-        <button onClick={submit} disabled={checking || !token.trim()}
-          className="w-full mt-4 py-2 rounded-lg text-sm font-semibold transition-all flex items-center justify-center gap-1.5"
-          style={{ background: "#00D68F", color: "#0A0A0B", opacity: checking || !token.trim() ? 0.6 : 1 }}>
-          {checking && <Loader2 size={14} className="animate-spin" />}
-          {checking ? "Checking…" : "Continue"}
+        <button onClick={startGoogleLogin}
+          className="w-full py-2 rounded-lg text-sm font-semibold transition-all flex items-center justify-center gap-2"
+          style={{ background: "#00D68F", color: "#0A0A0B" }}>
+          <svg width="16" height="16" viewBox="0 0 24 24" aria-hidden="true">
+            <path fill="#0A0A0B" d="M12 11v2.8h6.5c-.3 1.6-2.1 4.7-6.5 4.7-3.9 0-7.1-3.2-7.1-7.2s3.2-7.2 7.1-7.2c2.2 0 3.7.9 4.6 1.7l3.1-3C17.6 1 15.1 0 12 0 5.4 0 0 5.4 0 12s5.4 12 12 12c6.9 0 11.5-4.8 11.5-11.6 0-.8-.1-1.4-.2-2H12z"/>
+          </svg>
+          Sign in with Google
         </button>
 
         <p className="mt-4 text-[11px] text-zinc-600 leading-relaxed">
-          This is the same value as <span className="font-mono text-zinc-500">ADMIN_API_KEY</span> in
-          the backend's <span className="font-mono text-zinc-500">.env</span>. It's stored only in
-          this browser's local storage.
+          Each account only sees and manages its own keys, gateway tokens,
+          and request history.
         </p>
       </div>
     </div>
@@ -867,12 +845,32 @@ function LoginGate({ onAuthenticated }: { onAuthenticated: () => void }) {
 export default function App() {
   const [authed, setAuthed] = useState(false);
   const [checkingAuth, setCheckingAuth] = useState(true);
+  const [authError, setAuthError] = useState<string | null>(null);
+  const [user, setUser] = useState<UserRead | null>(null);
 
   useEffect(() => {
     (async () => {
-      if (getAdminToken()) {
-        const ok = await api.verifyToken();
-        setAuthed(ok);
+      // Google OAuth callback lands back here with tokens in the URL
+      // fragment (never sent to a server on subsequent requests).
+      if (location.hash.includes("access_token=")) {
+        const params = new URLSearchParams(location.hash.slice(1));
+        const accessToken = params.get("access_token");
+        const refreshToken = params.get("refresh_token");
+        if (accessToken && refreshToken) {
+          setTokenPair(accessToken, refreshToken);
+          history.replaceState(null, "", location.pathname + location.search);
+        }
+      }
+
+      if (getAccessToken() || getRefreshToken()) {
+        try {
+          const me = await api.me();
+          setUser(me);
+          setAuthed(true);
+        } catch {
+          clearTokenPair();
+          setAuthError("Your session expired — please sign in again.");
+        }
       }
       setCheckingAuth(false);
     })();
@@ -887,10 +885,20 @@ export default function App() {
   }
 
   if (!authed) {
-    return <LoginGate onAuthenticated={() => setAuthed(true)} />;
+    return <LoginGate error={authError} />;
   }
 
-  return <Dashboard onLogout={() => { clearAdminToken(); setAuthed(false); }} />;
+  return (
+    <Dashboard
+      user={user}
+      onLogout={async () => {
+        await api.logout();
+        clearTokenPair();
+        setUser(null);
+        setAuthed(false);
+      }}
+    />
+  );
 }
 
 // ─── Dashboard (authenticated app) ─────────────────────────────────────────────
@@ -1117,7 +1125,7 @@ function GatewayAccessPanel() {
   );
 }
 
-function Dashboard({ onLogout }: { onLogout: () => void }) {
+function Dashboard({ user, onLogout }: { user: UserRead | null; onLogout: () => void }) {
   const [keys, setKeys]           = useState<AK[]>([]);
   const [loading, setLoading]     = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -1262,7 +1270,7 @@ function Dashboard({ onLogout }: { onLogout: () => void }) {
 
   return (
     <div className="min-h-screen flex flex-col" style={{ background: "#0A0A0B", fontFamily: "Inter, sans-serif" }}>
-      <TopBar view={view} onView={setView} onAdd={() => setAddOpen(true)} operational={operational} onLogout={onLogout} />
+      <TopBar view={view} onView={setView} onAdd={() => setAddOpen(true)} operational={operational} onLogout={onLogout} userEmail={user?.email} />
 
       <main className="flex-1 px-3 sm:px-6 py-4 sm:py-5 w-full max-w-[1400px] mx-auto space-y-4">
         {loadError && (
