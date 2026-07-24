@@ -4,8 +4,12 @@
 // /auth/google/callback, which lands back on the frontend with the
 // pair in the URL fragment (#access_token=...&refresh_token=...).
 
-export const API_BASE_URL: string =
-  (import.meta as any).env?.VITE_API_URL ?? "http://localhost:8000";
+// Normalized to never end in a trailing slash, so every call site below can
+// safely do `${API_BASE_URL}/some/path` without risking `//` or a missing
+// separator depending on how VITE_API_URL happens to be configured.
+export const API_BASE_URL: string = (
+  (import.meta as any).env?.VITE_API_URL ?? "http://localhost:8000"
+).replace(/\/+$/, "");
 
 const ACCESS_TOKEN_KEY = "llm_gateway_access_token";
 const REFRESH_TOKEN_KEY = "llm_gateway_refresh_token";
@@ -127,7 +131,7 @@ async function tryRefresh(): Promise<boolean> {
       const refreshToken = getRefreshToken();
       if (!refreshToken) return false;
       try {
-        const res = await fetch(`${API_BASE_URL}auth/refresh`, {
+        const res = await fetch(`${API_BASE_URL}/auth/refresh`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ refresh_token: refreshToken }),
@@ -147,7 +151,7 @@ async function tryRefresh(): Promise<boolean> {
 }
 
 async function request<T>(path: string, init?: RequestInit, _retried = false): Promise<T> {
-  const res = await fetch(`${API_BASE_URL}${path}`, {
+  const res = await fetch(`${API_BASE_URL}/${path.replace(/^\/+/, "")}`, {
     ...init,
     headers: {
       "Content-Type": "application/json",
@@ -276,7 +280,7 @@ export function streamEvents(
 
   (async () => {
     try {
-      const res = await fetch(`${API_BASE_URL}me/monitor/stream`, {
+      const res = await fetch(`${API_BASE_URL}/me/monitor/stream`, {
         headers: { Authorization: `Bearer ${getAccessToken()}` },
         signal: controller.signal,
       });
