@@ -67,6 +67,8 @@ async def stream_events(
                     yield {"event": "ping", "data": ""}
                     continue
 
+                logger.info("monitoring stream: received message for user_id=%s", user.id)
+
                 try:
                     RequestEvent.model_validate_json(message["data"])
                 except Exception:  # noqa: BLE001 - never let a malformed event kill the stream

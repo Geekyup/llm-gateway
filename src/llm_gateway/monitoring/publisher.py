@@ -46,7 +46,11 @@ class RequestEventPublisher:
                 pipe.publish(channel_for(event.user_id), payload)
                 pipe.lpush(_history_key(event.user_id), payload)
                 pipe.ltrim(_history_key(event.user_id), 0, HISTORY_MAX_LEN - 1)
-                await pipe.execute()
+                results = await pipe.execute()
+            logger.info(
+                "monitoring publish: user_id=%s channel=%s subscribers_notified=%s",
+                event.user_id, channel_for(event.user_id), results[0] if results else "?",
+            )
         except Exception:  # noqa: BLE001 - monitoring must never break the gateway hot path
             logger.warning("failed to publish monitoring event request_id=%s", event.request_id, exc_info=True)
 
