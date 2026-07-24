@@ -1,7 +1,7 @@
 // ─── API client for llm-gateway backend ────────────────────────────────────
-// Talks to /api/v1/me/keys* and /api/v1/me/monitor* on the FastAPI backend.
+// Talks to /me/keys* and /me/monitor* on the FastAPI backend.
 // Auth is Google OAuth: the backend issues a JWT access/refresh pair after
-// /api/v1/auth/google/callback, which lands back on the frontend with the
+// /auth/google/callback, which lands back on the frontend with the
 // pair in the URL fragment (#access_token=...&refresh_token=...).
 
 export const API_BASE_URL: string =
@@ -30,7 +30,7 @@ export function clearTokenPair(): void {
 
 /** Redirects the whole page to Google's consent screen via the backend. */
 export function startGoogleLogin(): void {
-  window.location.href = `${API_BASE_URL}/api/v1/auth/google/login`;
+  window.location.href = `${API_BASE_URL}/auth/google/login`;
 }
 
 // ─── Types mirroring backend Pydantic schemas ──────────────────────────────
@@ -127,7 +127,7 @@ async function tryRefresh(): Promise<boolean> {
       const refreshToken = getRefreshToken();
       if (!refreshToken) return false;
       try {
-        const res = await fetch(`${API_BASE_URL}/api/v1/auth/refresh`, {
+        const res = await fetch(`${API_BASE_URL}auth/refresh`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ refresh_token: refreshToken }),
@@ -179,81 +179,81 @@ async function request<T>(path: string, init?: RequestInit, _retried = false): P
 
 export const api = {
   async listKeys(): Promise<ApiKeyRead[]> {
-    return request<ApiKeyRead[]>("/api/v1/me/keys");
+    return request<ApiKeyRead[]>("me/keys");
   },
 
   async createKey(payload: ApiKeyCreate): Promise<ApiKeyRead> {
-    return request<ApiKeyRead>("/api/v1/me/keys", {
+    return request<ApiKeyRead>("me/keys", {
       method: "POST",
       body: JSON.stringify(payload),
     });
   },
 
   async updateKey(id: number, payload: ApiKeyUpdate): Promise<ApiKeyRead> {
-    return request<ApiKeyRead>(`/api/v1/me/keys/${id}`, {
+    return request<ApiKeyRead>(`me/keys/${id}`, {
       method: "PATCH",
       body: JSON.stringify(payload),
     });
   },
 
   async resetCooldown(id: number): Promise<ApiKeyRead> {
-    return request<ApiKeyRead>(`/api/v1/me/keys/${id}/reset-cooldown`, {
+    return request<ApiKeyRead>(`me/keys/${id}/reset-cooldown`, {
       method: "POST",
     });
   },
 
   async deleteKey(id: number): Promise<void> {
-    return request<void>(`/api/v1/me/keys/${id}`, { method: "DELETE" });
+    return request<void>(`me/keys/${id}`, { method: "DELETE" });
   },
 
   async checkKey(id: number): Promise<ApiKeyHealthCheckResult> {
-    return request<ApiKeyHealthCheckResult>(`/api/v1/me/keys/${id}/check`, { method: "POST" });
+    return request<ApiKeyHealthCheckResult>(`me/keys/${id}/check`, { method: "POST" });
   },
 
   async checkAllKeys(): Promise<ApiKeyHealthCheckResult[]> {
-    return request<ApiKeyHealthCheckResult[]>("/api/v1/me/keys/check-all", { method: "POST" });
+    return request<ApiKeyHealthCheckResult[]>("me/keys/check-all", { method: "POST" });
   },
 
   async recentEvents(limit = 50): Promise<RequestEvent[]> {
     const data = await request<{ events: RequestEvent[] }>(
-      `/api/v1/me/monitor/recent?limit=${limit}`
+      `me/monitor/recent?limit=${limit}`
     );
     return data.events;
   },
 
   async listGatewayTokens(): Promise<GatewayTokenRead[]> {
-    return request<GatewayTokenRead[]>("/api/v1/me/gateway-tokens");
+    return request<GatewayTokenRead[]>("me/gateway-tokens");
   },
 
   async createGatewayToken(label: string): Promise<GatewayTokenCreated> {
-    return request<GatewayTokenCreated>("/api/v1/me/gateway-tokens", {
+    return request<GatewayTokenCreated>("me/gateway-tokens", {
       method: "POST",
       body: JSON.stringify({ label }),
     });
   },
 
   async revokeGatewayToken(id: number): Promise<GatewayTokenRead> {
-    return request<GatewayTokenRead>(`/api/v1/me/gateway-tokens/${id}/revoke`, { method: "POST" });
+    return request<GatewayTokenRead>(`me/gateway-tokens/${id}/revoke`, { method: "POST" });
   },
 
   async activateGatewayToken(id: number): Promise<GatewayTokenRead> {
-    return request<GatewayTokenRead>(`/api/v1/me/gateway-tokens/${id}/activate`, { method: "POST" });
+    return request<GatewayTokenRead>(`me/gateway-tokens/${id}/activate`, { method: "POST" });
   },
 
   async deleteGatewayToken(id: number): Promise<void> {
-    return request<void>(`/api/v1/me/gateway-tokens/${id}`, { method: "DELETE" });
+    return request<void>(`me/gateway-tokens/${id}`, { method: "DELETE" });
   },
 
   /** Fetches the signed-in user's profile — also doubles as an auth check. */
   async me(): Promise<UserRead> {
-    return request<UserRead>("/api/v1/auth/me");
+    return request<UserRead>("auth/me");
   },
 
   async logout(): Promise<void> {
     const refreshToken = getRefreshToken();
     if (!refreshToken) return;
     try {
-      await request<void>("/api/v1/auth/logout", {
+      await request<void>("auth/logout", {
         method: "POST",
         body: JSON.stringify({ refresh_token: refreshToken }),
       });
@@ -264,7 +264,7 @@ export const api = {
 };
 
 /**
- * Opens a Server-Sent Events connection to /api/v1/me/monitor/stream.
+ * Opens a Server-Sent Events connection to /me/monitor/stream.
  * Native EventSource can't send custom headers, so this is proxied through
  * fetch's streaming body instead, same as the rest of the client.
  */
@@ -276,7 +276,7 @@ export function streamEvents(
 
   (async () => {
     try {
-      const res = await fetch(`${API_BASE_URL}/api/v1/me/monitor/stream`, {
+      const res = await fetch(`${API_BASE_URL}me/monitor/stream`, {
         headers: { Authorization: `Bearer ${getAccessToken()}` },
         signal: controller.signal,
       });
