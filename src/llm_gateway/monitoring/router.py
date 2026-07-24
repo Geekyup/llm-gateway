@@ -78,4 +78,7 @@ async def stream_events(
             await pubsub.unsubscribe(channel_for(user.id))
             await pubsub.aclose()
 
-    return EventSourceResponse(event_generator())
+    return EventSourceResponse(
+        event_generator(),
+        headers={"X-Accel-Buffering": "no", "Cache-Control": "no-cache"},
+    )

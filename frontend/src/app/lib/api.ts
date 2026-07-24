@@ -273,48 +273,65 @@ export function streamEvents(
   onError?: (err: unknown) => void
 ): () => void {
   const controller = new AbortController();
+  let stopped = false;
+  let retryDelayMs = 1000;
 
-  (async () => {
-    try {
-      const res = await fetch(`${API_BASE_URL}/me/monitor/stream`, {
-        headers: { Authorization: `Bearer ${getAccessToken()}` },
-        signal: controller.signal,
-      });
-      if (!res.ok || !res.body) throw new Error(`stream failed: ${res.status}`);
+  async function connect() {
+    while (!stopped) {
+      try {
+        const res = await fetch(`${API_BASE_URL}/me/monitor/stream`, {
+          headers: { Authorization: `Bearer ${getAccessToken()}` },
+          signal: controller.signal,
+        });
+        if (!res.ok || !res.body) throw new Error(`stream failed: ${res.status}`);
 
-      const reader = res.body.getReader();
-      const decoder = new TextDecoder();
-      let buffer = "";
+        const reader = res.body.getReader();
+        const decoder = new TextDecoder();
+        let buffer = "";
+        retryDelayMs = 1000; // connected successfully — reset backoff
 
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        buffer += decoder.decode(value, { stream: true });
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          buffer += decoder.decode(value, { stream: true });
 
-        const chunks = buffer.split("\n\n");
-        buffer = chunks.pop() ?? "";
+          const chunks = buffer.split("\n\n");
+          buffer = chunks.pop() ?? "";
 
-        for (const chunk of chunks) {
-          const lines = chunk.split("\n");
-          let eventName = "message";
-          let data = "";
-          for (const line of lines) {
-            if (line.startsWith("event:")) eventName = line.slice(6).trim();
-            if (line.startsWith("data:")) data += line.slice(5).trim();
-          }
-          if (eventName === "request" && data) {
-            try {
-              onEvent(JSON.parse(data) as RequestEvent);
-            } catch {
-              // ignore malformed event
+          for (const chunk of chunks) {
+            const lines = chunk.split("\n");
+            let eventName = "message";
+            let data = "";
+            for (const line of lines) {
+              if (line.startsWith("event:")) eventName = line.slice(6).trim();
+              if (line.startsWith("data:")) data += line.slice(5).trim();
+            }
+            if (eventName === "request" && data) {
+              try {
+                onEvent(JSON.parse(data) as RequestEvent);
+              } catch {
+                // ignore malformed event
+              }
             }
           }
         }
+        // Server closed the stream cleanly (e.g. proxy idle timeout) —
+        // fall through to reconnect below rather than staying dead.
+      } catch (err) {
+        if ((err as any)?.name === "AbortError" || stopped) return;
+        onError?.(err);
       }
-    } catch (err) {
-      if ((err as any)?.name !== "AbortError") onError?.(err);
-    }
-  })();
 
-  return () => controller.abort();
+      if (stopped) return;
+      await new Promise(r => setTimeout(r, retryDelayMs));
+      retryDelayMs = Math.min(retryDelayMs * 2, 15000);
+    }
+  }
+
+  connect();
+
+  return () => {
+    stopped = true;
+    controller.abort();
+  };
 }

@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import {
   Plus, Eye, EyeOff, X, Activity, RefreshCw, Trash2, Edit2,
   Power, Clock, ArrowRight, CheckCircle2, Shield, AlertTriangle,
@@ -470,10 +470,16 @@ function AddEditModal({ editKey, onSave, onClose, error, saving }: {
     e.target.style.boxShadow = "none";
   }
 
+  const overlayMouseDownOnSelf = useRef(false);
+
   return (
     <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center"
       style={{ background: "rgba(0,0,0,0.72)", backdropFilter: "blur(4px)" }}
-      onClick={e => { if (e.target === e.currentTarget) onClose(); }}>
+      onMouseDown={e => { overlayMouseDownOnSelf.current = e.target === e.currentTarget; }}
+      onMouseUp={e => {
+        if (overlayMouseDownOnSelf.current && e.target === e.currentTarget) onClose();
+        overlayMouseDownOnSelf.current = false;
+      }}>
       <div className="w-full sm:max-w-md rounded-t-2xl sm:rounded-2xl p-5 sm:p-6 max-h-[92vh] overflow-y-auto"
         style={{ background: "#141416", border: "1px solid rgba(255,255,255,0.09)", boxShadow: "0 32px 80px rgba(0,0,0,0.6)" }}>
         <div className="flex items-center justify-between mb-6">
@@ -1172,7 +1178,7 @@ function Dashboard({ user, onLogout }: { user: UserRead | null; onLogout: () => 
     api.recentEvents(50).then(events => setReqs(events.map(toLR).reverse())).catch(() => {});
     const stop = streamEvents(
       evt => setReqs(prev => [toLR(evt), ...prev.slice(0, 99)]),
-      () => {}
+      err => console.warn("live event stream disconnected:", err)
     );
     return stop;
   }, []);
