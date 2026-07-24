@@ -39,21 +39,22 @@ def key_pool(key_repo, fake_redis):
     return KeyPoolService(key_repo, cache, selector)
 
 
-async def _create_active_key(key_pool: KeyPoolService, label: str):
+async def _create_active_key(key_pool: KeyPoolService, user_id: int, label: str):
     from llm_gateway.keys.schemas import APIKeyCreate
 
     return await key_pool.create_key(
-        APIKeyCreate(label=label, provider=ProviderType.GEMINI, raw_key=f"raw-{label}", daily_limit=100)
+        user_id, APIKeyCreate(label=label, provider=ProviderType.GEMINI, raw_key=f"raw-{label}", daily_limit=100)
     )
 
 
 @pytest.mark.asyncio
-async def test_first_key_succeeds_no_retry(key_pool):
-    await _create_active_key(key_pool, "k1")
+async def test_first_key_succeeds_no_retry(key_pool, test_user):
+    await _create_active_key(key_pool, test_user.id, "k1")
     provider = ScriptedProvider([200])
     gateway = GatewayService(key_pool, max_attempts=3)
 
     response = await gateway.proxy_request(
+        user_id=test_user.id,
         provider=provider,
         provider_type=ProviderType.GEMINI,
         path="v1beta/models/gemini-1.5-flash:generateContent",
@@ -67,13 +68,14 @@ async def test_first_key_succeeds_no_retry(key_pool):
 
 
 @pytest.mark.asyncio
-async def test_429_triggers_failover_to_second_key(key_pool):
-    await _create_active_key(key_pool, "k1")
-    await _create_active_key(key_pool, "k2")
+async def test_429_triggers_failover_to_second_key(key_pool, test_user):
+    await _create_active_key(key_pool, test_user.id, "k1")
+    await _create_active_key(key_pool, test_user.id, "k2")
     provider = ScriptedProvider([429, 200])
     gateway = GatewayService(key_pool, max_attempts=3)
 
     response = await gateway.proxy_request(
+        user_id=test_user.id,
         provider=provider,
         provider_type=ProviderType.GEMINI,
         path="p",
@@ -89,14 +91,15 @@ async def test_429_triggers_failover_to_second_key(key_pool):
 
 
 @pytest.mark.asyncio
-async def test_all_keys_rate_limited_raises_upstream_exhausted(key_pool):
-    await _create_active_key(key_pool, "k1")
-    await _create_active_key(key_pool, "k2")
+async def test_all_keys_rate_limited_raises_upstream_exhausted(key_pool, test_user):
+    await _create_active_key(key_pool, test_user.id, "k1")
+    await _create_active_key(key_pool, test_user.id, "k2")
     provider = ScriptedProvider([429, 429])
     gateway = GatewayService(key_pool, max_attempts=3)
 
     with pytest.raises(UpstreamExhaustedError):
         await gateway.proxy_request(
+            user_id=test_user.id,
             provider=provider,
             provider_type=ProviderType.GEMINI,
             path="p",
@@ -107,12 +110,13 @@ async def test_all_keys_rate_limited_raises_upstream_exhausted(key_pool):
 
 
 @pytest.mark.asyncio
-async def test_no_keys_at_all_raises_no_available_keys(key_pool):
+async def test_no_keys_at_all_raises_no_available_keys(key_pool, test_user):
     provider = ScriptedProvider([])
     gateway = GatewayService(key_pool, max_attempts=3)
 
     with pytest.raises(NoAvailableKeysError):
         await gateway.proxy_request(
+            user_id=test_user.id,
             provider=provider,
             provider_type=ProviderType.GEMINI,
             path="p",
@@ -123,13 +127,14 @@ async def test_no_keys_at_all_raises_no_available_keys(key_pool):
 
 
 @pytest.mark.asyncio
-async def test_exhausted_key_marked_and_skipped_next_call(key_pool):
-    await _create_active_key(key_pool, "k1")
-    await _create_active_key(key_pool, "k2")
+async def test_exhausted_key_marked_and_skipped_next_call(key_pool, test_user):
+    await _create_active_key(key_pool, test_user.id, "k1")
+    await _create_active_key(key_pool, test_user.id, "k2")
     provider = ScriptedProvider([403, 200])
     gateway = GatewayService(key_pool, max_attempts=3)
 
     response = await gateway.proxy_request(
+        user_id=test_user.id,
         provider=provider,
         provider_type=ProviderType.GEMINI,
         path="p",
@@ -143,19 +148,45 @@ async def test_exhausted_key_marked_and_skipped_next_call(key_pool):
     # than which specific label got exhausted: exactly one key should have
     # been marked exhausted (the one that returned 403) and one should
     # remain active (the one that returned 200 on the retry).
-    keys = await key_pool.list_keys(provider=ProviderType.GEMINI)
+    keys = await key_pool.list_keys(test_user.id, provider=ProviderType.GEMINI)
     statuses = sorted(k.status.value for k in keys)
     assert statuses == ["active", "exhausted"]
 
 
 @pytest.mark.asyncio
-async def test_successful_request_emits_one_event(key_pool, fake_redis):
-    await _create_active_key(key_pool, "k1")
+async def test_user_never_draws_on_another_users_keys(key_pool, test_user, other_user):
+    """The core isolation guarantee: a request authenticated as test_user
+    must only ever be served by test_user's own keys, even when another
+    user's pool has active keys for the same provider.
+    """
+    await _create_active_key(key_pool, other_user.id, "not-yours")
+    provider = ScriptedProvider([])
+    gateway = GatewayService(key_pool, max_attempts=3)
+
+    # test_user has zero keys of their own — must fail with NoAvailableKeysError,
+    # never silently fall back to other_user's key.
+    with pytest.raises(NoAvailableKeysError):
+        await gateway.proxy_request(
+            user_id=test_user.id,
+            provider=provider,
+            provider_type=ProviderType.GEMINI,
+            path="p",
+            method="POST",
+            payload=None,
+            headers={},
+        )
+    assert provider.calls == []
+
+
+@pytest.mark.asyncio
+async def test_successful_request_emits_one_event(key_pool, fake_redis, test_user):
+    await _create_active_key(key_pool, test_user.id, "k1")
     provider = ScriptedProvider([200])
     publisher = RequestEventPublisher(fake_redis)
     gateway = GatewayService(key_pool, max_attempts=3, event_publisher=publisher)
 
     await gateway.proxy_request(
+        user_id=test_user.id,
         provider=provider,
         provider_type=ProviderType.GEMINI,
         path="p",
@@ -164,23 +195,25 @@ async def test_successful_request_emits_one_event(key_pool, fake_redis):
         headers={},
     )
 
-    events = await publisher.recent(limit=10)
+    events = await publisher.recent(test_user.id, limit=10)
     assert len(events) == 1
     assert events[0].outcome == "success"
     assert events[0].attempt == 1
     assert events[0].is_retry is False
     assert events[0].upstream_status == 200
+    assert events[0].user_id == test_user.id
 
 
 @pytest.mark.asyncio
-async def test_retry_emits_one_event_per_attempt_sharing_request_id(key_pool, fake_redis):
-    await _create_active_key(key_pool, "k1")
-    await _create_active_key(key_pool, "k2")
+async def test_retry_emits_one_event_per_attempt_sharing_request_id(key_pool, fake_redis, test_user):
+    await _create_active_key(key_pool, test_user.id, "k1")
+    await _create_active_key(key_pool, test_user.id, "k2")
     provider = ScriptedProvider([429, 200])
     publisher = RequestEventPublisher(fake_redis)
     gateway = GatewayService(key_pool, max_attempts=3, event_publisher=publisher)
 
     await gateway.proxy_request(
+        user_id=test_user.id,
         provider=provider,
         provider_type=ProviderType.GEMINI,
         path="p",
@@ -189,7 +222,7 @@ async def test_retry_emits_one_event_per_attempt_sharing_request_id(key_pool, fa
         headers={},
     )
 
-    events = await publisher.recent(limit=10)
+    events = await publisher.recent(test_user.id, limit=10)
     assert len(events) == 2
     # recent() returns newest first: attempt 2 (success) then attempt 1 (rate_limited).
     assert events[0].outcome == "success"
@@ -203,13 +236,14 @@ async def test_retry_emits_one_event_per_attempt_sharing_request_id(key_pool, fa
 
 
 @pytest.mark.asyncio
-async def test_no_keys_available_emits_no_keys_event(key_pool, fake_redis):
+async def test_no_keys_available_emits_no_keys_event(key_pool, fake_redis, test_user):
     provider = ScriptedProvider([])
     publisher = RequestEventPublisher(fake_redis)
     gateway = GatewayService(key_pool, max_attempts=3, event_publisher=publisher)
 
     with pytest.raises(NoAvailableKeysError):
         await gateway.proxy_request(
+            user_id=test_user.id,
             provider=provider,
             provider_type=ProviderType.GEMINI,
             path="p",
@@ -218,22 +252,60 @@ async def test_no_keys_available_emits_no_keys_event(key_pool, fake_redis):
             headers={},
         )
 
-    events = await publisher.recent(limit=10)
+    events = await publisher.recent(test_user.id, limit=10)
     assert len(events) == 1
     assert events[0].outcome == "no_keys"
     assert events[0].key_id is None
 
 
 @pytest.mark.asyncio
-async def test_no_publisher_configured_does_not_raise(key_pool):
+async def test_events_never_leak_across_users(key_pool, fake_redis, test_user, other_user):
+    """Two users hitting the gateway concurrently must never see each
+    other's events in their own history.
+    """
+    await _create_active_key(key_pool, test_user.id, "mine")
+    await _create_active_key(key_pool, other_user.id, "theirs")
+    publisher = RequestEventPublisher(fake_redis)
+    gateway = GatewayService(key_pool, max_attempts=3, event_publisher=publisher)
+
+    await gateway.proxy_request(
+        user_id=test_user.id,
+        provider=ScriptedProvider([200]),
+        provider_type=ProviderType.GEMINI,
+        path="p",
+        method="POST",
+        payload=None,
+        headers={},
+    )
+    await gateway.proxy_request(
+        user_id=other_user.id,
+        provider=ScriptedProvider([200]),
+        provider_type=ProviderType.GEMINI,
+        path="p",
+        method="POST",
+        payload=None,
+        headers={},
+    )
+
+    my_events = await publisher.recent(test_user.id, limit=10)
+    their_events = await publisher.recent(other_user.id, limit=10)
+    assert len(my_events) == 1
+    assert len(their_events) == 1
+    assert my_events[0].user_id == test_user.id
+    assert their_events[0].user_id == other_user.id
+
+
+@pytest.mark.asyncio
+async def test_no_publisher_configured_does_not_raise(key_pool, test_user):
     """GatewayService without an event_publisher (e.g. old test call sites)
     must keep working exactly as before — monitoring is additive, not required.
     """
-    await _create_active_key(key_pool, "k1")
+    await _create_active_key(key_pool, test_user.id, "k1")
     provider = ScriptedProvider([200])
     gateway = GatewayService(key_pool, max_attempts=3)  # no event_publisher
 
     response = await gateway.proxy_request(
+        user_id=test_user.id,
         provider=provider,
         provider_type=ProviderType.GEMINI,
         path="p",

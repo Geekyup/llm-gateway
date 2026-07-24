@@ -12,9 +12,11 @@ import pytest
 import pytest_asyncio
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
+from llm_gateway.auth.models import User
 from llm_gateway.auth.repository import RefreshTokenRepository, UserRepository
 from llm_gateway.db.base import Base
 from llm_gateway.keys.repository import APIKeyRepository
+from llm_gateway.tokens.repository import GatewayTokenRepository
 
 
 @pytest_asyncio.fixture
@@ -43,8 +45,37 @@ async def key_repo(db_session: AsyncSession) -> APIKeyRepository:
 
 
 @pytest_asyncio.fixture
+async def token_repo(db_session: AsyncSession) -> GatewayTokenRepository:
+    return GatewayTokenRepository(db_session)
+
+
+@pytest_asyncio.fixture
 async def user_repo(db_session: AsyncSession) -> UserRepository:
     return UserRepository(db_session)
+
+
+@pytest_asyncio.fixture
+async def test_user(db_session: AsyncSession) -> User:
+    """A real persisted User row — api_keys/gateway_tokens now have a
+    NOT NULL FK to users.id, so key/token tests need an owner to point at.
+    """
+    user = User(google_sub="test-google-sub-1", email="owner@example.com", display_name="Owner")
+    db_session.add(user)
+    await db_session.commit()
+    await db_session.refresh(user)
+    return user
+
+
+@pytest_asyncio.fixture
+async def other_user(db_session: AsyncSession) -> User:
+    """A second, distinct owner — for isolation tests (user A can't touch
+    user B's keys/tokens/events).
+    """
+    user = User(google_sub="test-google-sub-2", email="other@example.com", display_name="Other")
+    db_session.add(user)
+    await db_session.commit()
+    await db_session.refresh(user)
+    return user
 
 
 @pytest_asyncio.fixture

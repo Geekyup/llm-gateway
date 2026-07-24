@@ -37,6 +37,7 @@ class GatewayService:
     async def _emit(
         self,
         *,
+        user_id: int,
         request_id: str,
         attempt: int,
         provider_type: ProviderType,
@@ -53,6 +54,7 @@ class GatewayService:
             return
         await self._events.publish(
             RequestEvent(
+                user_id=user_id,
                 request_id=request_id,
                 attempt=attempt,
                 timestamp=datetime.now(timezone.utc),
@@ -72,6 +74,7 @@ class GatewayService:
     async def proxy_request(
         self,
         *,
+        user_id: int,
         provider: Provider,
         provider_type: ProviderType,
         path: str,
@@ -84,10 +87,11 @@ class GatewayService:
         last_response: httpx.Response | None = None
 
         for attempt in range(1, self._max_attempts + 1):
-            dto = await self._key_pool.select_key(provider_type)
+            dto = await self._key_pool.select_key(user_id, provider_type)
             if dto is None:
                 outcome = "upstream_exhausted" if tried_key_ids else "no_keys"
                 await self._emit(
+                    user_id=user_id,
                     request_id=request_id,
                     attempt=attempt,
                     provider_type=provider_type,
@@ -123,8 +127,9 @@ class GatewayService:
             last_response = response
 
             if provider.is_key_exhausted(response):
-                await self._key_pool.record_exhausted(dto.id, provider_type)
+                await self._key_pool.record_exhausted(dto.id, user_id, provider_type)
                 await self._emit(
+                    user_id=user_id,
                     request_id=request_id,
                     attempt=attempt,
                     provider_type=provider_type,
@@ -140,8 +145,9 @@ class GatewayService:
                 continue
 
             if provider.is_rate_limited(response):
-                await self._key_pool.record_rate_limited(dto.id, provider_type)
+                await self._key_pool.record_rate_limited(dto.id, user_id, provider_type)
                 await self._emit(
+                    user_id=user_id,
                     request_id=request_id,
                     attempt=attempt,
                     provider_type=provider_type,
@@ -156,8 +162,9 @@ class GatewayService:
                 logger.info("attempt=%d key_id=%s rate-limited, retrying", attempt, dto.id)
                 continue
 
-            await self._key_pool.record_success(dto.id, provider_type)
+            await self._key_pool.record_success(dto.id, user_id, provider_type)
             await self._emit(
+                user_id=user_id,
                 request_id=request_id,
                 attempt=attempt,
                 provider_type=provider_type,

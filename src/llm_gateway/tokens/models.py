@@ -1,19 +1,21 @@
 from datetime import datetime
 
-from sqlalchemy import Boolean, DateTime, Integer, String
+from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, String
 from sqlalchemy.orm import Mapped, mapped_column
 
 from llm_gateway.db.base import Base, TimestampMixin
 
 
 class GatewayToken(TimestampMixin, Base):
-    """A client-facing token that unifies access to the whole key pool.
+    """A client-facing token that unifies access to one user's key pool.
 
     This is deliberately separate from APIKey (the upstream provider keys)
     and from ADMIN_API_KEY (which guards /admin/* management endpoints).
     A GatewayToken is what an external application uses to call
     POST /v1/{provider}/... — it never sees which upstream key served the
-    request, only that the call succeeded.
+    request, only that the call succeeded. Every GatewayToken belongs to
+    exactly one user, and a request authenticated with it can only ever
+    draw from that same user's api_keys.
 
     Only a salted hash of the token is stored; the plaintext is generated
     once, shown to the admin exactly one time, and never persisted or
@@ -23,6 +25,11 @@ class GatewayToken(TimestampMixin, Base):
     __tablename__ = "gateway_tokens"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
+
+    # Owning account — determines whose api_keys this token can draw from.
+    user_id: Mapped[int] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True
+    )
 
     # Human-friendly label, e.g. "kitroom-backend", "mobile-app-prod".
     label: Mapped[str] = mapped_column(String(255), nullable=False)

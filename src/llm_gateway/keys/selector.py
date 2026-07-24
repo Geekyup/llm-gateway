@@ -14,25 +14,25 @@ class KeySelector(ABC):
     """
 
     @abstractmethod
-    async def select(self, provider: str, candidates: list[APIKeyDTO]) -> APIKeyDTO | None:
+    async def select(self, user_id: int, provider: str, candidates: list[APIKeyDTO]) -> APIKeyDTO | None:
         """Return the next key to try, or None if candidates is empty."""
 
 
 class RoundRobinSelector(KeySelector):
-    """Cursor lives in Redis under `keyselector:cursor:{provider}` so that
-    multiple API replicas rotate through the same sequence instead of each
-    starting from index 0.
+    """Cursor lives in Redis under `keyselector:cursor:{user_id}:{provider}`
+    so that multiple API replicas rotate through the same sequence instead
+    of each starting from index 0, and each user's rotation is independent.
     """
 
     def __init__(self, redis: Redis) -> None:
         self._redis = redis
 
-    def _cursor_key(self, provider: str) -> str:
-        return f"keyselector:cursor:{provider}"
+    def _cursor_key(self, user_id: int, provider: str) -> str:
+        return f"keyselector:cursor:{user_id}:{provider}"
 
-    async def select(self, provider: str, candidates: list[APIKeyDTO]) -> APIKeyDTO | None:
+    async def select(self, user_id: int, provider: str, candidates: list[APIKeyDTO]) -> APIKeyDTO | None:
         if not candidates:
             return None
-        cursor = await self._redis.incr(self._cursor_key(provider))
+        cursor = await self._redis.incr(self._cursor_key(user_id, provider))
         index = cursor % len(candidates)
         return candidates[index]

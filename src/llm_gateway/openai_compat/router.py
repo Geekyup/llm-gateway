@@ -19,7 +19,7 @@ from llm_gateway.providers.registry import get_provider
 
 logger = logging.getLogger(__name__)
 
-router = APIRouter(prefix="/v1", tags=["openai-compat"], dependencies=[Depends(require_gateway_token)])
+router = APIRouter(prefix="/v1", tags=["openai-compat"])
 
 # Every request through this endpoint goes to Gemini today. Once a second
 # provider is registered, pick it from `request.model` (e.g. a prefix or
@@ -36,6 +36,7 @@ def _openai_error(status_code: int, message: str, error_type: str) -> JSONRespon
 async def chat_completions(
     request: ChatCompletionRequest,
     gateway: GatewayService = Depends(get_gateway_service),
+    user_id: int = Depends(require_gateway_token),
 ):
     """OpenAI-compatible chat completions, backed by the Gemini key pool.
 
@@ -57,6 +58,7 @@ async def chat_completions(
 
     try:
         upstream_response = await gateway.proxy_request(
+            user_id=user_id,
             provider=provider,
             provider_type=_PROVIDER_TYPE,
             path=path,

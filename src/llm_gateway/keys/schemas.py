@@ -56,6 +56,7 @@ class APIKeyDTO(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     id: int
+    user_id: int
     label: str
     provider: ProviderType
     status: KeyStatus

@@ -10,10 +10,15 @@ def require_admin(
     credentials: HTTPAuthorizationCredentials = Depends(_bearer_scheme),
     settings: Settings = Depends(get_settings),
 ) -> None:
-    """MVP admin auth: a single static bearer token from settings.
+    """Single static bearer token from settings.
 
-    Deliberately simple — swap for real user/role auth (reusing the
-    template-fastapi-jwt-auth stack) once this needs multiple operators.
+    NOT currently wired to any router — key and gateway-token CRUD moved to
+    /me/* under per-user JWT auth (see auth/deps.get_current_user) once the
+    key pool and tokens became per-account rather than one shared pool.
+    Kept available for any future operator-only, cross-account action
+    (e.g. a system-wide admin dashboard) that genuinely needs to bypass
+    per-user scoping — do not reintroduce it as a substitute for
+    get_current_user on anything that touches one user's own data.
     """
     if credentials.credentials != settings.ADMIN_API_KEY:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid admin credentials")

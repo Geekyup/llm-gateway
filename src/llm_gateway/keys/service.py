@@ -32,104 +32,110 @@ class KeyPoolService:
 
     # --- admin-facing CRUD -------------------------------------------------
 
-    async def create_key(self, payload: APIKeyCreate):
+    async def create_key(self, user_id: int, payload: APIKeyCreate):
         encrypted = encrypt_key(payload.raw_key)
         key = await self._repo.create(
+            user_id=user_id,
             label=payload.label,
             provider=payload.provider,
             key_encrypted=encrypted,
             daily_limit=payload.daily_limit,
         )
-        await self._cache.invalidate(payload.provider.value)
+        await self._cache.invalidate(user_id, payload.provider.value)
         return key  # ORM row — admin router serializes via APIKeyRead.model_validate
 
-    async def list_keys(self, *, provider: ProviderType | None = None):
-        return await self._repo.list_all(provider=provider)  # ORM rows
+    async def list_keys(self, user_id: int, *, provider: ProviderType | None = None):
+        return await self._repo.list_all(user_id=user_id, provider=provider)  # ORM rows
 
-    async def set_status(self, key_id: int, status: KeyStatus):
-        key = await self._repo.mark_status(key_id, status)
-        await self._cache.invalidate(key.provider.value)
+    async def set_status(self, key_id: int, user_id: int, status: KeyStatus):
+        key = await self._repo.mark_status(key_id, status, user_id=user_id)
+        await self._cache.invalidate(user_id, key.provider.value)
         return key  # ORM row
 
-    async def update_key(self, key_id: int, payload: APIKeyUpdate):
+    async def update_key(self, key_id: int, user_id: int, payload: APIKeyUpdate):
         fields = payload.model_dump(exclude_unset=True)
         if not fields:
-            return await self._repo.get(key_id)
+            return await self._repo.get(key_id, user_id=user_id)
 
         # Clear an explicit cooldown timestamp whenever status moves away
         # from COOLDOWN via a plain update (e.g. admin re-activating a key).
         if fields.get("status") is not None and fields["status"] != KeyStatus.COOLDOWN:
             fields.setdefault("cooldown_until", None)
 
-        key = await self._repo.update_fields(key_id, **fields)
-        await self._cache.invalidate(key.provider.value)
+        key = await self._repo.update_fields(key_id, user_id=user_id, **fields)
+        await self._cache.invalidate(user_id, key.provider.value)
         return key  # ORM row
 
-    async def reset_cooldown(self, key_id: int):
-        key = await self._repo.mark_status(key_id, KeyStatus.ACTIVE, cooldown_until=None)
-        await self._cache.invalidate(key.provider.value)
+    async def reset_cooldown(self, key_id: int, user_id: int):
+        key = await self._repo.mark_status(key_id, KeyStatus.ACTIVE, user_id=user_id, cooldown_until=None)
+        await self._cache.invalidate(user_id, key.provider.value)
         return key  # ORM row
 
-    async def delete_key(self, key_id: int) -> None:
-        key = await self._repo.get(key_id)
-        await self._cache.invalidate(key.provider.value)
-        await self._repo.delete(key_id)
+    async def delete_key(self, key_id: int, user_id: int) -> None:
+        key = await self._repo.get(key_id, user_id=user_id)
+        await self._cache.invalidate(user_id, key.provider.value)
+        await self._repo.delete(key_id, user_id=user_id)
 
     # --- gateway-facing hot path --------------------------------------------
 
-    async def get_candidate_keys(self, provider: ProviderType) -> list[APIKeyDTO]:
-        """ACTIVE key metadata for a provider, cache-first."""
-        cached = await self._cache.get_active(provider.value)
+    async def get_candidate_keys(self, user_id: int, provider: ProviderType) -> list[APIKeyDTO]:
+        """ACTIVE key metadata for this user+provider, cache-first."""
+        cached = await self._cache.get_active(user_id, provider.value)
         if cached is not None:
             return cached
 
-        keys = await self._repo.list_active(provider=provider)
+        keys = await self._repo.list_active(user_id=user_id, provider=provider)
         dtos = [APIKeyDTO.model_validate(k) for k in keys]
-        await self._cache.set_active(provider.value, dtos)
+        await self._cache.set_active(user_id, provider.value, dtos)
         return dtos
 
-    async def select_key(self, provider: ProviderType) -> APIKeyDTO | None:
-        """Pick the next candidate key (round-robin) and attach its decrypted secret.
+    async def select_key(self, user_id: int, provider: ProviderType) -> APIKeyDTO | None:
+        """Pick the next candidate key (round-robin) from this user's pool
+        and attach its decrypted secret.
 
-        Returns None if the pool has no active key for this provider.
+        Returns None if this user has no active key for this provider —
+        never falls back to another user's keys.
         """
-        candidates = await self.get_candidate_keys(provider)
-        chosen = await self._selector.select(provider.value, candidates)
+        candidates = await self.get_candidate_keys(user_id, provider)
+        chosen = await self._selector.select(user_id, provider.value, candidates)
         if chosen is None:
             return None
 
-        # Decrypt fresh from the DB — never from cache/DTO in flight.
-        key_row = await self._repo.get(chosen.id)
+        # Decrypt fresh from the DB — never from cache/DTO in flight. get()
+        # is user_id-scoped, so this can't accidentally decrypt someone
+        # else's key even if a cache entry were somehow mixed up.
+        key_row = await self._repo.get(chosen.id, user_id=user_id)
         return APIKeyDTO.model_validate(key_row).model_copy(
             update={"decrypted_key": decrypt_key(key_row.key_encrypted)}
         )
 
-    async def record_success(self, key_id: int, provider: ProviderType) -> None:
-        await self._repo.increment_usage(key_id)
+    async def record_success(self, key_id: int, user_id: int, provider: ProviderType) -> None:
+        await self._repo.increment_usage(key_id, user_id=user_id)
         # Counter changed — invalidate so the next candidate fetch sees it.
         # (Cheap: TTL already bounds staleness, this just tightens it.)
-        await self._cache.invalidate(provider.value)
+        await self._cache.invalidate(user_id, provider.value)
 
     async def record_rate_limited(
         self,
         key_id: int,
+        user_id: int,
         provider: ProviderType,
         *,
         cooldown_seconds: int = 3600,
     ) -> None:
         cooldown_until = datetime.now(timezone.utc) + timedelta(seconds=cooldown_seconds)
-        await self._repo.mark_status(key_id, KeyStatus.COOLDOWN, cooldown_until=cooldown_until)
-        await self._cache.invalidate(provider.value)
-        logger.warning("key_id=%s provider=%s -> COOLDOWN until %s", key_id, provider, cooldown_until)
+        await self._repo.mark_status(key_id, KeyStatus.COOLDOWN, user_id=user_id, cooldown_until=cooldown_until)
+        await self._cache.invalidate(user_id, provider.value)
+        logger.warning("user_id=%s key_id=%s provider=%s -> COOLDOWN until %s", user_id, key_id, provider, cooldown_until)
 
-    async def record_exhausted(self, key_id: int, provider: ProviderType) -> None:
-        await self._repo.mark_status(key_id, KeyStatus.EXHAUSTED)
-        await self._cache.invalidate(provider.value)
-        logger.warning("key_id=%s provider=%s -> EXHAUSTED", key_id, provider)
+    async def record_exhausted(self, key_id: int, user_id: int, provider: ProviderType) -> None:
+        await self._repo.mark_status(key_id, KeyStatus.EXHAUSTED, user_id=user_id)
+        await self._cache.invalidate(user_id, provider.value)
+        logger.warning("user_id=%s key_id=%s provider=%s -> EXHAUSTED", user_id, key_id, provider)
 
     # --- health checks -------------------------------------------------------
 
-    async def check_key_health(self, key_id: int) -> APIKeyHealthCheckResult:
+    async def check_key_health(self, key_id: int, user_id: int) -> APIKeyHealthCheckResult:
         """On-demand, quota-friendly probe of a single key against its upstream.
 
         Unlike record_success/record_rate_limited/record_exhausted (which
@@ -140,7 +146,7 @@ class KeyPoolService:
         429-specific signal from real traffic, not something a health
         check should guess at).
         """
-        key_row = await self._repo.get(key_id)
+        key_row = await self._repo.get(key_id, user_id=user_id)
         provider = get_provider(key_row.provider.value)
         decrypted = decrypt_key(key_row.key_encrypted)
 
@@ -148,33 +154,34 @@ class KeyPoolService:
 
         if result.ok:
             if key_row.status != KeyStatus.DISABLED:
-                await self._repo.mark_status(key_id, KeyStatus.ACTIVE, cooldown_until=None)
-                await self._cache.invalidate(key_row.provider.value)
-            logger.info("health_check key_id=%s provider=%s -> ok", key_id, key_row.provider.value)
+                await self._repo.mark_status(key_id, KeyStatus.ACTIVE, user_id=user_id, cooldown_until=None)
+                await self._cache.invalidate(user_id, key_row.provider.value)
+            logger.info("health_check user_id=%s key_id=%s provider=%s -> ok", user_id, key_id, key_row.provider.value)
         else:
             if key_row.status not in (KeyStatus.DISABLED, KeyStatus.COOLDOWN):
                 # A hard failure (bad key, revoked, permission denied) is
                 # distinct from a temporary 429 seen on the hot path — park
                 # it as EXHAUSTED so an admin notices, but leave an existing
                 # COOLDOWN alone since that already has its own recovery time.
-                await self._repo.mark_status(key_id, KeyStatus.EXHAUSTED)
-                await self._cache.invalidate(key_row.provider.value)
+                await self._repo.mark_status(key_id, KeyStatus.EXHAUSTED, user_id=user_id)
+                await self._cache.invalidate(user_id, key_row.provider.value)
             logger.warning(
-                "health_check key_id=%s provider=%s -> failed: %s", key_id, key_row.provider.value, result.detail
+                "health_check user_id=%s key_id=%s provider=%s -> failed: %s",
+                user_id, key_id, key_row.provider.value, result.detail,
             )
 
         return APIKeyHealthCheckResult(key_id=key_id, ok=result.ok, detail=result.detail)
 
-    async def check_all_keys(self, *, provider: ProviderType | None = None) -> list[APIKeyHealthCheckResult]:
-        """Health-check every non-disabled key, e.g. for a periodic housekeeping sweep.
+    async def check_all_keys(self, user_id: int, *, provider: ProviderType | None = None) -> list[APIKeyHealthCheckResult]:
+        """Health-check every non-disabled key belonging to this user.
 
         DISABLED keys are skipped — an admin turned those off on purpose,
         so there's no reason to spend a request probing them.
         """
-        keys = await self._repo.list_all(provider=provider)
+        keys = await self._repo.list_all(user_id=user_id, provider=provider)
         results: list[APIKeyHealthCheckResult] = []
         for key in keys:
             if key.status == KeyStatus.DISABLED:
                 continue
-            results.append(await self.check_key_health(key.id))
+            results.append(await self.check_key_health(key.id, user_id))
         return results

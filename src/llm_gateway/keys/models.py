@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from sqlalchemy import DateTime, Enum, Index, Integer, String
+from sqlalchemy import DateTime, Enum, ForeignKey, Index, Integer, String
 from sqlalchemy.orm import Mapped, mapped_column
 
 from llm_gateway.db.base import Base, TimestampMixin
@@ -11,6 +11,12 @@ class APIKey(TimestampMixin, Base):
     __tablename__ = "api_keys"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
+
+    # Owning account. Every query against this table must filter by this —
+    # there is no "global pool" anymore, each user has their own.
+    user_id: Mapped[int] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True
+    )
 
     # Human-friendly label so an admin can tell keys apart without decrypting
     # them, e.g. "gemini-personal-acct-2". Never contains the secret itself.
@@ -43,8 +49,10 @@ class APIKey(TimestampMixin, Base):
     last_used_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
     __table_args__ = (
-        # The hot query on the request path: "give me active keys for provider X".
-        Index("ix_api_keys_provider_status", "provider", "status"),
+        # The hot query on the request path: "give me this user's active keys
+        # for provider X". user_id leads so it can also serve plain
+        # "list my keys" lookups without a separate index.
+        Index("ix_api_keys_user_provider_status", "user_id", "provider", "status"),
     )
 
     def __repr__(self) -> str:  # pragma: no cover - debug convenience only

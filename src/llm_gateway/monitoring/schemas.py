@@ -11,6 +11,7 @@ class RequestEvent(BaseModel):
     they share `request_id` so the frontend can render them as one chain.
     """
 
+    user_id: int = Field(..., description="Owner of the gateway token that made this request")
     request_id: str = Field(..., description="Shared across all attempts of the same client request")
     attempt: int = Field(..., description="1-indexed attempt number within this request")
     timestamp: datetime

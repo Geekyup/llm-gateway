@@ -9,19 +9,22 @@ from llm_gateway.gateway.schemas import GatewayErrorBody
 from llm_gateway.keys.enums import ProviderType
 from llm_gateway.providers.registry import get_provider
 
-router = APIRouter(prefix="/v1", tags=["gateway"], dependencies=[Depends(require_gateway_token)])
+router = APIRouter(prefix="/v1", tags=["gateway"])
 
 
 async def _proxy_impl(
     provider_name: str,
     path: str,
     request: Request,
-    gateway: GatewayService = Depends(get_gateway_service),
+    gateway: GatewayService,
+    user_id: int,
 ) -> Response:
     """Transparent proxy: POST /v1/gemini/v1beta/models/gemini-1.5-flash:generateContent
 
     Client never sees which underlying API key served the request, nor
-    that a 429 caused a silent retry against a different key.
+    that a 429 caused a silent retry against a different key. The bearer
+    token resolves to user_id (require_gateway_token), which scopes every
+    key lookup below to that caller's own pool.
     """
     try:
         provider_type = ProviderType(provider_name)
@@ -38,6 +41,7 @@ async def _proxy_impl(
 
     try:
         upstream_response = await gateway.proxy_request(
+            user_id=user_id,
             provider=provider,
             provider_type=provider_type,
             path=path,
@@ -74,8 +78,9 @@ async def proxy_post(
     path: str,
     request: Request,
     gateway: GatewayService = Depends(get_gateway_service),
+    user_id: int = Depends(require_gateway_token),
 ) -> Response:
-    return await _proxy_impl(provider_name, path, request, gateway)
+    return await _proxy_impl(provider_name, path, request, gateway, user_id)
 
 
 @router.get("/{provider_name}/{path:path}", operation_id="proxy_gateway_request_get")
@@ -84,5 +89,6 @@ async def proxy_get(
     path: str,
     request: Request,
     gateway: GatewayService = Depends(get_gateway_service),
+    user_id: int = Depends(require_gateway_token),
 ) -> Response:
-    return await _proxy_impl(provider_name, path, request, gateway)
+    return await _proxy_impl(provider_name, path, request, gateway, user_id)
