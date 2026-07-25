@@ -1,8 +1,8 @@
 import pytest
 
-from llm_gateway.tokens.repository import GatewayTokenRepository
-from llm_gateway.tokens.schemas import GatewayTokenCreate
-from llm_gateway.tokens.service import GatewayTokenService
+from app.tokens.repository import GatewayTokenRepository
+from app.tokens.schemas import GatewayTokenCreate
+from app.tokens.service import GatewayTokenService
 
 
 @pytest.fixture
@@ -57,7 +57,7 @@ async def test_authenticate_rejects_revoked_token(token_service, test_user):
 async def test_set_active_cannot_touch_another_users_token(token_service, test_user, other_user):
     theirs = await token_service.create_token(other_user.id, GatewayTokenCreate(label="theirs"))
 
-    from llm_gateway.core.exceptions import GatewayTokenNotFoundError
+    from app.core.exceptions import GatewayTokenNotFoundError
 
     with pytest.raises(GatewayTokenNotFoundError):
         await token_service.set_active(theirs.token.id, test_user.id, is_active=False)
@@ -70,7 +70,7 @@ async def test_set_active_cannot_touch_another_users_token(token_service, test_u
 async def test_delete_cannot_touch_another_users_token(token_service, test_user, other_user):
     theirs = await token_service.create_token(other_user.id, GatewayTokenCreate(label="theirs"))
 
-    from llm_gateway.core.exceptions import GatewayTokenNotFoundError
+    from app.core.exceptions import GatewayTokenNotFoundError
 
     with pytest.raises(GatewayTokenNotFoundError):
         await token_service.delete_token(theirs.token.id, test_user.id)

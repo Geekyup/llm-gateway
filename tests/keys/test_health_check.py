@@ -2,11 +2,11 @@ from unittest.mock import AsyncMock, patch
 
 import pytest
 
-from llm_gateway.keys.cache import KeyStatusCache
-from llm_gateway.keys.enums import KeyStatus, ProviderType
-from llm_gateway.keys.selector import RoundRobinSelector
-from llm_gateway.keys.service import KeyPoolService
-from llm_gateway.providers.base import HealthCheckResult
+from app.keys.cache import KeyStatusCache
+from app.keys.enums import KeyStatus, ProviderType
+from app.keys.selector import RoundRobinSelector
+from app.keys.service import KeyPoolService
+from app.providers.base import HealthCheckResult
 
 
 @pytest.fixture
@@ -26,8 +26,8 @@ async def test_check_key_health_revives_exhausted_key(key_repo, key_pool_service
     fake_provider = AsyncMock()
     fake_provider.health_check.return_value = HealthCheckResult(ok=True)
 
-    with patch("llm_gateway.keys.service.get_provider", return_value=fake_provider), \
-         patch("llm_gateway.keys.service.decrypt_key", return_value="plaintext-key"):
+    with patch("app.keys.service.get_provider", return_value=fake_provider), \
+         patch("app.keys.service.decrypt_key", return_value="plaintext-key"):
         result = await key_pool_service.check_key_health(key.id, test_user.id)
 
     assert result.ok is True
@@ -47,8 +47,8 @@ async def test_check_key_health_marks_active_key_exhausted_on_failure(key_repo, 
     fake_provider = AsyncMock()
     fake_provider.health_check.return_value = HealthCheckResult(ok=False, detail="HTTP 401: API key not valid")
 
-    with patch("llm_gateway.keys.service.get_provider", return_value=fake_provider), \
-         patch("llm_gateway.keys.service.decrypt_key", return_value="plaintext-key"):
+    with patch("app.keys.service.get_provider", return_value=fake_provider), \
+         patch("app.keys.service.decrypt_key", return_value="plaintext-key"):
         result = await key_pool_service.check_key_health(key.id, test_user.id)
 
     assert result.ok is False
@@ -68,8 +68,8 @@ async def test_check_key_health_never_reactivates_disabled_key(key_repo, key_poo
     fake_provider = AsyncMock()
     fake_provider.health_check.return_value = HealthCheckResult(ok=True)
 
-    with patch("llm_gateway.keys.service.get_provider", return_value=fake_provider), \
-         patch("llm_gateway.keys.service.decrypt_key", return_value="plaintext-key"):
+    with patch("app.keys.service.get_provider", return_value=fake_provider), \
+         patch("app.keys.service.decrypt_key", return_value="plaintext-key"):
         result = await key_pool_service.check_key_health(key.id, test_user.id)
 
     assert result.ok is True
@@ -89,8 +89,8 @@ async def test_check_key_health_leaves_cooldown_key_alone_on_failure(key_repo, k
     fake_provider = AsyncMock()
     fake_provider.health_check.return_value = HealthCheckResult(ok=False, detail="HTTP 429")
 
-    with patch("llm_gateway.keys.service.get_provider", return_value=fake_provider), \
-         patch("llm_gateway.keys.service.decrypt_key", return_value="plaintext-key"):
+    with patch("app.keys.service.get_provider", return_value=fake_provider), \
+         patch("app.keys.service.decrypt_key", return_value="plaintext-key"):
         result = await key_pool_service.check_key_health(key.id, test_user.id)
 
     assert result.ok is False
@@ -113,8 +113,8 @@ async def test_check_all_keys_skips_disabled(key_repo, key_pool_service, test_us
     fake_provider = AsyncMock()
     fake_provider.health_check.return_value = HealthCheckResult(ok=True)
 
-    with patch("llm_gateway.keys.service.get_provider", return_value=fake_provider), \
-         patch("llm_gateway.keys.service.decrypt_key", return_value="plaintext-key"):
+    with patch("app.keys.service.get_provider", return_value=fake_provider), \
+         patch("app.keys.service.decrypt_key", return_value="plaintext-key"):
         results = await key_pool_service.check_all_keys(test_user.id)
 
     assert [r.key_id for r in results] == [active.id]
@@ -132,8 +132,8 @@ async def test_check_all_keys_never_touches_other_users_keys(key_repo, key_pool_
     fake_provider = AsyncMock()
     fake_provider.health_check.return_value = HealthCheckResult(ok=True)
 
-    with patch("llm_gateway.keys.service.get_provider", return_value=fake_provider), \
-         patch("llm_gateway.keys.service.decrypt_key", return_value="plaintext-key"):
+    with patch("app.keys.service.get_provider", return_value=fake_provider), \
+         patch("app.keys.service.decrypt_key", return_value="plaintext-key"):
         results = await key_pool_service.check_all_keys(test_user.id)
 
     assert [r.key_id for r in results] == [mine.id]

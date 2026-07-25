@@ -2,8 +2,8 @@ from datetime import datetime, timedelta, timezone
 
 import pytest
 
-from llm_gateway.core.exceptions import KeyNotFoundError
-from llm_gateway.keys.enums import KeyStatus, ProviderType
+from app.core.exceptions import KeyNotFoundError
+from app.keys.enums import KeyStatus, ProviderType
 
 
 @pytest.mark.asyncio

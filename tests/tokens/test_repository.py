@@ -1,6 +1,6 @@
 import pytest
 
-from llm_gateway.core.exceptions import GatewayTokenNotFoundError
+from app.core.exceptions import GatewayTokenNotFoundError
 
 
 @pytest.mark.asyncio

@@ -1,8 +1,8 @@
 import pytest
 
-from llm_gateway.keys.enums import KeyStatus, ProviderType
-from llm_gateway.keys.schemas import APIKeyDTO
-from llm_gateway.keys.selector import RoundRobinSelector
+from app.keys.enums import KeyStatus, ProviderType
+from app.keys.schemas import APIKeyDTO
+from app.keys.selector import RoundRobinSelector
 
 
 def make_dto(key_id: int, user_id: int = 1) -> APIKeyDTO:

@@ -1,13 +1,13 @@
 import httpx
 import pytest
 
-from llm_gateway.core.exceptions import NoAvailableKeysError, UpstreamExhaustedError
-from llm_gateway.gateway.proxy_service import GatewayService
-from llm_gateway.keys.cache import KeyStatusCache
-from llm_gateway.keys.enums import ProviderType
-from llm_gateway.keys.selector import RoundRobinSelector
-from llm_gateway.keys.service import KeyPoolService
-from llm_gateway.monitoring.publisher import RequestEventPublisher
+from app.core.exceptions import NoAvailableKeysError, UpstreamExhaustedError
+from app.gateway.proxy_service import GatewayService
+from app.keys.cache import KeyStatusCache
+from app.keys.enums import ProviderType
+from app.keys.selector import RoundRobinSelector
+from app.keys.service import KeyPoolService
+from app.monitoring.publisher import RequestEventPublisher
 
 
 class ScriptedProvider:
@@ -40,7 +40,7 @@ def key_pool(key_repo, fake_redis):
 
 
 async def _create_active_key(key_pool: KeyPoolService, user_id: int, label: str):
-    from llm_gateway.keys.schemas import APIKeyCreate
+    from app.keys.schemas import APIKeyCreate
 
     return await key_pool.create_key(
         user_id, APIKeyCreate(label=label, provider=ProviderType.GEMINI, raw_key=f"raw-{label}", daily_limit=100)

@@ -3,7 +3,7 @@ from unittest.mock import patch
 
 import pytest
 
-from llm_gateway.auth.jwt import (
+from app.auth.jwt import (
     InvalidTokenError,
     TokenExpiredError,
     create_access_token,
@@ -11,8 +11,8 @@ from llm_gateway.auth.jwt import (
     decode_token,
     hash_refresh_token,
 )
-from llm_gateway.auth.service import AuthService
-from llm_gateway.core.exceptions import InactiveUserError, TokenRevokedError
+from app.auth.service import AuthService
+from app.core.exceptions import InactiveUserError, TokenRevokedError
 
 
 # --- jwt.py ------------------------------------------------------------------
@@ -187,7 +187,7 @@ async def test_refresh_reuse_of_revoked_token_revokes_whole_session(auth_service
 
 @pytest.mark.asyncio
 async def test_refresh_with_expired_token_raises(auth_service):
-    with patch("llm_gateway.auth.jwt.get_settings") as mock_settings:
+    with patch("app.auth.jwt.get_settings") as mock_settings:
         mock_settings.return_value.JWT_SECRET_KEY = "test-jwt-secret-key"
         mock_settings.return_value.JWT_ALGORITHM = "HS256"
         mock_settings.return_value.REFRESH_TOKEN_EXPIRE_DAYS = -1  # already expired

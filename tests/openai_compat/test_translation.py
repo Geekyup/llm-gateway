@@ -1,5 +1,5 @@
-from llm_gateway.openai_compat.schemas import ChatCompletionRequest
-from llm_gateway.openai_compat.translation import (
+from app.openai_compat.schemas import ChatCompletionRequest
+from app.openai_compat.translation import (
     gemini_path_for_model,
     gemini_response_to_openai,
     openai_request_to_gemini_payload,

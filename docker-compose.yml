@@ -35,12 +35,12 @@ services:
 
   api:
     build: .
-    command: uvicorn llm_gateway.main:app --host 0.0.0.0 --port 8000 --reload
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
     ports:
       - "8000:8000"
     env_file: .env
     volumes:
-      - ./src:/app/src
+      - ./app:/app/app
     depends_on:
       postgres:
         condition: service_healthy
@@ -51,10 +51,10 @@ services:
 
   worker:
     build: .
-    command: arq llm_gateway.housekeeping.arq_worker.WorkerSettings
+    command: arq app.housekeeping.arq_worker.WorkerSettings
     env_file: .env
     volumes:
-      - ./src:/app/src
+      - ./app:/app/app
     depends_on:
       postgres:
         condition: service_healthy

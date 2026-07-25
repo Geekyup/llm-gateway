@@ -5,14 +5,14 @@ from alembic import context
 from sqlalchemy import pool
 from sqlalchemy.ext.asyncio import async_engine_from_config
 
-from llm_gateway.config import get_settings
-from llm_gateway.db.base import Base
+from app.config import get_settings
+from app.db.base import Base
 
 # Import all ORM models here so Base.metadata is fully populated for
 # autogenerate. Add new domains' models to this list as they're created.
-from llm_gateway.auth.models import RefreshToken, User  # noqa: F401
-from llm_gateway.keys.models import APIKey  # noqa: F401
-from llm_gateway.tokens.models import GatewayToken  # noqa: F401
+from app.auth.models import RefreshToken, User  # noqa: F401
+from app.keys.models import APIKey  # noqa: F401
+from app.tokens.models import GatewayToken  # noqa: F401
 
 config = context.config
 

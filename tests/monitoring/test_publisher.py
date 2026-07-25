@@ -2,8 +2,8 @@ from datetime import datetime, timezone
 
 import pytest
 
-from llm_gateway.monitoring.publisher import HISTORY_MAX_LEN, RequestEventPublisher, channel_for
-from llm_gateway.monitoring.schemas import RequestEvent
+from app.monitoring.publisher import HISTORY_MAX_LEN, RequestEventPublisher, channel_for
+from app.monitoring.schemas import RequestEvent
 
 
 def _event(user_id: int = 1, request_id: str = "req-1", attempt: int = 1, outcome: str = "success") -> RequestEvent:

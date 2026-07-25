@@ -12,11 +12,11 @@ import pytest
 import pytest_asyncio
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
-from llm_gateway.auth.models import User
-from llm_gateway.auth.repository import RefreshTokenRepository, UserRepository
-from llm_gateway.db.base import Base
-from llm_gateway.keys.repository import APIKeyRepository
-from llm_gateway.tokens.repository import GatewayTokenRepository
+from app.auth.models import User
+from app.auth.repository import RefreshTokenRepository, UserRepository
+from app.db.base import Base
+from app.keys.repository import APIKeyRepository
+from app.tokens.repository import GatewayTokenRepository
 
 
 @pytest_asyncio.fixture
