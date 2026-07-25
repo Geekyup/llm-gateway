@@ -1190,11 +1190,12 @@ function Dashboard({ user, onLogout }: { user: UserRead | null; onLogout: () => 
 
   // Live request feed via SSE, plus an initial snapshot so the monitor isn't empty on load.
   useEffect(() => {
-    // recentEvents comes back oldest-first, so reverse it once here — the
-    // rest of the app (state + render) then treats index 0 as "newest".
-    api.recentEvents(50).then(events => setReqs(events.map(toLR).reverse())).catch(() => {});
+    // recentEvents comes back newest-first already (Redis LPUSH puts the
+    // latest event at index 0) — no reversal needed. Index 0 stays "newest"
+    // throughout the app, matching how the SSE handler below prepends.
+    api.recentEvents(50).then(events => setReqs(events.map(toLR))).catch(() => {});
     const stop = streamEvents(
-      evt => setReqs(prev => [toLR(evt), ...prev.slice(0, 99)]),
+      evt => setReqs(prev => [toLR(evt), ...prev.slice(0, 49)]),
       err => console.warn("live event stream disconnected:", err)
     );
     return stop;
