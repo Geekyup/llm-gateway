@@ -76,12 +76,6 @@ function providerMeta(provider: string) {
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
-const HOURLY_W = [0,0,0,0,0,0.3,0.8,1.5,2,2.5,2.8,2.6,2.2,2,1.8,1.5,1.2,0.9,0.6,0.3,0.1,0,0,0];
-function makeHourly(total: number) {
-  const sum = HOURLY_W.reduce((a, b) => a + b, 0);
-  return HOURLY_W.map((w, i) => ({ h: `${i}h`, r: Math.round((w / sum) * total) }));
-}
-
 function rel(ts: number, now: number) {
   const d = now - ts;
   if (d < 60000)   return `${Math.floor(d / 1000)}s ago`;
@@ -164,9 +158,9 @@ function TopBar({ view, onView, onAdd, operational, onLogout, userEmail }: {
   userEmail?: string | null;
 }) {
   return (
-    <header className="flex flex-col md:flex-row md:items-center md:justify-between md:h-14 shrink-0 px-3 sm:px-6 gap-2 md:gap-5 py-2.5 md:py-0"
+    <header className="flex flex-col md:grid md:grid-cols-[1fr_auto_1fr] md:items-center md:h-14 shrink-0 px-3 sm:px-6 gap-2 md:gap-5 py-2.5 md:py-0"
       style={{ borderBottom: "1px solid rgba(255,255,255,0.06)", background: "#0A0A0B" }}>
-      <div className="flex items-center justify-between md:justify-start gap-2.5 md:gap-5">
+      <div className="flex items-center justify-between md:justify-self-start gap-2.5 md:gap-5">
         <div className="flex items-center gap-2.5 min-w-0">
           <div className="w-7 h-7 rounded-lg flex items-center justify-center shrink-0"
             style={{ background: "rgba(0,214,143,0.12)", border: "1px solid rgba(0,214,143,0.2)" }}>
@@ -178,7 +172,6 @@ function TopBar({ view, onView, onAdd, operational, onLogout, userEmail }: {
             v0.4.1
           </span>
         </div>
-        <div className="hidden md:block h-4 w-px" style={{ background: "rgba(255,255,255,0.08)" }} />
         <div className="flex md:hidden items-center gap-2">
           <span className="w-2 h-2 rounded-full"
             style={{
@@ -188,7 +181,7 @@ function TopBar({ view, onView, onAdd, operational, onLogout, userEmail }: {
         </div>
       </div>
 
-      <nav className="flex gap-0.5 overflow-x-auto -mx-3 px-3 sm:mx-0 sm:px-0">
+      <nav className="flex gap-0.5 overflow-x-auto -mx-3 px-3 sm:mx-0 sm:px-0 md:justify-self-center">
         {(["dashboard", "monitor", "access"] as View[]).map(v => (
           <button key={v} onClick={() => onView(v)}
             className="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-all shrink-0 whitespace-nowrap"
@@ -203,7 +196,7 @@ function TopBar({ view, onView, onAdd, operational, onLogout, userEmail }: {
         ))}
       </nav>
 
-      <div className="flex items-center justify-between md:justify-end gap-4">
+      <div className="flex items-center justify-between md:justify-self-end gap-4">
         <div className="hidden md:flex items-center gap-2">
           <span className="w-2 h-2 rounded-full"
             style={{
@@ -473,14 +466,14 @@ function AddEditModal({ editKey, onSave, onClose, error, saving }: {
   const overlayMouseDownOnSelf = useRef(false);
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center"
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4"
       style={{ background: "rgba(0,0,0,0.72)", backdropFilter: "blur(4px)" }}
       onMouseDown={e => { overlayMouseDownOnSelf.current = e.target === e.currentTarget; }}
       onMouseUp={e => {
         if (overlayMouseDownOnSelf.current && e.target === e.currentTarget) onClose();
         overlayMouseDownOnSelf.current = false;
       }}>
-      <div className="w-full sm:max-w-md rounded-t-2xl sm:rounded-2xl p-5 sm:p-6 max-h-[92vh] overflow-y-auto"
+      <div className="w-full sm:max-w-md rounded-2xl p-5 sm:p-6 max-h-[92vh] overflow-y-auto"
         style={{ background: "#141416", border: "1px solid rgba(255,255,255,0.09)", boxShadow: "0 32px 80px rgba(0,0,0,0.6)" }}>
         <div className="flex items-center justify-between mb-6">
           <h2 className="text-sm font-semibold text-zinc-100">{editKey ? "Edit Key" : "Add API Key"}</h2>
@@ -586,13 +579,29 @@ function KeyDetailDrawer({ keyData, now, onClose, onDisable, onReset, onDelete, 
   onCheck: () => void; checking: boolean;
 }) {
   const s = S[keyData.status];
-  const chartData = makeHourly(keyData.used);
+  const [chartData, setChartData] = useState<{ h: string; r: number }[] | null>(null);
+  const [chartError, setChartError] = useState(false);
 
   useEffect(() => {
     const h = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
     window.addEventListener("keydown", h);
     return () => window.removeEventListener("keydown", h);
   }, [onClose]);
+
+  useEffect(() => {
+    let cancelled = false;
+    setChartData(null);
+    setChartError(false);
+    api.hourlyUsage(Number(keyData.id))
+      .then(res => {
+        if (cancelled) return;
+        setChartData(res.points.map(p => ({ h: `${p.hour}h`, r: p.requests })));
+      })
+      .catch(() => {
+        if (!cancelled) setChartError(true);
+      });
+    return () => { cancelled = true; };
+  }, [keyData.id]);
 
   const meta = [
     { label: "Provider",   val: P[keyData.provider].name,                                           mono: false },
@@ -643,26 +652,34 @@ function KeyDetailDrawer({ keyData, now, onClose, onDisable, onReset, onDelete, 
 
           <div>
             <p className="text-[10px] text-zinc-600 mb-2.5 uppercase tracking-widest font-semibold">Hourly Usage Today</p>
-            <div style={{ height: 88 }}>
-              <ResponsiveContainer width="100%" height="100%">
-                <AreaChart data={chartData} margin={{ top: 4, right: 0, left: -32, bottom: 0 }}>
-                  <defs>
-                    <linearGradient id="agrad" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%"  stopColor={s.color} stopOpacity={0.22} />
-                      <stop offset="95%" stopColor={s.color} stopOpacity={0}    />
-                    </linearGradient>
-                  </defs>
-                  <XAxis dataKey="h"
-                    tick={{ fontSize: 9, fill: "#52525B", fontFamily: "JetBrains Mono, monospace" }}
-                    tickLine={false} axisLine={false} interval={3} />
-                  <Tooltip
-                    contentStyle={{ background: "#1C1C1E", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 8, fontSize: 11, fontFamily: "JetBrains Mono, monospace" }}
-                    labelStyle={{ color: "#71717A" }} itemStyle={{ color: s.color }}
-                    formatter={(v: number) => [v.toLocaleString(), "req"]} />
-                  <Area type="monotone" dataKey="r" stroke={s.color} strokeWidth={1.5}
-                    fill="url(#agrad)" dot={false} />
-                </AreaChart>
-              </ResponsiveContainer>
+            <div style={{ height: 88 }} className="flex items-center justify-center">
+              {chartError ? (
+                <p className="text-[11px] text-zinc-600">Couldn't load usage data</p>
+              ) : chartData === null ? (
+                <Loader2 size={16} className="animate-spin" color="#52525B" />
+              ) : chartData.every(p => p.r === 0) ? (
+                <p className="text-[11px] text-zinc-600">No requests yet today</p>
+              ) : (
+                <ResponsiveContainer width="100%" height="100%">
+                  <AreaChart data={chartData} margin={{ top: 4, right: 0, left: -32, bottom: 0 }}>
+                    <defs>
+                      <linearGradient id="agrad" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%"  stopColor={s.color} stopOpacity={0.22} />
+                        <stop offset="95%" stopColor={s.color} stopOpacity={0}    />
+                      </linearGradient>
+                    </defs>
+                    <XAxis dataKey="h"
+                      tick={{ fontSize: 9, fill: "#52525B", fontFamily: "JetBrains Mono, monospace" }}
+                      tickLine={false} axisLine={false} interval={3} />
+                    <Tooltip
+                      contentStyle={{ background: "#1C1C1E", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 8, fontSize: 11, fontFamily: "JetBrains Mono, monospace" }}
+                      labelStyle={{ color: "#71717A" }} itemStyle={{ color: s.color }}
+                      formatter={(v: number) => [v.toLocaleString(), "req"]} />
+                    <Area type="monotone" dataKey="r" stroke={s.color} strokeWidth={1.5}
+                      fill="url(#agrad)" dot={false} />
+                  </AreaChart>
+                </ResponsiveContainer>
+              )}
             </div>
           </div>
 

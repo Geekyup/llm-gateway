@@ -47,6 +47,10 @@ class KeyPoolService:
     async def list_keys(self, user_id: int, *, provider: ProviderType | None = None):
         return await self._repo.list_all(user_id=user_id, provider=provider)  # ORM rows
 
+    async def get_key(self, key_id: int, user_id: int):
+        """Fetch one key scoped to its owner; raises KeyNotFoundError otherwise."""
+        return await self._repo.get(key_id, user_id=user_id)  # ORM row
+
     async def set_status(self, key_id: int, user_id: int, status: KeyStatus):
         key = await self._repo.mark_status(key_id, status, user_id=user_id)
         await self._cache.invalidate(user_id, key.provider.value)

@@ -35,3 +35,13 @@ class RequestEvent(BaseModel):
 
 class RequestEventList(BaseModel):
     events: list[RequestEvent]
+
+
+class HourlyUsagePoint(BaseModel):
+    hour: int = Field(..., ge=0, le=23, description="UTC hour of day, 0-23")
+    requests: int = Field(..., ge=0)
+
+
+class HourlyUsageResponse(BaseModel):
+    key_id: int
+    points: list[HourlyUsagePoint]

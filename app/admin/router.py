@@ -1,11 +1,13 @@
 from fastapi import APIRouter, Depends, status
 
-from app.api.deps import get_key_pool_service
+from app.api.deps import get_event_publisher, get_key_pool_service
 from app.auth.deps import get_current_user
 from app.auth.models import User
 from app.keys.enums import ProviderType
 from app.keys.schemas import APIKeyCreate, APIKeyHealthCheckResult, APIKeyRead, APIKeyUpdate
 from app.keys.service import KeyPoolService
+from app.monitoring.publisher import RequestEventPublisher
+from app.monitoring.schemas import HourlyUsagePoint, HourlyUsageResponse
 
 router = APIRouter(prefix="/me/keys", tags=["keys"])
 
@@ -87,3 +89,24 @@ async def check_all_keys(
 ) -> list[APIKeyHealthCheckResult]:
     """Health-check every non-disabled key belonging to the caller (optionally scoped to one provider)."""
     return await service.check_all_keys(user.id, provider=provider)
+
+
+@router.get("/{key_id}/hourly-usage", response_model=HourlyUsageResponse)
+async def hourly_usage(
+    key_id: int,
+    user: User = Depends(get_current_user),
+    service: KeyPoolService = Depends(get_key_pool_service),
+    publisher: RequestEventPublisher = Depends(get_event_publisher),
+) -> HourlyUsageResponse:
+    """Real per-hour request counts for this key, for the current UTC day.
+
+    Derived from the live-monitor's Redis event history rather than a
+    separate table, so coverage is bounded by that history's capped size —
+    see RequestEventPublisher.hourly_usage_for_key for the exact caveat.
+    Raises 404 (via KeyNotFoundError) if key_id doesn't belong to the
+    caller, same as every other per-key endpoint here.
+    """
+    await service.get_key(key_id, user.id)
+    counts = await publisher.hourly_usage_for_key(user.id, key_id)
+    points = [HourlyUsagePoint(hour=h, requests=c) for h, c in enumerate(counts)]
+    return HourlyUsageResponse(key_id=key_id, points=points)

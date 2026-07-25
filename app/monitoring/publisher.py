@@ -1,4 +1,5 @@
 import logging
+from datetime import datetime, timezone
 
 from redis.asyncio import Redis
 
@@ -64,3 +65,38 @@ class RequestEventPublisher:
             except Exception:  # noqa: BLE001 - skip malformed/legacy entries, don't fail the whole read
                 logger.warning("failed to parse monitoring history entry", exc_info=True)
         return events
+
+    async def hourly_usage_for_key(self, user_id: int, key_id: int) -> list[int]:
+        """Real per-hour request counts for one key, for the current UTC day.
+
+        Built from the same capped history list the live monitor reads —
+        no separate storage, so this is only as deep as HISTORY_MAX_LEN
+        events for the *whole account* (all keys combined). For a busy
+        account that can mean the earliest hours of a heavy day have
+        already scrolled out of the window; there's no persistent request
+        log to fall back on, so this is the best available signal without
+        adding a database table.
+
+        Only successful upstream calls count as "usage" here (skips
+        no_keys/error attempts that never reached the provider).
+        """
+        counts = [0] * 24
+        raw = await self._redis.lrange(_history_key(user_id), 0, HISTORY_MAX_LEN - 1)
+        today = datetime.now(timezone.utc).date()
+        for item in raw:
+            try:
+                event = RequestEvent.model_validate_json(item)
+            except Exception:  # noqa: BLE001 - skip malformed/legacy entries
+                continue
+            if event.key_id != key_id:
+                continue
+            if event.outcome not in ("success", "rate_limited", "exhausted"):
+                continue
+            ts = event.timestamp
+            if ts.tzinfo is None:
+                ts = ts.replace(tzinfo=timezone.utc)
+            ts = ts.astimezone(timezone.utc)
+            if ts.date() != today:
+                continue
+            counts[ts.hour] += 1
+        return counts

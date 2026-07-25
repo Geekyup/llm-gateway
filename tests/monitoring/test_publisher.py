@@ -1,4 +1,4 @@
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 import pytest
 
@@ -6,16 +6,23 @@ from app.monitoring.publisher import HISTORY_MAX_LEN, RequestEventPublisher, cha
 from app.monitoring.schemas import RequestEvent
 
 
-def _event(user_id: int = 1, request_id: str = "req-1", attempt: int = 1, outcome: str = "success") -> RequestEvent:
+def _event(
+    user_id: int = 1,
+    request_id: str = "req-1",
+    attempt: int = 1,
+    outcome: str = "success",
+    key_id: int | None = 1,
+    timestamp: datetime | None = None,
+) -> RequestEvent:
     return RequestEvent(
         user_id=user_id,
         request_id=request_id,
         attempt=attempt,
-        timestamp=datetime.now(timezone.utc),
+        timestamp=timestamp or datetime.now(timezone.utc),
         provider="gemini",
         path="v1beta/models/gemini-1.5-flash:generateContent",
         method="POST",
-        key_id=1,
+        key_id=key_id,
         key_label="k1",
         upstream_status=200,
         outcome=outcome,
@@ -106,3 +113,60 @@ async def test_publish_failure_is_swallowed_not_raised(fake_redis, monkeypatch):
     # Must not raise — monitoring is best-effort and should never break the
     # actual gateway request path.
     await publisher.publish(_event())
+
+
+@pytest.mark.asyncio
+async def test_hourly_usage_buckets_by_hour_for_today(fake_redis):
+    publisher = RequestEventPublisher(fake_redis)
+    now = datetime.now(timezone.utc)
+    nine_am = now.replace(hour=9, minute=15, second=0, microsecond=0)
+    two_pm = now.replace(hour=14, minute=50, second=0, microsecond=0)
+
+    await publisher.publish(_event(request_id="a", timestamp=nine_am))
+    await publisher.publish(_event(request_id="b", timestamp=nine_am + timedelta(minutes=5)))
+    await publisher.publish(_event(request_id="c", timestamp=two_pm))
+
+    counts = await publisher.hourly_usage_for_key(1, key_id=1)
+
+    assert len(counts) == 24
+    assert counts[9] == 2
+    assert counts[14] == 1
+    assert sum(counts) == 3
+
+
+@pytest.mark.asyncio
+async def test_hourly_usage_ignores_other_keys_and_users(fake_redis):
+    publisher = RequestEventPublisher(fake_redis)
+    now = datetime.now(timezone.utc)
+
+    await publisher.publish(_event(request_id="mine", key_id=1, timestamp=now))
+    await publisher.publish(_event(request_id="other-key", key_id=2, timestamp=now))
+    await publisher.publish(_event(request_id="other-user", user_id=2, key_id=1, timestamp=now))
+
+    counts = await publisher.hourly_usage_for_key(1, key_id=1)
+
+    assert sum(counts) == 1
+
+
+@pytest.mark.asyncio
+async def test_hourly_usage_excludes_events_from_previous_days(fake_redis):
+    publisher = RequestEventPublisher(fake_redis)
+    yesterday = datetime.now(timezone.utc) - timedelta(days=1)
+
+    await publisher.publish(_event(request_id="stale", timestamp=yesterday))
+
+    counts = await publisher.hourly_usage_for_key(1, key_id=1)
+
+    assert sum(counts) == 0
+
+
+@pytest.mark.asyncio
+async def test_hourly_usage_ignores_events_with_no_upstream_call(fake_redis):
+    publisher = RequestEventPublisher(fake_redis)
+    now = datetime.now(timezone.utc)
+
+    await publisher.publish(_event(request_id="dropped", outcome="no_keys", timestamp=now))
+
+    counts = await publisher.hourly_usage_for_key(1, key_id=1)
+
+    assert sum(counts) == 0

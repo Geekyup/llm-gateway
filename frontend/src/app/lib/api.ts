@@ -86,6 +86,16 @@ export interface ApiKeyHealthCheckResult {
   detail: string | null;
 }
 
+export interface HourlyUsagePoint {
+  hour: number;
+  requests: number;
+}
+
+export interface HourlyUsageResponse {
+  key_id: number;
+  points: HourlyUsagePoint[];
+}
+
 export interface GatewayTokenRead {
   id: number;
   label: string;
@@ -212,6 +222,10 @@ export const api = {
 
   async checkAllKeys(): Promise<ApiKeyHealthCheckResult[]> {
     return request<ApiKeyHealthCheckResult[]>("/me/keys/check-all", { method: "POST" });
+  },
+
+  async hourlyUsage(id: number): Promise<HourlyUsageResponse> {
+    return request<HourlyUsageResponse>(`/me/keys/${id}/hourly-usage`);
   },
 
   async recentEvents(limit = 50): Promise<RequestEvent[]> {
