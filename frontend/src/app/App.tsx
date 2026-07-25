@@ -98,9 +98,9 @@ function cd(until: number, now: number) {
 function SBadge({ status }: { status: Status }) {
   const s = S[status];
   return (
-    <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md text-[11px] font-mono font-medium whitespace-nowrap"
+    <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md text-[11px] font-mono font-medium whitespace-nowrap transition-colors duration-300"
       style={{ color: s.color, background: s.bg, border: `1px solid ${s.bd}` }}>
-      <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${status === "active" ? "animate-pulse" : ""}`}
+      <span className={`w-1.5 h-1.5 rounded-full shrink-0 transition-colors duration-300 ${status === "active" ? "animate-pulse" : ""}`}
         style={{ background: s.color }} />
       {s.text}
     </span>
@@ -208,7 +208,7 @@ function TopBar({ view, onView, onAdd, operational, onLogout, userEmail }: {
           </span>
         </div>
         <button onClick={onAdd}
-          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all"
+          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all active:scale-95"
           style={{ background: "#00D68F", color: "#0A0A0B", boxShadow: "0 0 16px rgba(0,214,143,0.3)" }}
           onMouseEnter={e => (e.currentTarget.style.boxShadow = "0 0 28px rgba(0,214,143,0.55)")}
           onMouseLeave={e => (e.currentTarget.style.boxShadow = "0 0 16px rgba(0,214,143,0.3)")}>
@@ -244,12 +244,16 @@ function MetricCards({ keys }: { keys: AK[] }) {
 
   return (
     <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-      {cards.map(c => (
-        <div key={c.label} className="rounded-xl p-4"
+      {cards.map((c, i) => (
+        <div key={c.label}
+          className="rounded-xl p-4 transition-transform duration-200 hover:-translate-y-0.5 animate-in fade-in slide-in-from-bottom-1"
           style={{
             background: "#111113",
             border: "1px solid rgba(255,255,255,0.06)",
             boxShadow: c.glow ? "0 0 24px rgba(0,214,143,0.05)" : "none",
+            animationDuration: "300ms",
+            animationDelay: `${i * 40}ms`,
+            animationFillMode: "backwards",
           }}>
           <div className="flex items-center justify-between mb-3">
             <span className="text-[11px] text-zinc-500 uppercase tracking-wider font-medium">{c.label}</span>
@@ -311,7 +315,7 @@ function KeysTable({ keys, filter, onFilter, onSelect, onEdit, onToggle, onCheck
           {/* Mobile: stacked cards */}
           <div className="sm:hidden" style={{ background: "#111113" }}>
             {filtered.map((k, i) => (
-              <div key={k.id} className="px-4 py-3.5 active:bg-white/[0.02]"
+              <div key={k.id} className="px-4 py-3.5 transition-colors active:bg-white/[0.03] cursor-pointer"
                 style={{ borderBottom: i < filtered.length - 1 ? "1px solid rgba(255,255,255,0.03)" : "none" }}
                 onClick={() => onSelect(k.id)}>
                 <div className="flex items-start justify-between gap-2 mb-2">
@@ -371,11 +375,9 @@ function KeysTable({ keys, filter, onFilter, onSelect, onEdit, onToggle, onCheck
               </thead>
               <tbody>
                 {filtered.map((k, i) => (
-                  <tr key={k.id} className="group cursor-pointer"
+                  <tr key={k.id} className="group cursor-pointer transition-colors hover:bg-white/[0.02]"
                     style={{ borderBottom: i < filtered.length - 1 ? "1px solid rgba(255,255,255,0.03)" : "none" }}
-                    onClick={() => onSelect(k.id)}
-                    onMouseEnter={e => (e.currentTarget.style.background = "rgba(255,255,255,0.02)")}
-                    onMouseLeave={e => (e.currentTarget.style.background = "transparent")}>
+                    onClick={() => onSelect(k.id)}>
                     <td className="px-4 py-3">
                       <div className="text-sm font-medium text-zinc-200 leading-none">{k.label}</div>
                       <div className="text-[11px] font-mono text-zinc-600 mt-1">{k.masked}</div>
@@ -466,14 +468,14 @@ function AddEditModal({ editKey, onSave, onClose, error, saving }: {
   const overlayMouseDownOnSelf = useRef(false);
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4"
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 animate-in fade-in duration-200"
       style={{ background: "rgba(0,0,0,0.72)", backdropFilter: "blur(4px)" }}
       onMouseDown={e => { overlayMouseDownOnSelf.current = e.target === e.currentTarget; }}
       onMouseUp={e => {
         if (overlayMouseDownOnSelf.current && e.target === e.currentTarget) onClose();
         overlayMouseDownOnSelf.current = false;
       }}>
-      <div className="w-full sm:max-w-md rounded-2xl p-5 sm:p-6 max-h-[92vh] overflow-y-auto"
+      <div className="w-full sm:max-w-md rounded-2xl p-5 sm:p-6 max-h-[92vh] overflow-y-auto animate-in fade-in zoom-in-95 slide-in-from-bottom-2 duration-200 ease-out"
         style={{ background: "#141416", border: "1px solid rgba(255,255,255,0.09)", boxShadow: "0 32px 80px rgba(0,0,0,0.6)" }}>
         <div className="flex items-center justify-between mb-6">
           <h2 className="text-sm font-semibold text-zinc-100">{editKey ? "Edit Key" : "Add API Key"}</h2>
@@ -554,12 +556,12 @@ function AddEditModal({ editKey, onSave, onClose, error, saving }: {
 
         <div className="flex gap-2 mt-6">
           <button onClick={onClose}
-            className="flex-1 py-2 rounded-lg text-sm font-medium transition-colors"
+            className="flex-1 py-2 rounded-lg text-sm font-medium transition-colors active:scale-95"
             style={{ background: "rgba(255,255,255,0.04)", color: "#71717A", border: "1px solid rgba(255,255,255,0.06)" }}>
             Cancel
           </button>
           <button onClick={() => !saving && onSave(form)} disabled={saving}
-            className="flex-1 py-2 rounded-lg text-sm font-semibold transition-all flex items-center justify-center gap-1.5"
+            className="flex-1 py-2 rounded-lg text-sm font-semibold transition-all flex items-center justify-center gap-1.5 active:scale-95 disabled:active:scale-100"
             style={{ background: "#00D68F", color: "#0A0A0B", boxShadow: "0 0 16px rgba(0,214,143,0.3)", opacity: saving ? 0.7 : 1 }}
             onMouseEnter={e => (e.currentTarget.style.boxShadow = "0 0 28px rgba(0,214,143,0.55)")}
             onMouseLeave={e => (e.currentTarget.style.boxShadow = "0 0 16px rgba(0,214,143,0.3)")}>
@@ -614,9 +616,9 @@ function KeyDetailDrawer({ keyData, now, onClose, onDisable, onReset, onDelete, 
 
   return (
     <>
-      <div className="fixed inset-0 z-40" onClick={onClose}
+      <div className="fixed inset-0 z-40 animate-in fade-in duration-200" onClick={onClose}
         style={{ background: "rgba(0,0,0,0.5)", backdropFilter: "blur(2px)" }} />
-      <aside className="fixed right-0 top-0 bottom-0 z-50 w-full sm:w-96 flex flex-col overflow-y-auto"
+      <aside className="fixed right-0 top-0 bottom-0 z-50 w-full sm:w-96 flex flex-col overflow-y-auto animate-in slide-in-from-right duration-300 ease-out"
         style={{ background: "#111113", borderLeft: "1px solid rgba(255,255,255,0.07)", boxShadow: "-24px 0 60px rgba(0,0,0,0.4)" }}>
         <div className="flex items-start justify-between p-5"
           style={{ borderBottom: "1px solid rgba(255,255,255,0.05)" }}>
@@ -748,10 +750,11 @@ function LiveMonitor({ reqs, now }: { reqs: LR[]; now: number }) {
           ))}
         </div>
 
-        {reqs.map(r => {
+        {reqs.map((r, i) => {
           const cColor = r.code === 200 ? "#00D68F" : r.code === 429 ? "#F59E0B" : "#EF4444";
+          const isNewest = i === 0;
           return (
-            <div key={r.id}>
+            <div key={r.id} className={isNewest ? "animate-in fade-in slide-in-from-top-2 duration-300 ease-out" : undefined}>
               {/* Mobile: stacked row */}
               <div className="sm:hidden px-4 py-2.5"
                 style={{ borderBottom: "1px solid rgba(255,255,255,0.03)" }}>
@@ -1310,7 +1313,7 @@ function Dashboard({ user, onLogout }: { user: UserRead | null; onLogout: () => 
             <Loader2 size={20} className="animate-spin" color="#52525B" />
           </div>
         ) : view === "dashboard" ? (
-          <>
+          <div key="dashboard" className="space-y-4 animate-in fade-in slide-in-from-bottom-1 duration-300 ease-out">
             <MetricCards keys={keys} />
             <KeysTable
               keys={keys} filter={filter} onFilter={setFilter} now={now}
@@ -1320,16 +1323,20 @@ function Dashboard({ user, onLogout }: { user: UserRead | null; onLogout: () => 
               onCheck={checkKey}
               checkingIds={checkingIds}
             />
-          </>
+          </div>
         ) : view === "monitor" ? (
-          <LiveMonitor reqs={reqs} now={now} />
+          <div key="monitor" className="animate-in fade-in slide-in-from-bottom-1 duration-300 ease-out">
+            <LiveMonitor reqs={reqs} now={now} />
+          </div>
         ) : (
-          <GatewayAccessPanel />
+          <div key="access" className="animate-in fade-in slide-in-from-bottom-1 duration-300 ease-out">
+            <GatewayAccessPanel />
+          </div>
         )}
       </main>
 
       {checkResult && (
-        <div className="fixed bottom-4 right-4 z-50 flex items-center gap-2 px-4 py-3 rounded-lg shadow-lg"
+        <div className="fixed bottom-4 right-4 z-50 flex items-center gap-2 px-4 py-3 rounded-lg shadow-lg animate-in fade-in slide-in-from-bottom-2 duration-250 ease-out"
           style={{
             background: "#18181B",
             border: `1px solid ${checkResult.ok ? "rgba(0,214,143,0.3)" : "rgba(239,68,68,0.3)"}`,
