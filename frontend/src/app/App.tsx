@@ -1165,7 +1165,7 @@ function Dashboard({ user, onLogout }: { user: UserRead | null; onLogout: () => 
   const [reqs, setReqs]           = useState<LR[]>([]);
   const [now, setNow]             = useState(Date.now());
   const [checkingIds, setCheckingIds] = useState<Set<string>>(new Set());
-  const [checkResult, setCheckResult] = useState<{ id: string; ok: boolean; detail: string | null } | null>(null);
+  const [checkResults, setCheckResults] = useState<{ toastId: string; keyId: string; ok: boolean; detail: string | null }[]>([]);
 
   useEffect(() => {
     const id = setInterval(() => setNow(Date.now()), 1000);
@@ -1275,23 +1275,25 @@ function Dashboard({ user, onLogout }: { user: UserRead | null; onLogout: () => 
 
   async function checkKey(id: string) {
     setCheckingIds(prev => new Set(prev).add(id));
+    const toastId = `${id}-${Date.now()}`;
     try {
       const result = await api.checkKey(Number(id));
-      setCheckResult({ id, ok: result.ok, detail: result.detail });
+      setCheckResults(prev => [...prev, { toastId, keyId: id, ok: result.ok, detail: result.detail }]);
       await refreshKeys();
     } catch (err) {
-      setCheckResult({
-        id,
+      setCheckResults(prev => [...prev, {
+        toastId,
+        keyId: id,
         ok: false,
         detail: err instanceof ApiError ? err.message : "Check failed — couldn't reach the API",
-      });
+      }]);
     } finally {
       setCheckingIds(prev => {
         const next = new Set(prev);
         next.delete(id);
         return next;
       });
-      setTimeout(() => setCheckResult(r => (r?.id === id ? null : r)), 5000);
+      setTimeout(() => setCheckResults(prev => prev.filter(r => r.toastId !== toastId)), 5000);
     }
   }
 
@@ -1335,24 +1337,29 @@ function Dashboard({ user, onLogout }: { user: UserRead | null; onLogout: () => 
         )}
       </main>
 
-      {checkResult && (
-        <div className="fixed bottom-4 right-4 z-50 flex items-center gap-2 px-4 py-3 rounded-lg shadow-lg animate-in fade-in slide-in-from-bottom-2 duration-250 ease-out"
-          style={{
-            background: "#18181B",
-            border: `1px solid ${checkResult.ok ? "rgba(0,214,143,0.3)" : "rgba(239,68,68,0.3)"}`,
-            maxWidth: 360,
-          }}>
-          {checkResult.ok
-            ? <CheckCircle2 size={16} color="#00D68F" className="shrink-0" />
-            : <AlertTriangle size={16} color="#EF4444" className="shrink-0" />}
-          <div className="min-w-0">
-            <div className="text-xs font-medium text-zinc-200">
-              {checkResult.ok ? "Key is working" : "Key check failed"}
+      {checkResults.length > 0 && (
+        <div className="fixed bottom-4 right-4 z-[60] flex flex-col-reverse gap-2 pointer-events-none">
+          {checkResults.map(r => (
+            <div key={r.toastId}
+              className="flex items-center gap-2 px-4 py-3 rounded-lg shadow-lg animate-in fade-in slide-in-from-bottom-2 duration-250 ease-out pointer-events-auto"
+              style={{
+                background: "#18181B",
+                border: `1px solid ${r.ok ? "rgba(0,214,143,0.3)" : "rgba(239,68,68,0.3)"}`,
+                maxWidth: 360,
+              }}>
+              {r.ok
+                ? <CheckCircle2 size={16} color="#00D68F" className="shrink-0" />
+                : <AlertTriangle size={16} color="#EF4444" className="shrink-0" />}
+              <div className="min-w-0">
+                <div className="text-xs font-medium text-zinc-200">
+                  {r.ok ? "Key is working" : "Key check failed"}
+                </div>
+                {r.detail && (
+                  <div className="text-[11px] text-zinc-500 truncate">{r.detail}</div>
+                )}
+              </div>
             </div>
-            {checkResult.detail && (
-              <div className="text-[11px] text-zinc-500 truncate">{checkResult.detail}</div>
-            )}
-          </div>
+          ))}
         </div>
       )}
 
