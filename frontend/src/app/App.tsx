@@ -577,10 +577,10 @@ function AddEditModal({ editKey, onSave, onClose, error, saving }: {
 }
 
 // ─── KeyDetailDrawer ──────────────────────────────────────────────────────────
-function KeyDetailDrawer({ keyData, now, onClose, onDisable, onReset, onDelete, onCheck, checking }: {
+function KeyDetailDrawer({ keyData, now, onClose, onDisable, onReset, onDelete, onCheck, checking, resetting }: {
   keyData: AK; now: number;
   onClose: () => void; onDisable: () => void; onReset: () => void; onDelete: () => void;
-  onCheck: () => void; checking: boolean;
+  onCheck: () => void; checking: boolean; resetting: boolean;
 }) {
   const s = S[keyData.status];
   const [chartMode, setChartMode] = useState<"requests" | "tokens">("requests");
@@ -782,10 +782,11 @@ function KeyDetailDrawer({ keyData, now, onClose, onDisable, onReset, onDelete, 
               {checking ? <Loader2 size={12} className="animate-spin" /> : <Stethoscope size={12} />}
               {checking ? "Checking..." : "Test Key"}
             </button>
-            <button onClick={onReset}
-              className="w-full flex items-center justify-center gap-2 py-2 rounded-lg text-xs font-medium transition-all active:scale-[0.97]"
+            <button onClick={onReset} disabled={resetting}
+              className="w-full flex items-center justify-center gap-2 py-2 rounded-lg text-xs font-medium transition-all active:scale-[0.97] disabled:active:scale-100 disabled:opacity-50"
               style={{ background: "rgba(79,142,247,0.08)", color: "#4F8EF7", border: "1px solid rgba(79,142,247,0.16)" }}>
-              <RefreshCw size={12} /> Reset Cooldown
+              {resetting ? <Loader2 size={12} className="animate-spin" /> : <RefreshCw size={12} />}
+              {resetting ? "Resetting..." : "Reset Cooldown"}
             </button>
             <button onClick={onDisable}
               className="w-full flex items-center justify-center gap-2 py-2 rounded-lg text-xs font-medium transition-all active:scale-[0.97]"
@@ -1250,6 +1251,7 @@ function Dashboard({ user, onLogout }: { user: UserRead | null; onLogout: () => 
   const [reqs, setReqs]           = useState<LR[]>([]);
   const [now, setNow]             = useState(Date.now());
   const [checkingIds, setCheckingIds] = useState<Set<string>>(new Set());
+  const [resettingIds, setResettingIds] = useState<Set<string>>(new Set());
   const [checkResults, setCheckResults] = useState<{ toastId: string; keyId: string; ok: boolean; detail: string | null }[]>([]);
 
   useEffect(() => {
@@ -1340,11 +1342,18 @@ function Dashboard({ user, onLogout }: { user: UserRead | null; onLogout: () => 
   }
 
   async function resetCooldown(id: string) {
+    setResettingIds(prev => new Set(prev).add(id));
     try {
       await api.resetCooldown(Number(id));
       await refreshKeys();
     } catch {
       // surfaced via loadError on next refresh
+    } finally {
+      setResettingIds(prev => {
+        const next = new Set(prev);
+        next.delete(id);
+        return next;
+      });
     }
   }
 
@@ -1467,6 +1476,7 @@ function Dashboard({ user, onLogout }: { user: UserRead | null; onLogout: () => 
           onDelete={() => deleteKey(selectedKey.id)}
           onCheck={() => checkKey(selectedKey.id)}
           checking={checkingIds.has(selectedKey.id)}
+          resetting={resettingIds.has(selectedKey.id)}
         />
       )}
     </div>
