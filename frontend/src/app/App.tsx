@@ -14,7 +14,7 @@ import {
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 type Status = "active" | "cooldown" | "exhausted" | "disabled";
-type Provider = "gemini";
+type Provider = "gemini" | "openrouter";
 type View = "dashboard" | "monitor" | "access";
 type PF = "all" | Provider;
 
@@ -71,7 +71,8 @@ const S: Record<Status, { text: string; color: string; bg: string; bd: string }>
 };
 
 const P: Record<string, { name: string; color: string; bg: string }> = {
-  gemini: { name: "Gemini", color: "#4F8EF7", bg: "rgba(79,142,247,0.1)"  },
+  gemini:     { name: "Gemini",     color: "#4F8EF7", bg: "rgba(79,142,247,0.1)"  },
+  openrouter: { name: "OpenRouter", color: "#A78BFA", bg: "rgba(167,139,250,0.1)" },
 };
 function providerMeta(provider: string) {
   return P[provider] ?? { name: provider, color: "#71717A", bg: "rgba(113,113,122,0.1)" };
@@ -287,7 +288,7 @@ function KeysTable({ keys, filter, onFilter, onSelect, onEdit, onToggle, onCheck
         style={{ borderBottom: "1px solid rgba(255,255,255,0.05)", background: "#0F0F11" }}>
         <span className="text-xs font-medium text-zinc-400">API Keys</span>
         <div className="flex gap-1">
-          {(["all", "gemini"] as PF[]).map(f => (
+          {(["all", "gemini", "openrouter"] as PF[]).map(f => (
             <button key={f} onClick={() => onFilter(f)}
               className="px-2.5 py-1 rounded-md text-[11px] font-medium capitalize transition-all"
               style={{
@@ -501,7 +502,7 @@ function AddEditModal({ editKey, onSave, onClose, error, saving }: {
           <div>
             <label className="block text-xs font-medium text-zinc-400 mb-1.5">Provider</label>
             <div className="flex gap-2">
-              {(["gemini"] as Provider[]).map(p => (
+              {(["gemini", "openrouter"] as Provider[]).map(p => (
                 <button key={p} onClick={() => setForm({ ...form, provider: p })}
                   className="flex-1 py-2 rounded-lg text-xs font-medium transition-all"
                   style={{

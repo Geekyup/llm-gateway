@@ -21,11 +21,6 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/v1", tags=["openai-compat"])
 
-# Every request through this endpoint goes to Gemini today. Once a second
-# provider is registered, pick it from `request.model` (e.g. a prefix or
-# an explicit mapping) instead of hardcoding this.
-_PROVIDER_TYPE = ProviderType.GEMINI
-
 
 def _openai_error(status_code: int, message: str, error_type: str) -> JSONResponse:
     body = OpenAIErrorResponse(error=OpenAIErrorDetail(message=message, type=error_type))
@@ -38,32 +33,51 @@ async def chat_completions(
     gateway: GatewayService = Depends(get_gateway_service),
     user_id: int = Depends(require_gateway_token),
 ):
-    """OpenAI-compatible chat completions, backed by the Gemini key pool.
+    """OpenAI-compatible chat completions, backed by whichever provider's
+    key pool `request.provider` selects (defaults to "gemini" so existing
+    clients that don't send it keep working unchanged).
 
     Point any OpenAI SDK / LangChain / etc. at this gateway's base_url with
-    a `gwk_...` token as the API key, and `model="gemini-3.5-flash"` (or any
-    other Gemini model name) — no other client-side changes needed. Request
-    and response are translated to/from Gemini's format; failover across
-    the key pool is unchanged (see GatewayService).
+    a `gwk_...` token as the API key. Failover across the key pool is
+    unchanged regardless of provider (see GatewayService).
+
+    Gemini isn't natively OpenAI-compatible, so its request/response are
+    translated (see translation.py). OpenRouter *is* OpenAI-compatible
+    already, so its payload passes through close to 1:1.
 
     Non-streaming only for now — see translation.py docstring for scope.
     """
     try:
-        provider = get_provider(_PROVIDER_TYPE.value)
+        provider_type = ProviderType(request.provider)
+    except ValueError:
+        return _openai_error(
+            400,
+            f"Unknown provider '{request.provider}'. Supported: {', '.join(p.value for p in ProviderType)}",
+            "invalid_request_error",
+        )
+
+    try:
+        provider = get_provider(provider_type.value)
     except ProviderNotSupportedError as exc:
         return _openai_error(404, str(exc), "invalid_request_error")
 
-    gemini_payload = openai_request_to_gemini_payload(request)
-    path = gemini_path_for_model(request.model)
+    if provider_type is ProviderType.GEMINI:
+        upstream_payload = openai_request_to_gemini_payload(request)
+        path = gemini_path_for_model(request.model)
+    else:
+        # OpenRouter (and any future OpenAI-compatible provider): forward
+        # the request close to as-is, stripping only our own routing field.
+        upstream_payload = request.model_dump(exclude={"provider"}, exclude_none=True)
+        path = "v1/chat/completions"
 
     try:
         upstream_response = await gateway.proxy_request(
             user_id=user_id,
             provider=provider,
-            provider_type=_PROVIDER_TYPE,
+            provider_type=provider_type,
             path=path,
             method="POST",
-            payload=gemini_payload,
+            payload=upstream_payload,
             headers={},
         )
     except NoAvailableKeysError as exc:
@@ -72,15 +86,20 @@ async def chat_completions(
         return _openai_error(503, str(exc), "upstream_exhausted")
 
     if upstream_response.status_code >= 400:
-        # Surface Gemini's own error body rather than reshaping it — callers
-        # debugging a bad model name / bad request want to see the real
-        # upstream message, not a generic wrapper.
+        # Surface the upstream's own error body rather than reshaping it —
+        # callers debugging a bad model name / bad request want to see the
+        # real upstream message, not a generic wrapper.
         try:
             detail = upstream_response.json()
         except json.JSONDecodeError:
             detail = upstream_response.text
         return _openai_error(upstream_response.status_code, str(detail), "upstream_error")
 
-    gemini_body = upstream_response.json()
-    openai_response = gemini_response_to_openai(gemini_body, model=request.model)
-    return JSONResponse(status_code=200, content=openai_response.model_dump())
+    upstream_body = upstream_response.json()
+    if provider_type is ProviderType.GEMINI:
+        openai_response = gemini_response_to_openai(upstream_body, model=request.model)
+        return JSONResponse(status_code=200, content=openai_response.model_dump())
+
+    # OpenRouter already returns an OpenAI-shaped body — pass it straight
+    # through rather than round-tripping it through our own schema.
+    return JSONResponse(status_code=200, content=upstream_body)

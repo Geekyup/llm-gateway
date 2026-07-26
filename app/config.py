@@ -36,6 +36,7 @@ class Settings(BaseSettings):
     DEFAULT_DAILY_LIMIT: int = 1_000
 
     GEMINI_BASE_URL: str = "https://generativelanguage.googleapis.com"
+    OPENROUTER_BASE_URL: str = "https://openrouter.ai/api"
     UPSTREAM_TIMEOUT_SECONDS: float = 60.0
 
     HOUSEKEEPING_RESET_CRON_MINUTE: int = 0

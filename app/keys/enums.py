@@ -10,5 +10,6 @@ class KeyStatus(str, enum.Enum):
 
 class ProviderType(str, enum.Enum):
     GEMINI = "gemini"
+    OPENROUTER = "openrouter"
     # OPENAI = "openai"          # future
     # GITHUB_ACTIONS = "github_actions"  # future — different resource shape, see notes

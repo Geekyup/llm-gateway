@@ -19,6 +19,12 @@ class ChatCompletionRequest(BaseModel):
     messages: list[ChatMessage]
     temperature: float | None = None
     max_tokens: int | None = None
+    # Which upstream provider's key pool to use. Optional and defaults to
+    # "gemini" so existing clients that don't send this keep working
+    # unchanged; pass "openrouter" to route through an OpenRouter key
+    # instead. Validated against ProviderType in the router (kept as str
+    # here to avoid a schemas->enums import for a single field).
+    provider: str = "gemini"
 
 
 # ─── Response (OpenAI chat/completions response shape) ─────────────────────
