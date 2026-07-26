@@ -38,8 +38,12 @@ async def chat_completions(
     clients that don't send it keep working unchanged).
 
     Point any OpenAI SDK / LangChain / etc. at this gateway's base_url with
-    a `gwk_...` token as the API key. Failover across the key pool is
-    unchanged regardless of provider (see GatewayService).
+    a `gwk_...` token as the API key. `request.model` is required (per the
+    OpenAI schema) and is also used to filter the key pool: only keys
+    pinned to that exact model are candidates, so a request for
+    "gemini-3.6-pro" never lands on a key configured for
+    "gemini-3.6-flash". Failover across the matching subset is otherwise
+    unchanged (see GatewayService, KeyPoolService.get_candidate_keys).
 
     Gemini isn't natively OpenAI-compatible, so its request/response are
     translated (see translation.py). OpenRouter *is* OpenAI-compatible
@@ -79,6 +83,7 @@ async def chat_completions(
             method="POST",
             payload=upstream_payload,
             headers={},
+            model=request.model,
         )
     except NoAvailableKeysError as exc:
         return _openai_error(503, str(exc), "no_available_keys")

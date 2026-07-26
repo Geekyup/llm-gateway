@@ -31,6 +31,13 @@ class APIKey(TimestampMixin, Base):
     # Fernet ciphertext, base64-encoded text — never store or log the plaintext.
     key_encrypted: Mapped[str] = mapped_column(String(512), nullable=False)
 
+    # Which upstream model requests on this key should use, e.g.
+    # "gemini-3.6-flash" or "openai/gpt-4o-mini". Nullable: existing keys
+    # created before this field existed have no model set, and are simply
+    # never selected for a request that specifies a model (see selector
+    # docstring for the exact matching rule).
+    model: Mapped[str | None] = mapped_column(String(128), nullable=True)
+
     status: Mapped[KeyStatus] = mapped_column(
         Enum(KeyStatus, name="key_status", native_enum=False, length=32),
         nullable=False,

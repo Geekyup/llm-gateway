@@ -1,4 +1,5 @@
 from fastapi import APIRouter, Depends, status
+from pydantic import BaseModel, Field
 
 from app.api.deps import get_event_publisher, get_key_pool_service
 from app.auth.deps import get_current_user
@@ -8,8 +9,23 @@ from app.keys.schemas import APIKeyCreate, APIKeyHealthCheckResult, APIKeyRead, 
 from app.keys.service import KeyPoolService
 from app.monitoring.publisher import RequestEventPublisher
 from app.monitoring.schemas import HourlyTokenPoint, HourlyTokenUsageResponse, HourlyUsagePoint, HourlyUsageResponse
+from app.providers.registry import get_provider
 
 router = APIRouter(prefix="/me/keys", tags=["keys"])
+
+
+class ListModelsRequest(BaseModel):
+    provider: ProviderType
+    raw_key: str = Field(..., description="Plaintext API key, tried live against the provider. Never stored.")
+
+
+class ModelOption(BaseModel):
+    id: str
+    label: str
+
+
+class ListModelsResponse(BaseModel):
+    models: list[ModelOption]
 
 
 @router.post("", response_model=APIKeyRead, status_code=201)
@@ -20,6 +36,24 @@ async def create_key(
 ) -> APIKeyRead:
     key = await service.create_key(user.id, payload)
     return APIKeyRead.model_validate(key)
+
+
+@router.post("/list-models", response_model=ListModelsResponse)
+async def list_models(
+    payload: ListModelsRequest,
+    user: User = Depends(get_current_user),  # noqa: ARG001 - auth-gated even though no key is looked up
+) -> ListModelsResponse:
+    """Live model catalog for a not-yet-saved key, for the Add/Edit Key
+    form's model picker. Tries `payload.raw_key` directly against the
+    provider — the key is never persisted or logged here, only used for
+    this one on-demand call (same trust boundary as the Test Key health
+    check). Raises 502 (via ProviderRequestError) if the key is invalid or
+    the provider call fails, so the form can show why nothing came back
+    instead of just an empty picker.
+    """
+    provider = get_provider(payload.provider.value)
+    models = await provider.list_models(payload.raw_key)
+    return ListModelsResponse(models=[ModelOption(id=m.id, label=m.label) for m in models])
 
 
 @router.get("", response_model=list[APIKeyRead])

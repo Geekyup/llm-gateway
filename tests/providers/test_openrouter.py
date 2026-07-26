@@ -1,6 +1,7 @@
 import httpx
 import pytest
 
+from app.core.exceptions import ProviderRequestError
 from app.providers.openrouter import OpenRouterProvider
 
 
@@ -109,3 +110,65 @@ async def test_health_check_handles_network_error():
 
     assert result.ok is False
     assert "Network error" in result.detail
+
+
+@pytest.mark.asyncio
+async def test_list_models_returns_ids_and_labels():
+    def handler(request: httpx.Request) -> httpx.Response:
+        assert str(request.url) == "https://openrouter.ai/api/v1/models"
+        return httpx.Response(
+            200,
+            json={
+                "data": [
+                    {"id": "openai/gpt-4o-mini", "name": "GPT-4o mini"},
+                    {"id": "anthropic/claude-3.5-sonnet", "name": "Claude 3.5 Sonnet"},
+                ]
+            },
+        )
+
+    provider = OpenRouterProvider(client=_client_with(handler))
+
+    models = await provider.list_models("sk-or-real-key")
+
+    assert [m.id for m in models] == ["openai/gpt-4o-mini", "anthropic/claude-3.5-sonnet"]
+    assert models[0].label == "GPT-4o mini"
+
+
+@pytest.mark.asyncio
+async def test_list_models_skips_entries_without_an_id():
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(200, json={"data": [{"name": "no id here"}, {"id": "openai/gpt-4o-mini"}]})
+
+    provider = OpenRouterProvider(client=_client_with(handler))
+
+    models = await provider.list_models("sk-or-real-key")
+
+    assert [m.id for m in models] == ["openai/gpt-4o-mini"]
+    # Falls back to id when the upstream doesn't provide a friendlier name.
+    assert models[0].label == "openai/gpt-4o-mini"
+
+
+@pytest.mark.asyncio
+async def test_list_models_raises_on_bad_key():
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(401, json={"error": {"message": "No auth credentials found"}})
+
+    provider = OpenRouterProvider(client=_client_with(handler))
+
+    with pytest.raises(ProviderRequestError) as exc_info:
+        await provider.list_models("bad-key")
+
+    assert "No auth credentials found" in str(exc_info.value)
+
+
+@pytest.mark.asyncio
+async def test_list_models_raises_on_network_error():
+    def handler(request: httpx.Request) -> httpx.Response:
+        raise httpx.ConnectError("boom")
+
+    provider = OpenRouterProvider(client=_client_with(handler))
+
+    with pytest.raises(ProviderRequestError) as exc_info:
+        await provider.list_models("sk-or-real-key")
+
+    assert "Network error" in str(exc_info.value)

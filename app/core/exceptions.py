@@ -37,6 +37,21 @@ class ProviderNotSupportedError(LLMGatewayError):
     detail = "Provider '{provider}' is not registered"
 
 
+class ProviderRequestError(LLMGatewayError):
+    """Raised when a direct, on-demand call to a provider (not part of the
+    key-pool failover path) fails — currently just Provider.list_models,
+    invoked synchronously for the Add/Edit Key model picker so the person
+    gets an immediate, specific reason rather than a silent empty list.
+    """
+
+    status_code = 502
+    # NOTE: the format placeholder is deliberately `{reason}`, not
+    # `{detail}` — LLMGatewayError.__init__ takes `detail` as its own
+    # positional/reserved parameter name, so a fmt_kwargs key called
+    # "detail" would never reach .format() and raise KeyError instead.
+    detail = "Request to '{provider}' failed: {reason}"
+
+
 class GatewayTokenNotFoundError(LLMGatewayError):
     status_code = 404
     detail = "Gateway token with id={token_id} not found"

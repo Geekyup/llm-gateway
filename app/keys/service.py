@@ -40,6 +40,7 @@ class KeyPoolService:
             provider=payload.provider,
             key_encrypted=encrypted,
             daily_limit=payload.daily_limit,
+            model=payload.model,
         )
         await self._cache.invalidate(user_id, payload.provider.value)
         return key  # ORM row — admin router serializes via APIKeyRead.model_validate
@@ -82,25 +83,42 @@ class KeyPoolService:
 
     # --- gateway-facing hot path --------------------------------------------
 
-    async def get_candidate_keys(self, user_id: int, provider: ProviderType) -> list[APIKeyDTO]:
-        """ACTIVE key metadata for this user+provider, cache-first."""
+    async def get_candidate_keys(
+        self, user_id: int, provider: ProviderType, *, model: str | None = None
+    ) -> list[APIKeyDTO]:
+        """ACTIVE key metadata for this user+provider, cache-first.
+
+        If `model` is given, only keys pinned to that exact model are
+        returned — a client asking for a specific model should never
+        silently land on a key configured for a different one. Keys with
+        no model set (model=None) never match a model-specific request;
+        they're only used when the request itself doesn't specify a model
+        either. Filtering happens here, after the cache read, so the
+        cached list itself stays a single per-(user, provider) entry
+        rather than fragmenting into one cache key per model.
+        """
         cached = await self._cache.get_active(user_id, provider.value)
         if cached is not None:
-            return cached
+            all_active = cached
+        else:
+            keys = await self._repo.list_active(user_id=user_id, provider=provider)
+            all_active = [APIKeyDTO.model_validate(k) for k in keys]
+            await self._cache.set_active(user_id, provider.value, all_active)
 
-        keys = await self._repo.list_active(user_id=user_id, provider=provider)
-        dtos = [APIKeyDTO.model_validate(k) for k in keys]
-        await self._cache.set_active(user_id, provider.value, dtos)
-        return dtos
+        if model is None:
+            return [k for k in all_active if k.model is None]
+        return [k for k in all_active if k.model == model]
 
-    async def select_key(self, user_id: int, provider: ProviderType) -> APIKeyDTO | None:
+    async def select_key(self, user_id: int, provider: ProviderType, *, model: str | None = None) -> APIKeyDTO | None:
         """Pick the next candidate key (round-robin) from this user's pool
         and attach its decrypted secret.
 
-        Returns None if this user has no active key for this provider —
-        never falls back to another user's keys.
+        Returns None if this user has no active key for this provider (and,
+        if `model` is given, pinned to that model) — never falls back to
+        another user's keys, and never falls back to a differently-pinned
+        key either.
         """
-        candidates = await self.get_candidate_keys(user_id, provider)
+        candidates = await self.get_candidate_keys(user_id, provider, model=model)
         chosen = await self._selector.select(user_id, provider.value, candidates)
         if chosen is None:
             return None

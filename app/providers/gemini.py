@@ -3,7 +3,8 @@ from typing import ClassVar
 import httpx
 
 from app.config import get_settings
-from app.providers.base import HealthCheckResult, Provider
+from app.core.exceptions import ProviderRequestError
+from app.providers.base import HealthCheckResult, ModelInfo, Provider
 
 
 class GeminiProvider(Provider):
@@ -80,3 +81,38 @@ class GeminiProvider(Provider):
         except Exception:  # noqa: BLE001 - best-effort detail extraction only
             pass
         return HealthCheckResult(ok=False, detail=detail)
+
+    async def list_models(self, key: str) -> list[ModelInfo]:
+        try:
+            response = await self.forward(key=key, path="v1beta/models", method="GET", payload=None, headers={})
+        except httpx.HTTPError as exc:
+            raise ProviderRequestError(provider=self.name, reason=f"Network error: {exc}") from exc
+
+        if response.status_code != 200:
+            detail = f"HTTP {response.status_code}"
+            try:
+                message = response.json().get("error", {}).get("message")
+                if message:
+                    detail = f"HTTP {response.status_code}: {message}"
+            except Exception:  # noqa: BLE001 - best-effort detail extraction only
+                pass
+            raise ProviderRequestError(provider=self.name, reason=detail)
+
+        body = response.json()
+        models = []
+        for entry in body.get("models", []):
+            # entry["name"] is like "models/gemini-3.6-flash" — strip the
+            # "models/" prefix since that's the id clients actually send
+            # as ChatCompletionRequest.model and what a key gets pinned to.
+            raw_name = entry.get("name", "")
+            model_id = raw_name.removeprefix("models/")
+            if not model_id:
+                continue
+            # Only list models that support the call this gateway actually
+            # makes — generateContent — so the picker doesn't offer e.g.
+            # embedding-only models that would just 404 on every request.
+            supported = entry.get("supportedGenerationMethods", [])
+            if "generateContent" not in supported:
+                continue
+            models.append(ModelInfo(id=model_id, label=entry.get("displayName")))
+        return models

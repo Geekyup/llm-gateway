@@ -19,6 +19,23 @@ class HealthCheckResult:
         self.detail = detail
 
 
+class ModelInfo:
+    """One model entry as returned by Provider.list_models.
+
+    `id` is what a client should put in ChatCompletionRequest.model and
+    what an admin pins a key to — the only field the rest of the app
+    actually uses. `label` is an optional friendlier display name (falls
+    back to `id` when the upstream API doesn't provide one) for the UI's
+    model picker only.
+    """
+
+    __slots__ = ("id", "label")
+
+    def __init__(self, id: str, label: str | None = None) -> None:
+        self.id = id
+        self.label = label or id
+
+
 class Provider(ABC):
     """Adapter to one upstream LLM API.
 
@@ -55,4 +72,16 @@ class Provider(ABC):
         its own lightweight request on demand — e.g. for an admin "Test"
         button or a periodic sweep — and should avoid billed/heavy
         endpoints (no completions/generation calls).
+        """
+
+    @abstractmethod
+    async def list_models(self, key: str) -> list[ModelInfo]:
+        """List models this key can actually use, straight from the upstream API.
+
+        Used by the Add/Edit Key form to populate a live model picker —
+        deliberately live rather than a hardcoded list, since available
+        models (and which ones a given account/tier can reach) change
+        over time and per-provider. Raises on a bad/unauthenticated key
+        rather than returning an empty list, so the caller can tell "no
+        models" apart from "couldn't even ask".
         """

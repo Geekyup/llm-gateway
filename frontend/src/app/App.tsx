@@ -2,14 +2,14 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import {
   Plus, Eye, EyeOff, X, Activity, RefreshCw, Trash2, Edit2,
   Power, Clock, ArrowRight, CheckCircle2, Shield, AlertTriangle,
-  LayoutDashboard, KeyRound, Zap, LogOut, Loader2, Stethoscope,
+  LayoutDashboard, KeyRound, Zap, LogOut, Loader2, Stethoscope, ChevronDown,
 } from "lucide-react";
 import { AreaChart, Area, XAxis, Tooltip, ResponsiveContainer } from "recharts";
 import {
   api, streamEvents, getAccessToken, getRefreshToken, setTokenPair, clearTokenPair,
   startGoogleLogin,
   ApiError, type ApiKeyRead, type RequestEvent as ApiRequestEvent,
-  type GatewayTokenRead, type GatewayTokenCreated, type UserRead,
+  type GatewayTokenRead, type GatewayTokenCreated, type UserRead, type ModelOption,
 } from "./lib/api";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -20,7 +20,7 @@ type PF = "all" | Provider;
 
 interface AK {
   id: string; label: string; provider: Provider; status: Status;
-  masked: string; used: number; limit: number;
+  masked: string; used: number; limit: number; model: string | null;
   cooldownUntil?: number; lastUsed?: number; created: number; updated: number;
 }
 
@@ -31,7 +31,7 @@ interface LR {
   totalTokens: number | null;
 }
 
-interface FormState { label: string; provider: Provider; rawKey: string; limit: string }
+interface FormState { label: string; provider: Provider; rawKey: string; limit: string; model: string }
 
 // ─── Mapping between backend schema and UI view-model ─────────────────────────
 function toAK(k: ApiKeyRead): AK {
@@ -43,6 +43,7 @@ function toAK(k: ApiKeyRead): AK {
     masked: `#${k.id}`,
     used: k.requests_today,
     limit: k.daily_limit,
+    model: k.model,
     cooldownUntil: k.cooldown_until ? new Date(k.cooldown_until).getTime() : undefined,
     lastUsed: k.last_used_at ? new Date(k.last_used_at).getTime() : undefined,
     created: new Date(k.created_at).getTime(),
@@ -324,7 +325,9 @@ function KeysTable({ keys, filter, onFilter, onSelect, onEdit, onToggle, onCheck
                 <div className="flex items-start justify-between gap-2 mb-2">
                   <div className="min-w-0">
                     <div className="text-sm font-medium text-zinc-200 leading-none truncate">{k.label}</div>
-                    <div className="text-[11px] font-mono text-zinc-600 mt-1">{k.masked}</div>
+                    <div className="text-[11px] font-mono text-zinc-600 mt-1 truncate">
+                      {k.masked}{k.model && <span className="text-zinc-700"> · {k.model}</span>}
+                    </div>
                   </div>
                   <div className="flex items-center gap-1 shrink-0" onClick={e => e.stopPropagation()}>
                     <button onClick={() => onCheck(k.id)} disabled={checkingIds.has(k.id)}
@@ -383,7 +386,9 @@ function KeysTable({ keys, filter, onFilter, onSelect, onEdit, onToggle, onCheck
                     onClick={() => onSelect(k.id)}>
                     <td className="px-4 py-3">
                       <div className="text-sm font-medium text-zinc-200 leading-none">{k.label}</div>
-                      <div className="text-[11px] font-mono text-zinc-600 mt-1">{k.masked}</div>
+                      <div className="text-[11px] font-mono text-zinc-600 mt-1">
+                        {k.masked}{k.model && <span className="text-zinc-700"> · {k.model}</span>}
+                      </div>
                     </td>
                     <td className="px-4 py-3"><PBadge provider={k.provider} /></td>
                     <td className="px-4 py-3"><SBadge status={k.status} /></td>
@@ -443,8 +448,34 @@ function AddEditModal({ editKey, onSave, onClose, error, saving }: {
     provider: editKey?.provider ?? "gemini",
     rawKey: "",
     limit: String(editKey?.limit ?? 15000),
+    model: editKey?.model ?? "",
   });
   const [showKey, setShowKey] = useState(false);
+  const [modelOptions, setModelOptions] = useState<ModelOption[] | null>(null);
+  const [modelPickerOpen, setModelPickerOpen] = useState(false);
+  const [modelLoading, setModelLoading] = useState(false);
+  const [modelError, setModelError] = useState<string | null>(null);
+
+  async function fetchModels() {
+    if (!form.rawKey.trim() && !editKey) return; // nothing to try the call with yet
+    setModelLoading(true);
+    setModelError(null);
+    try {
+      // Editing an existing key with a blank "leave unchanged" key field —
+      // there's no raw key to try live, so this can't fetch a fresh list.
+      if (!form.rawKey.trim() && editKey) {
+        setModelError("Enter the API key above to look up models for it.");
+        return;
+      }
+      const models = await api.listModels(form.provider, form.rawKey.trim());
+      setModelOptions(models);
+      setModelPickerOpen(true);
+    } catch (err) {
+      setModelError(err instanceof ApiError ? err.message : "Couldn't reach the provider to list models.");
+    } finally {
+      setModelLoading(false);
+    }
+  }
 
   useEffect(() => {
     const h = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
@@ -503,7 +534,11 @@ function AddEditModal({ editKey, onSave, onClose, error, saving }: {
             <label className="block text-xs font-medium text-zinc-400 mb-1.5">Provider</label>
             <div className="flex gap-2">
               {(["gemini", "openrouter"] as Provider[]).map(p => (
-                <button key={p} onClick={() => setForm({ ...form, provider: p })}
+                <button key={p} onClick={() => {
+                  setForm({ ...form, provider: p, model: "" });
+                  setModelOptions(null);
+                  setModelError(null);
+                }}
                   className="flex-1 py-2 rounded-lg text-xs font-medium transition-all"
                   style={{
                     color: form.provider === p ? P[p].color : "#52525B",
@@ -535,6 +570,55 @@ function AddEditModal({ editKey, onSave, onClose, error, saving }: {
               <Shield size={10} color="#52525B" className="shrink-0" />
               Encrypted before storage — never shown in plaintext
             </p>
+          </div>
+
+          <div>
+            <label className="block text-xs font-medium text-zinc-400 mb-1.5">
+              Model <span className="text-zinc-600 font-normal">(optional)</span>
+            </label>
+            <p className="text-[11px] text-zinc-600 mb-2">
+              Pin this key to one model — requests for that exact model will only use keys pinned to it.
+              Leave unset to only serve requests that also don't specify a model.
+            </p>
+
+            {form.model ? (
+              <div className="flex items-center justify-between px-3 py-2 rounded-lg text-sm"
+                style={{ ...baseInp, background: "rgba(0,214,143,0.06)", borderColor: "rgba(0,214,143,0.2)" }}>
+                <span className="font-mono text-zinc-200 truncate">{form.model}</span>
+                <button onClick={() => setForm({ ...form, model: "" })}
+                  className="shrink-0 ml-2 p-0.5 rounded transition-colors hover:bg-white/10">
+                  <X size={13} color="#71717A" />
+                </button>
+              </div>
+            ) : (
+              <div className="relative">
+                <button onClick={fetchModels} disabled={modelLoading}
+                  className="w-full flex items-center justify-center gap-2 py-2 rounded-lg text-xs font-medium transition-all active:scale-[0.98] disabled:active:scale-100 disabled:opacity-60"
+                  style={{ background: "rgba(255,255,255,0.04)", color: "#A1A1AA", border: "1px solid rgba(255,255,255,0.08)" }}>
+                  {modelLoading ? <Loader2 size={13} className="animate-spin" /> : <ChevronDown size={13} />}
+                  {modelLoading ? "Loading models…" : "Select Model"}
+                </button>
+
+                {modelPickerOpen && modelOptions && (
+                  <div className="absolute z-10 mt-1.5 w-full max-h-56 overflow-y-auto rounded-lg shadow-lg animate-in fade-in slide-in-from-top-1 duration-150"
+                    style={{ background: "#1C1C1E", border: "1px solid rgba(255,255,255,0.1)" }}>
+                    {modelOptions.length === 0 ? (
+                      <p className="px-3 py-2.5 text-xs text-zinc-500">No models available for this key.</p>
+                    ) : (
+                      modelOptions.map(m => (
+                        <button key={m.id}
+                          onClick={() => { setForm({ ...form, model: m.id }); setModelPickerOpen(false); }}
+                          className="w-full text-left px-3 py-2 text-xs transition-colors hover:bg-white/5">
+                          <div className="text-zinc-200 truncate">{m.label}</div>
+                          {m.label !== m.id && <div className="text-[10px] font-mono text-zinc-600 truncate">{m.id}</div>}
+                        </button>
+                      ))
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
+            {modelError && <p className="mt-1.5 text-[11px]" style={{ color: "#EF4444" }}>{modelError}</p>}
           </div>
 
           <div>
@@ -632,6 +716,7 @@ function KeyDetailDrawer({ keyData, now, onClose, onDisable, onReset, onDelete, 
 
   const meta = [
     { label: "Provider",   val: P[keyData.provider].name,                                           mono: false },
+    { label: "Model",      val: keyData.model ?? "Any (unpinned)",                                    mono: true  },
     { label: "Masked Key", val: keyData.masked,                                                      mono: true  },
     { label: "Created",    val: new Date(keyData.created).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }), mono: false },
     { label: "Updated",    val: new Date(keyData.updated).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }), mono: false },
@@ -1304,6 +1389,9 @@ function Dashboard({ user, onLogout }: { user: UserRead | null; onLogout: () => 
         await api.updateKey(Number(editId), {
           label: form.label || undefined,
           daily_limit: Number(form.limit) || undefined,
+          // Always sent (never `undefined`) so clearing the model via the
+          // "x" button actually persists as unset, not "leave unchanged".
+          model: form.model.trim() || null,
         });
         setEditId(null);
       } else {
@@ -1317,6 +1405,7 @@ function Dashboard({ user, onLogout }: { user: UserRead | null; onLogout: () => 
           provider: form.provider,
           raw_key: form.rawKey.trim(),
           daily_limit: Number(form.limit) || 15000,
+          model: form.model.trim() || null,
         });
         setAddOpen(false);
       }

@@ -60,11 +60,12 @@ def key_pool(key_repo, fake_redis):
     return KeyPoolService(key_repo, cache, selector)
 
 
-async def _create_active_key(key_pool: KeyPoolService, user_id: int, label: str):
+async def _create_active_key(key_pool: KeyPoolService, user_id: int, label: str, model: str | None = None):
     from app.keys.schemas import APIKeyCreate
 
     return await key_pool.create_key(
-        user_id, APIKeyCreate(label=label, provider=ProviderType.GEMINI, raw_key=f"raw-{label}", daily_limit=100)
+        user_id,
+        APIKeyCreate(label=label, provider=ProviderType.GEMINI, raw_key=f"raw-{label}", daily_limit=100, model=model),
     )
 
 

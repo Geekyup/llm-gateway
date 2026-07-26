@@ -3,7 +3,8 @@ from typing import ClassVar
 import httpx
 
 from app.config import get_settings
-from app.providers.base import HealthCheckResult, Provider
+from app.core.exceptions import ProviderRequestError
+from app.providers.base import HealthCheckResult, ModelInfo, Provider
 
 
 class OpenRouterProvider(Provider):
@@ -79,3 +80,35 @@ class OpenRouterProvider(Provider):
         except Exception:  # noqa: BLE001 - best-effort detail extraction only
             pass
         return HealthCheckResult(ok=False, detail=detail)
+
+    async def list_models(self, key: str) -> list[ModelInfo]:
+        # GET /api/v1/models is actually a public, unauthenticated catalog
+        # of every model on the platform (not filtered to what this key
+        # can afford/access) — OpenRouter doesn't offer a per-key model
+        # list. We still send the key so this fails the same way other
+        # calls would if it were ever revoked, and so a future
+        # personalized-list endpoint would just work here without callers
+        # changing.
+        try:
+            response = await self.forward(key=key, path="v1/models", method="GET", payload=None, headers={})
+        except httpx.HTTPError as exc:
+            raise ProviderRequestError(provider=self.name, reason=f"Network error: {exc}") from exc
+
+        if response.status_code != 200:
+            reason = f"HTTP {response.status_code}"
+            try:
+                message = response.json().get("error", {}).get("message")
+                if message:
+                    reason = f"HTTP {response.status_code}: {message}"
+            except Exception:  # noqa: BLE001 - best-effort detail extraction only
+                pass
+            raise ProviderRequestError(provider=self.name, reason=reason)
+
+        body = response.json()
+        models = []
+        for entry in body.get("data", []):
+            model_id = entry.get("id")
+            if not model_id:
+                continue
+            models.append(ModelInfo(id=model_id, label=entry.get("name")))
+        return models

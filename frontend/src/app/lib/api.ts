@@ -44,6 +44,7 @@ export interface ApiKeyRead {
   status: ApiKeyStatus;
   requests_today: number;
   daily_limit: number;
+  model: string | null;
   cooldown_until: string | null;
   last_used_at: string | null;
   created_at: string;
@@ -55,12 +56,19 @@ export interface ApiKeyCreate {
   provider: ApiProvider;
   raw_key: string;
   daily_limit: number;
+  model?: string | null;
 }
 
 export interface ApiKeyUpdate {
   label?: string;
   status?: ApiKeyStatus;
   daily_limit?: number;
+  model?: string | null;
+}
+
+export interface ModelOption {
+  id: string;
+  label: string;
 }
 
 export interface RequestEvent {
@@ -212,6 +220,14 @@ export const api = {
       method: "POST",
       body: JSON.stringify(payload),
     });
+  },
+
+  async listModels(provider: ApiProvider, rawKey: string): Promise<ModelOption[]> {
+    const res = await request<{ models: ModelOption[] }>("/me/keys/list-models", {
+      method: "POST",
+      body: JSON.stringify({ provider, raw_key: rawKey }),
+    });
+    return res.models;
   },
 
   async updateKey(id: number, payload: ApiKeyUpdate): Promise<ApiKeyRead> {

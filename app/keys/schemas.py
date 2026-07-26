@@ -10,12 +10,19 @@ class APIKeyCreate(BaseModel):
     provider: ProviderType
     raw_key: str = Field(..., description="Plaintext API key. Encrypted before storage, never persisted as-is.")
     daily_limit: int = Field(..., gt=0)
+    model: str | None = Field(
+        default=None,
+        max_length=128,
+        description="Upstream model this key serves, e.g. 'gemini-3.6-flash' or 'openai/gpt-4o-mini'. "
+        "If unset, this key is only used for requests that also don't specify a model.",
+    )
 
 
 class APIKeyUpdate(BaseModel):
     label: str | None = Field(default=None, max_length=255)
     status: KeyStatus | None = None
     daily_limit: int | None = Field(default=None, gt=0)
+    model: str | None = Field(default=None, max_length=128)
 
 
 class APIKeyRead(BaseModel):
@@ -29,6 +36,7 @@ class APIKeyRead(BaseModel):
     status: KeyStatus
     requests_today: int
     daily_limit: int
+    model: str | None
     cooldown_until: datetime | None
     last_used_at: datetime | None
     created_at: datetime
@@ -62,4 +70,5 @@ class APIKeyDTO(BaseModel):
     status: KeyStatus
     requests_today: int
     daily_limit: int
+    model: str | None = None
     decrypted_key: str | None = None

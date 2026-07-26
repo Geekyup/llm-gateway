@@ -19,7 +19,14 @@ class APIKeyRepository:
         self._session = session
 
     async def create(
-        self, *, user_id: int, label: str, provider: ProviderType, key_encrypted: str, daily_limit: int
+        self,
+        *,
+        user_id: int,
+        label: str,
+        provider: ProviderType,
+        key_encrypted: str,
+        daily_limit: int,
+        model: str | None = None,
     ) -> APIKey:
         key = APIKey(
             user_id=user_id,
@@ -27,6 +34,7 @@ class APIKeyRepository:
             provider=provider,
             key_encrypted=key_encrypted,
             daily_limit=daily_limit,
+            model=model,
             status=KeyStatus.ACTIVE,
         )
         self._session.add(key)

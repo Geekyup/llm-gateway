@@ -87,13 +87,14 @@ class GatewayService:
         method: str,
         payload: dict | None,
         headers: dict,
+        model: str | None = None,
     ) -> httpx.Response:
         request_id = uuid.uuid4().hex
         tried_key_ids: set[int] = set()
         last_response: httpx.Response | None = None
 
         for attempt in range(1, self._max_attempts + 1):
-            dto = await self._key_pool.select_key(user_id, provider_type)
+            dto = await self._key_pool.select_key(user_id, provider_type, model=model)
             if dto is None:
                 outcome = "upstream_exhausted" if tried_key_ids else "no_keys"
                 await self._emit(
@@ -112,7 +113,8 @@ class GatewayService:
                 if tried_key_ids:
                     # We had candidates earlier but exhausted them all this request.
                     raise UpstreamExhaustedError(provider=provider_type.value, attempts=len(tried_key_ids))
-                raise NoAvailableKeysError(provider=provider_type.value)
+                provider_label = f"{provider_type.value}' for model '{model}" if model else provider_type.value
+                raise NoAvailableKeysError(provider=provider_label)
 
             if dto.id in tried_key_ids:
                 # Round-robin cursor looped back before we hit max_attempts
