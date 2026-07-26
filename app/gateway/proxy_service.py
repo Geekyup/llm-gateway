@@ -49,6 +49,9 @@ class GatewayService:
         outcome: str,
         latency_ms: int | None,
         error_detail: str | None = None,
+        prompt_tokens: int | None = None,
+        completion_tokens: int | None = None,
+        total_tokens: int | None = None,
     ) -> None:
         if self._events is None:
             return
@@ -68,6 +71,9 @@ class GatewayService:
                 latency_ms=latency_ms,
                 is_retry=attempt > 1,
                 error_detail=error_detail,
+                prompt_tokens=prompt_tokens,
+                completion_tokens=completion_tokens,
+                total_tokens=total_tokens,
             )
         )
 
@@ -163,6 +169,14 @@ class GatewayService:
                 continue
 
             await self._key_pool.record_success(dto.id, user_id, provider_type)
+            prompt_tokens = completion_tokens = total_tokens = None
+            try:
+                usage = response.json().get("usageMetadata") or {}
+                prompt_tokens = usage.get("promptTokenCount")
+                completion_tokens = usage.get("candidatesTokenCount")
+                total_tokens = usage.get("totalTokenCount")
+            except Exception:  # noqa: BLE001 - token accounting is best-effort, never block the response
+                logger.warning("failed to parse usageMetadata for token accounting", exc_info=True)
             await self._emit(
                 user_id=user_id,
                 request_id=request_id,
@@ -175,6 +189,9 @@ class GatewayService:
                 upstream_status=response.status_code,
                 outcome="success",
                 latency_ms=latency_ms,
+                prompt_tokens=prompt_tokens,
+                completion_tokens=completion_tokens,
+                total_tokens=total_tokens,
             )
             return response
 

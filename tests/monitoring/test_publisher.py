@@ -13,6 +13,9 @@ def _event(
     outcome: str = "success",
     key_id: int | None = 1,
     timestamp: datetime | None = None,
+    prompt_tokens: int | None = None,
+    completion_tokens: int | None = None,
+    total_tokens: int | None = None,
 ) -> RequestEvent:
     return RequestEvent(
         user_id=user_id,
@@ -28,6 +31,9 @@ def _event(
         outcome=outcome,
         latency_ms=42,
         is_retry=attempt > 1,
+        prompt_tokens=prompt_tokens,
+        completion_tokens=completion_tokens,
+        total_tokens=total_tokens,
     )
 
 
@@ -170,3 +176,52 @@ async def test_hourly_usage_ignores_events_with_no_upstream_call(fake_redis):
     counts = await publisher.hourly_usage_for_key(1, key_id=1)
 
     assert sum(counts) == 0
+
+
+@pytest.mark.asyncio
+async def test_hourly_token_usage_sums_by_hour_for_today(fake_redis):
+    publisher = RequestEventPublisher(fake_redis)
+    now = datetime.now(timezone.utc)
+    nine_am = now.replace(hour=9, minute=0, second=0, microsecond=0)
+    two_pm = now.replace(hour=14, minute=0, second=0, microsecond=0)
+
+    await publisher.publish(_event(request_id="a", timestamp=nine_am, prompt_tokens=100, completion_tokens=20, total_tokens=120))
+    await publisher.publish(_event(request_id="b", timestamp=nine_am, prompt_tokens=50, completion_tokens=10, total_tokens=60))
+    await publisher.publish(_event(request_id="c", timestamp=two_pm, prompt_tokens=200, completion_tokens=40, total_tokens=240))
+
+    triples = await publisher.hourly_token_usage_for_key(1, key_id=1)
+
+    assert len(triples) == 24
+    assert triples[9] == (150, 30, 180)
+    assert triples[14] == (200, 40, 240)
+
+
+@pytest.mark.asyncio
+async def test_hourly_token_usage_skips_non_success_and_missing_tokens(fake_redis):
+    publisher = RequestEventPublisher(fake_redis)
+    now = datetime.now(timezone.utc)
+
+    # rate_limited never reaches generation, so no usageMetadata to count.
+    await publisher.publish(_event(request_id="limited", outcome="rate_limited", timestamp=now))
+    # A success event published before this feature existed (or a parse
+    # failure) has no token fields — must not crash or count as zero-usage noise.
+    await publisher.publish(_event(request_id="legacy-success", outcome="success", timestamp=now))
+
+    triples = await publisher.hourly_token_usage_for_key(1, key_id=1)
+
+    assert all(t == (0, 0, 0) for t in triples)
+
+
+@pytest.mark.asyncio
+async def test_hourly_token_usage_excludes_other_keys_and_stale_days(fake_redis):
+    publisher = RequestEventPublisher(fake_redis)
+    now = datetime.now(timezone.utc)
+    yesterday = now - timedelta(days=1)
+
+    await publisher.publish(_event(request_id="mine", key_id=1, timestamp=now, prompt_tokens=10, completion_tokens=5, total_tokens=15))
+    await publisher.publish(_event(request_id="other-key", key_id=2, timestamp=now, prompt_tokens=999, completion_tokens=999, total_tokens=1998))
+    await publisher.publish(_event(request_id="stale", key_id=1, timestamp=yesterday, prompt_tokens=999, completion_tokens=999, total_tokens=1998))
+
+    triples = await publisher.hourly_token_usage_for_key(1, key_id=1)
+
+    assert sum(t[2] for t in triples) == 15

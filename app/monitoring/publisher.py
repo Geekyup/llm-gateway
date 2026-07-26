@@ -100,3 +100,39 @@ class RequestEventPublisher:
                 continue
             counts[ts.hour] += 1
         return counts
+
+    async def hourly_token_usage_for_key(self, user_id: int, key_id: int) -> list[tuple[int, int, int]]:
+        """Real per-hour token counts (prompt, completion, total) for one
+        key, for the current UTC day.
+
+        Same Redis-history source and same coverage caveat as
+        hourly_usage_for_key. Only "success" events carry usageMetadata
+        (rate_limited/exhausted attempts never reached generation, so
+        there's nothing to count) — events missing token fields (e.g.
+        published before this feature existed) are skipped.
+        """
+        prompt = [0] * 24
+        completion = [0] * 24
+        total = [0] * 24
+        raw = await self._redis.lrange(_history_key(user_id), 0, HISTORY_MAX_LEN - 1)
+        today = datetime.now(timezone.utc).date()
+        for item in raw:
+            try:
+                event = RequestEvent.model_validate_json(item)
+            except Exception:  # noqa: BLE001 - skip malformed/legacy entries
+                continue
+            if event.key_id != key_id or event.outcome != "success":
+                continue
+            if event.total_tokens is None:
+                continue
+            ts = event.timestamp
+            if ts.tzinfo is None:
+                ts = ts.replace(tzinfo=timezone.utc)
+            ts = ts.astimezone(timezone.utc)
+            if ts.date() != today:
+                continue
+            h = ts.hour
+            prompt[h] += event.prompt_tokens or 0
+            completion[h] += event.completion_tokens or 0
+            total[h] += event.total_tokens
+        return list(zip(prompt, completion, total))

@@ -32,6 +32,10 @@ class RequestEvent(BaseModel):
     is_retry: bool = Field(default=False, description="True for attempt > 1")
     error_detail: str | None = None
 
+    prompt_tokens: int | None = Field(default=None, description="From upstream usageMetadata, success only")
+    completion_tokens: int | None = Field(default=None, description="From upstream usageMetadata, success only")
+    total_tokens: int | None = Field(default=None, description="From upstream usageMetadata, success only")
+
 
 class RequestEventList(BaseModel):
     events: list[RequestEvent]
@@ -45,3 +49,15 @@ class HourlyUsagePoint(BaseModel):
 class HourlyUsageResponse(BaseModel):
     key_id: int
     points: list[HourlyUsagePoint]
+
+
+class HourlyTokenPoint(BaseModel):
+    hour: int = Field(..., ge=0, le=23, description="UTC hour of day, 0-23")
+    prompt_tokens: int = Field(..., ge=0)
+    completion_tokens: int = Field(..., ge=0)
+    total_tokens: int = Field(..., ge=0)
+
+
+class HourlyTokenUsageResponse(BaseModel):
+    key_id: int
+    points: list[HourlyTokenPoint]

@@ -28,6 +28,7 @@ interface LR {
   id: string; provider: string; keyLabel: string;
   code: number; latency: number; ts: number;
   chain?: { label: string; code: number }[];
+  totalTokens: number | null;
 }
 
 interface FormState { label: string; provider: Provider; rawKey: string; limit: string }
@@ -57,6 +58,7 @@ function toLR(e: ApiRequestEvent): LR {
     code: e.upstream_status ?? (e.outcome === "no_keys" ? 503 : 0),
     latency: e.latency_ms ?? 0,
     ts: new Date(e.timestamp).getTime(),
+    totalTokens: e.total_tokens,
   };
 }
 
@@ -581,8 +583,11 @@ function KeyDetailDrawer({ keyData, now, onClose, onDisable, onReset, onDelete, 
   onCheck: () => void; checking: boolean;
 }) {
   const s = S[keyData.status];
+  const [chartMode, setChartMode] = useState<"requests" | "tokens">("requests");
   const [chartData, setChartData] = useState<{ h: string; r: number }[] | null>(null);
   const [chartError, setChartError] = useState(false);
+  const [tokenData, setTokenData] = useState<{ h: string; r: number; prompt: number; completion: number }[] | null>(null);
+  const [tokenError, setTokenError] = useState(false);
 
   useEffect(() => {
     const h = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
@@ -594,6 +599,9 @@ function KeyDetailDrawer({ keyData, now, onClose, onDisable, onReset, onDelete, 
     let cancelled = false;
     setChartData(null);
     setChartError(false);
+    setTokenData(null);
+    setTokenError(false);
+    setChartMode("requests");
     api.hourlyUsage(Number(keyData.id))
       .then(res => {
         if (cancelled) return;
@@ -604,6 +612,22 @@ function KeyDetailDrawer({ keyData, now, onClose, onDisable, onReset, onDelete, 
       });
     return () => { cancelled = true; };
   }, [keyData.id]);
+
+  // Token usage is fetched lazily — only once the person actually switches
+  // to that view, so opening the panel doesn't always cost two requests.
+  useEffect(() => {
+    if (chartMode !== "tokens" || tokenData !== null || tokenError) return;
+    let cancelled = false;
+    api.hourlyTokenUsage(Number(keyData.id))
+      .then(res => {
+        if (cancelled) return;
+        setTokenData(res.points.map(p => ({ h: `${p.hour}h`, r: p.total_tokens, prompt: p.prompt_tokens, completion: p.completion_tokens })));
+      })
+      .catch(() => {
+        if (!cancelled) setTokenError(true);
+      });
+    return () => { cancelled = true; };
+  }, [chartMode, keyData.id, tokenData, tokenError]);
 
   const meta = [
     { label: "Provider",   val: P[keyData.provider].name,                                           mono: false },
@@ -653,34 +677,87 @@ function KeyDetailDrawer({ keyData, now, onClose, onDisable, onReset, onDelete, 
           </div>
 
           <div>
-            <p className="text-[10px] text-zinc-600 mb-2.5 uppercase tracking-widest font-semibold">Hourly Usage Today</p>
+            <div className="flex items-center justify-between mb-2.5">
+              <p className="text-[10px] text-zinc-600 uppercase tracking-widest font-semibold">
+                {chartMode === "requests" ? "Hourly Usage Today" : "Hourly Tokens Today"}
+              </p>
+              <div className="flex gap-0.5 rounded-md p-0.5" style={{ background: "rgba(255,255,255,0.03)" }}>
+                {(["requests", "tokens"] as const).map(m => (
+                  <button key={m} onClick={() => setChartMode(m)}
+                    className="px-2 py-0.5 rounded text-[10px] font-medium transition-all"
+                    style={{
+                      color: chartMode === m ? "#ECECF0" : "#52525B",
+                      background: chartMode === m ? "rgba(255,255,255,0.07)" : "transparent",
+                    }}>
+                    {m === "requests" ? "Requests" : "Tokens"}
+                  </button>
+                ))}
+              </div>
+            </div>
             <div style={{ height: 88 }} className="flex items-center justify-center">
-              {chartError ? (
-                <p className="text-[11px] text-zinc-600">Couldn't load usage data</p>
-              ) : chartData === null ? (
-                <Loader2 size={16} className="animate-spin" color="#52525B" />
-              ) : chartData.every(p => p.r === 0) ? (
-                <p className="text-[11px] text-zinc-600">No requests yet today</p>
+              {chartMode === "requests" ? (
+                chartError ? (
+                  <p className="text-[11px] text-zinc-600">Couldn't load usage data</p>
+                ) : chartData === null ? (
+                  <Loader2 size={16} className="animate-spin" color="#52525B" />
+                ) : chartData.every(p => p.r === 0) ? (
+                  <p className="text-[11px] text-zinc-600">No requests yet today</p>
+                ) : (
+                  <ResponsiveContainer width="100%" height="100%">
+                    <AreaChart data={chartData} margin={{ top: 4, right: 0, left: -32, bottom: 0 }}>
+                      <defs>
+                        <linearGradient id="agrad" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="5%"  stopColor={s.color} stopOpacity={0.22} />
+                          <stop offset="95%" stopColor={s.color} stopOpacity={0}    />
+                        </linearGradient>
+                      </defs>
+                      <XAxis dataKey="h"
+                        tick={{ fontSize: 9, fill: "#52525B", fontFamily: "JetBrains Mono, monospace" }}
+                        tickLine={false} axisLine={false} interval={3} />
+                      <Tooltip
+                        contentStyle={{ background: "#1C1C1E", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 8, fontSize: 11, fontFamily: "JetBrains Mono, monospace" }}
+                        labelStyle={{ color: "#71717A" }} itemStyle={{ color: s.color }}
+                        formatter={(v: number) => [v.toLocaleString(), "req"]} />
+                      <Area type="monotone" dataKey="r" stroke={s.color} strokeWidth={1.5}
+                        fill="url(#agrad)" dot={false} />
+                    </AreaChart>
+                  </ResponsiveContainer>
+                )
               ) : (
-                <ResponsiveContainer width="100%" height="100%">
-                  <AreaChart data={chartData} margin={{ top: 4, right: 0, left: -32, bottom: 0 }}>
-                    <defs>
-                      <linearGradient id="agrad" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="5%"  stopColor={s.color} stopOpacity={0.22} />
-                        <stop offset="95%" stopColor={s.color} stopOpacity={0}    />
-                      </linearGradient>
-                    </defs>
-                    <XAxis dataKey="h"
-                      tick={{ fontSize: 9, fill: "#52525B", fontFamily: "JetBrains Mono, monospace" }}
-                      tickLine={false} axisLine={false} interval={3} />
-                    <Tooltip
-                      contentStyle={{ background: "#1C1C1E", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 8, fontSize: 11, fontFamily: "JetBrains Mono, monospace" }}
-                      labelStyle={{ color: "#71717A" }} itemStyle={{ color: s.color }}
-                      formatter={(v: number) => [v.toLocaleString(), "req"]} />
-                    <Area type="monotone" dataKey="r" stroke={s.color} strokeWidth={1.5}
-                      fill="url(#agrad)" dot={false} />
-                  </AreaChart>
-                </ResponsiveContainer>
+                tokenError ? (
+                  <p className="text-[11px] text-zinc-600">Couldn't load token data</p>
+                ) : tokenData === null ? (
+                  <Loader2 size={16} className="animate-spin" color="#52525B" />
+                ) : tokenData.every(p => p.r === 0) ? (
+                  <p className="text-[11px] text-zinc-600">No token usage yet today</p>
+                ) : (
+                  <ResponsiveContainer width="100%" height="100%">
+                    <AreaChart data={tokenData} margin={{ top: 4, right: 0, left: -32, bottom: 0 }}>
+                      <defs>
+                        <linearGradient id="tgrad" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="5%"  stopColor="#A78BFA" stopOpacity={0.22} />
+                          <stop offset="95%" stopColor="#A78BFA" stopOpacity={0}    />
+                        </linearGradient>
+                      </defs>
+                      <XAxis dataKey="h"
+                        tick={{ fontSize: 9, fill: "#52525B", fontFamily: "JetBrains Mono, monospace" }}
+                        tickLine={false} axisLine={false} interval={3} />
+                      <Tooltip
+                        contentStyle={{ background: "#1C1C1E", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 8, fontSize: 11, fontFamily: "JetBrains Mono, monospace" }}
+                        labelStyle={{ color: "#71717A" }}
+                        formatter={(v: number, name: string, p: { payload?: { prompt: number; completion: number } }) => {
+                          if (name !== "r") return [v, name];
+                          const pt = p.payload;
+                          return [
+                            pt ? `${v.toLocaleString()} (${pt.prompt.toLocaleString()} in / ${pt.completion.toLocaleString()} out)` : v.toLocaleString(),
+                            "tokens",
+                          ];
+                        }} />
+                      <Area type="monotone" dataKey="r" stroke="#A78BFA" strokeWidth={1.5}
+                        fill="url(#tgrad)" dot={false} />
+                    </AreaChart>
+                  </ResponsiveContainer>
+                )
               )}
             </div>
           </div>
@@ -700,24 +777,24 @@ function KeyDetailDrawer({ keyData, now, onClose, onDisable, onReset, onDelete, 
 
           <div className="space-y-2">
             <button onClick={onCheck} disabled={checking}
-              className="w-full flex items-center justify-center gap-2 py-2 rounded-lg text-xs font-medium transition-colors disabled:opacity-50"
+              className="w-full flex items-center justify-center gap-2 py-2 rounded-lg text-xs font-medium transition-all active:scale-[0.97] disabled:active:scale-100 disabled:opacity-50"
               style={{ background: "rgba(0,214,143,0.08)", color: "#00D68F", border: "1px solid rgba(0,214,143,0.16)" }}>
               {checking ? <Loader2 size={12} className="animate-spin" /> : <Stethoscope size={12} />}
               {checking ? "Checking..." : "Test Key"}
             </button>
             <button onClick={onReset}
-              className="w-full flex items-center justify-center gap-2 py-2 rounded-lg text-xs font-medium transition-colors"
+              className="w-full flex items-center justify-center gap-2 py-2 rounded-lg text-xs font-medium transition-all active:scale-[0.97]"
               style={{ background: "rgba(79,142,247,0.08)", color: "#4F8EF7", border: "1px solid rgba(79,142,247,0.16)" }}>
               <RefreshCw size={12} /> Reset Cooldown
             </button>
             <button onClick={onDisable}
-              className="w-full flex items-center justify-center gap-2 py-2 rounded-lg text-xs font-medium transition-colors"
+              className="w-full flex items-center justify-center gap-2 py-2 rounded-lg text-xs font-medium transition-all active:scale-[0.97]"
               style={{ background: "rgba(255,255,255,0.04)", color: "#71717A", border: "1px solid rgba(255,255,255,0.07)" }}>
               <Power size={12} />
               {keyData.status === "disabled" ? "Enable Key" : "Disable Key"}
             </button>
             <button onClick={onDelete}
-              className="w-full flex items-center justify-center gap-2 py-2 rounded-lg text-xs font-medium transition-colors"
+              className="w-full flex items-center justify-center gap-2 py-2 rounded-lg text-xs font-medium transition-all active:scale-[0.97]"
               style={{ background: "rgba(239,68,68,0.07)", color: "#EF4444", border: "1px solid rgba(239,68,68,0.16)" }}>
               <Trash2 size={12} /> Delete Key
             </button>
@@ -744,8 +821,8 @@ function LiveMonitor({ reqs, now }: { reqs: LR[]; now: number }) {
       <div style={{ background: "#111113" }}>
         {/* Header row — desktop/tablet only */}
         <div className="hidden sm:grid px-4 py-2"
-          style={{ gridTemplateColumns: "72px 60px 1fr 52px 56px", borderBottom: "1px solid rgba(255,255,255,0.04)" }}>
-          {["Time", "Provider", "Key / Chain", "Status", "Latency"].map(h => (
+          style={{ gridTemplateColumns: "72px 60px 1fr 52px 64px 56px", borderBottom: "1px solid rgba(255,255,255,0.04)" }}>
+          {["Time", "Provider", "Key / Chain", "Status", "Tokens", "Latency"].map(h => (
             <span key={h} className="text-[10px] font-semibold text-zinc-600 uppercase tracking-widest">{h}</span>
           ))}
         </div>
@@ -784,14 +861,19 @@ function LiveMonitor({ reqs, now }: { reqs: LR[]; now: number }) {
                   <span className="text-[11px] font-mono text-zinc-600">
                     {new Date(r.ts).toLocaleTimeString("en-US", { hour12: false, hour: "2-digit", minute: "2-digit", second: "2-digit" })}
                   </span>
-                  <span className="text-[11px] font-mono text-zinc-600">{r.latency}ms</span>
+                  <div className="flex items-center gap-2">
+                    {r.totalTokens != null && (
+                      <span className="text-[11px] font-mono text-zinc-500">{r.totalTokens.toLocaleString()} tok</span>
+                    )}
+                    <span className="text-[11px] font-mono text-zinc-600">{r.latency}ms</span>
+                  </div>
                 </div>
               </div>
 
               {/* Desktop/tablet: grid row */}
               <div className="hidden sm:grid items-center px-4 py-2.5 transition-colors"
                 style={{
-                  gridTemplateColumns: "72px 60px 1fr 52px 56px",
+                  gridTemplateColumns: "72px 60px 1fr 52px 64px 56px",
                   borderBottom: "1px solid rgba(255,255,255,0.03)",
                 }}
                 onMouseEnter={e => (e.currentTarget.style.background = "rgba(255,255,255,0.015)")}
@@ -814,6 +896,9 @@ function LiveMonitor({ reqs, now }: { reqs: LR[]; now: number }) {
                 <span className="text-[11px] font-mono px-1.5 py-0.5 rounded justify-self-start"
                   style={{ color: cColor, background: `${cColor}12`, border: `1px solid ${cColor}22` }}>
                   {r.code}
+                </span>
+                <span className="text-[11px] font-mono text-zinc-500">
+                  {r.totalTokens != null ? r.totalTokens.toLocaleString() : "—"}
                 </span>
                 <span className="text-[11px] font-mono text-zinc-600 justify-self-end">{r.latency}ms</span>
               </div>

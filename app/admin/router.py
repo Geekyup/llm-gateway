@@ -7,7 +7,7 @@ from app.keys.enums import ProviderType
 from app.keys.schemas import APIKeyCreate, APIKeyHealthCheckResult, APIKeyRead, APIKeyUpdate
 from app.keys.service import KeyPoolService
 from app.monitoring.publisher import RequestEventPublisher
-from app.monitoring.schemas import HourlyUsagePoint, HourlyUsageResponse
+from app.monitoring.schemas import HourlyTokenPoint, HourlyTokenUsageResponse, HourlyUsagePoint, HourlyUsageResponse
 
 router = APIRouter(prefix="/me/keys", tags=["keys"])
 
@@ -110,3 +110,24 @@ async def hourly_usage(
     counts = await publisher.hourly_usage_for_key(user.id, key_id)
     points = [HourlyUsagePoint(hour=h, requests=c) for h, c in enumerate(counts)]
     return HourlyUsageResponse(key_id=key_id, points=points)
+
+
+@router.get("/{key_id}/hourly-token-usage", response_model=HourlyTokenUsageResponse)
+async def hourly_token_usage(
+    key_id: int,
+    user: User = Depends(get_current_user),
+    service: KeyPoolService = Depends(get_key_pool_service),
+    publisher: RequestEventPublisher = Depends(get_event_publisher),
+) -> HourlyTokenUsageResponse:
+    """Real per-hour token counts (prompt/completion/total) for this key,
+    for the current UTC day. Same Redis-history source and coverage caveat
+    as /hourly-usage — see RequestEventPublisher.hourly_token_usage_for_key.
+    Only successful requests carry token counts.
+    """
+    await service.get_key(key_id, user.id)
+    triples = await publisher.hourly_token_usage_for_key(user.id, key_id)
+    points = [
+        HourlyTokenPoint(hour=h, prompt_tokens=p, completion_tokens=c, total_tokens=t)
+        for h, (p, c, t) in enumerate(triples)
+    ]
+    return HourlyTokenUsageResponse(key_id=key_id, points=points)

@@ -32,6 +32,27 @@ class ScriptedProvider:
         return response.status_code == 403
 
 
+class UsageMetadataProvider:
+    """Fake Provider returning a Gemini-shaped 200 with usageMetadata, to
+    test token accounting without hitting a real upstream.
+    """
+
+    def __init__(self, usage_metadata: dict | None = None) -> None:
+        self._usage_metadata = usage_metadata
+
+    async def forward(self, *, key, path, method, payload, headers):
+        body = {"candidates": []}
+        if self._usage_metadata is not None:
+            body["usageMetadata"] = self._usage_metadata
+        return httpx.Response(status_code=200, json=body)
+
+    def is_rate_limited(self, response: httpx.Response) -> bool:
+        return response.status_code == 429
+
+    def is_key_exhausted(self, response: httpx.Response) -> bool:
+        return response.status_code == 403
+
+
 @pytest.fixture
 def key_pool(key_repo, fake_redis):
     cache = KeyStatusCache(fake_redis, ttl_seconds=30)
@@ -315,3 +336,55 @@ async def test_no_publisher_configured_does_not_raise(key_pool, test_user):
     )
 
     assert response.status_code == 200
+
+
+@pytest.mark.asyncio
+async def test_successful_request_captures_token_usage(key_pool, fake_redis, test_user):
+    await _create_active_key(key_pool, test_user.id, "k1")
+    provider = UsageMetadataProvider({"promptTokenCount": 120, "candidatesTokenCount": 45, "totalTokenCount": 165})
+    publisher = RequestEventPublisher(fake_redis)
+    gateway = GatewayService(key_pool, max_attempts=3, event_publisher=publisher)
+
+    await gateway.proxy_request(
+        user_id=test_user.id,
+        provider=provider,
+        provider_type=ProviderType.GEMINI,
+        path="p",
+        method="POST",
+        payload=None,
+        headers={},
+    )
+
+    events = await publisher.recent(test_user.id, limit=10)
+    assert len(events) == 1
+    assert events[0].prompt_tokens == 120
+    assert events[0].completion_tokens == 45
+    assert events[0].total_tokens == 165
+
+
+@pytest.mark.asyncio
+async def test_missing_usage_metadata_does_not_raise(key_pool, fake_redis, test_user):
+    """Not every upstream response includes usageMetadata (e.g. errors that
+    still return 200, or a provider that omits it) — token fields should
+    just come back None rather than breaking the request.
+    """
+    await _create_active_key(key_pool, test_user.id, "k1")
+    provider = UsageMetadataProvider(usage_metadata=None)
+    publisher = RequestEventPublisher(fake_redis)
+    gateway = GatewayService(key_pool, max_attempts=3, event_publisher=publisher)
+
+    response = await gateway.proxy_request(
+        user_id=test_user.id,
+        provider=provider,
+        provider_type=ProviderType.GEMINI,
+        path="p",
+        method="POST",
+        payload=None,
+        headers={},
+    )
+
+    assert response.status_code == 200
+    events = await publisher.recent(test_user.id, limit=10)
+    assert events[0].prompt_tokens is None
+    assert events[0].completion_tokens is None
+    assert events[0].total_tokens is None

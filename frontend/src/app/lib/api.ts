@@ -78,6 +78,9 @@ export interface RequestEvent {
   latency_ms: number | null;
   is_retry: boolean;
   error_detail: string | null;
+  prompt_tokens: number | null;
+  completion_tokens: number | null;
+  total_tokens: number | null;
 }
 
 export interface ApiKeyHealthCheckResult {
@@ -94,6 +97,18 @@ export interface HourlyUsagePoint {
 export interface HourlyUsageResponse {
   key_id: number;
   points: HourlyUsagePoint[];
+}
+
+export interface HourlyTokenPoint {
+  hour: number;
+  prompt_tokens: number;
+  completion_tokens: number;
+  total_tokens: number;
+}
+
+export interface HourlyTokenUsageResponse {
+  key_id: number;
+  points: HourlyTokenPoint[];
 }
 
 export interface GatewayTokenRead {
@@ -226,6 +241,10 @@ export const api = {
 
   async hourlyUsage(id: number): Promise<HourlyUsageResponse> {
     return request<HourlyUsageResponse>(`/me/keys/${id}/hourly-usage`);
+  },
+
+  async hourlyTokenUsage(id: number): Promise<HourlyTokenUsageResponse> {
+    return request<HourlyTokenUsageResponse>(`/me/keys/${id}/hourly-token-usage`);
   },
 
   async recentEvents(limit = 50): Promise<RequestEvent[]> {
