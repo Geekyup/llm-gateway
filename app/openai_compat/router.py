@@ -37,24 +37,6 @@ async def chat_completions(
     gateway: GatewayService = Depends(get_gateway_service),
     user_id: int = Depends(require_gateway_token),
 ):
-    """OpenAI-compatible chat completions, backed by whichever provider's
-    key pool `request.provider` selects (defaults to "gemini" so existing
-    clients that don't send it keep working unchanged).
-
-    Point any OpenAI SDK / LangChain / etc. at this gateway's base_url with
-    a `gwk_...` token as the API key. `request.model` is required (per the
-    OpenAI schema) and is also used to filter the key pool: only keys
-    pinned to that exact model are candidates, so a request for
-    "gemini-3.6-pro" never lands on a key configured for
-    "gemini-3.6-flash". Failover across the matching subset is otherwise
-    unchanged (see GatewayService, KeyPoolService.get_candidate_keys).
-
-    Gemini isn't natively OpenAI-compatible, so its request/response are
-    translated (see translation.py). OpenRouter *is* OpenAI-compatible
-    already, so its payload passes through close to 1:1.
-
-    Non-streaming only for now — see translation.py docstring for scope.
-    """
     try:
         provider_type = ProviderType(request.provider)
     except ValueError:
@@ -73,8 +55,6 @@ async def chat_completions(
         upstream_payload = openai_request_to_gemini_payload(request)
         path = gemini_path_for_model(request.model)
     else:
-        # OpenRouter (and any future OpenAI-compatible provider): forward
-        # the request close to as-is, stripping only our own routing field.
         upstream_payload = request.model_dump(exclude={"provider"}, exclude_none=True)
         path = "v1/chat/completions"
 
@@ -95,9 +75,6 @@ async def chat_completions(
         return _openai_error(503, str(exc), "upstream_exhausted")
 
     if upstream_response.status_code >= 400:
-        # Surface the upstream's own error body rather than reshaping it —
-        # callers debugging a bad model name / bad request want to see the
-        # real upstream message, not a generic wrapper.
         try:
             detail = upstream_response.json()
         except json.JSONDecodeError:
@@ -108,7 +85,4 @@ async def chat_completions(
     if provider_type is ProviderType.GEMINI:
         openai_response = gemini_response_to_openai(upstream_body, model=request.model)
         return JSONResponse(status_code=200, content=openai_response.model_dump())
-
-    # OpenRouter already returns an OpenAI-shaped body — pass it straight
-    # through rather than round-tripping it through our own schema.
     return JSONResponse(status_code=200, content=upstream_body)

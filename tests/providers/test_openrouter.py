@@ -130,7 +130,7 @@ async def test_list_models_returns_ids_and_labels():
 
     models = await provider.list_models("sk-or-real-key")
 
-    assert [m.id for m in models] == ["openai/gpt-4o-mini", "anthropic/claude-3.5-sonnet"]
+    assert [m.model_id for m in models] == ["openai/gpt-4o-mini", "anthropic/claude-3.5-sonnet"]
     assert models[0].label == "GPT-4o mini"
 
 
@@ -143,7 +143,7 @@ async def test_list_models_skips_entries_without_an_id():
 
     models = await provider.list_models("sk-or-real-key")
 
-    assert [m.id for m in models] == ["openai/gpt-4o-mini"]
+    assert [m.model_id for m in models] == ["openai/gpt-4o-mini"]
     # Falls back to id when the upstream doesn't provide a friendlier name.
     assert models[0].label == "openai/gpt-4o-mini"
 

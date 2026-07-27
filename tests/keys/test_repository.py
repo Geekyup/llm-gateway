@@ -24,9 +24,6 @@ async def test_get_missing_raises(key_repo, test_user):
 
 @pytest.mark.asyncio
 async def test_get_other_users_key_raises(key_repo, test_user, other_user):
-    """A key that exists but belongs to someone else must behave exactly
-    like a nonexistent one — this is the isolation guarantee itself.
-    """
     key = await key_repo.create(
         user_id=other_user.id, label="not-yours", provider=ProviderType.GEMINI, key_encrypted="c", daily_limit=100
     )
@@ -107,9 +104,6 @@ async def test_reset_daily_counters_leaves_disabled_alone(key_repo, test_user):
 
 @pytest.mark.asyncio
 async def test_reset_daily_counters_spans_all_users(key_repo, test_user, other_user):
-    """The housekeeping sweep is deliberately system-wide — it must reset
-    every user's keys in one pass, not just the caller's own.
-    """
     mine = await key_repo.create(
         user_id=test_user.id, label="mine", provider=ProviderType.GEMINI, key_encrypted="c1", daily_limit=100
     )

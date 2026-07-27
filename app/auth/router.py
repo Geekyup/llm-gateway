@@ -18,12 +18,6 @@ router = APIRouter(prefix="/auth", tags=["auth"])
 
 @router.get("/google/login")
 async def google_login(request: Request):
-    """Kicks off the OAuth dance: redirects the browser to Google's consent screen.
-
-    The nonce is stashed in the signed session cookie (see SessionMiddleware
-    in main.py) and re-checked in the callback below — this is what stops
-    an attacker from replaying someone else's callback URL.
-    """
     settings = get_settings()
     request.session["oauth_nonce"] = secrets.token_urlsafe(16)
     return await oauth.google.authorize_redirect(
@@ -36,14 +30,6 @@ async def google_callback(
     request: Request,
     service: Annotated[AuthService, Depends(get_auth_service)],
 ):
-    """Google redirects back here after the person approves/denies access.
-
-    Issues our own access/refresh pair and hands them to the frontend via
-    a redirect with the tokens in the URL fragment (never sent to the
-    server on the next request, unlike a query string) rather than a
-    JSON body, since this endpoint is reached by full-page browser
-    navigation, not an API call the SPA controls directly.
-    """
     settings = get_settings()
     try:
         token = await oauth.google.authorize_access_token(request)

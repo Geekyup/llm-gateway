@@ -28,12 +28,6 @@ async def recent_events(
     user: User = Depends(get_current_user),
     publisher: RequestEventPublisher = Depends(get_event_publisher),
 ) -> RequestEventList:
-    """Snapshot of the last N proxied-request events for the caller only,
-    newest first.
-
-    Used to populate the dashboard immediately on load, before any new
-    traffic arrives on the live stream below.
-    """
     events = await publisher.recent(user.id, limit=limit)
     return RequestEventList(events=events)
 
@@ -44,16 +38,6 @@ async def stream_events(
     user: User = Depends(get_current_user),
     redis: Redis = Depends(get_redis),
 ) -> EventSourceResponse:
-    """Server-Sent Events stream of the caller's own request events as they happen.
-
-    One Redis Pub/Sub subscription per connected client, scoped to that
-    user's channel — nobody can ever subscribe to another user's traffic,
-    since the channel name is derived from the authenticated JWT, not from
-    anything the client supplies. Disconnects are detected via
-    `request.is_disconnected()` so we don't leak subscriptions when a
-    dashboard tab is closed.
-    """
-
     async def event_generator():
         pubsub = redis.pubsub()
         await pubsub.subscribe(channel_for(user.id))

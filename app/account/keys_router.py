@@ -48,17 +48,9 @@ async def list_models(
     payload: ListModelsRequest,
     user: User = Depends(get_current_user),
 ) -> ListModelsResponse:
-    """Live model catalog for a not-yet-saved key, for the Add/Edit Key
-    form's model picker. Tries `payload.raw_key` directly against the
-    provider — the key is never persisted or logged here, only used for
-    this one on-demand call (same trust boundary as the Test Key health
-    check). Raises 502 (via ProviderRequestError) if the key is invalid or
-    the provider call fails, so the form can show why nothing came back
-    instead of just an empty picker.
-    """
     provider = get_provider(payload.provider.value)
     models = await provider.list_models(payload.raw_key)
-    return ListModelsResponse(models=[ModelOption(id=m.id, label=m.label) for m in models])
+    return ListModelsResponse(models=[ModelOption(id=m.model_id, label=m.label) for m in models])
 
 
 @router.get("", response_model=list[APIKeyRead])
@@ -78,12 +70,6 @@ async def update_key(
     user: User = Depends(get_current_user),
     service: KeyPoolService = Depends(get_key_pool_service),
 ) -> APIKeyRead:
-    """Partial update — label, status, and/or daily_limit. Used for the
-
-    dashboard's edit dialog and the enable/disable toggle. Scoped to the
-    caller's own keys — a key_id belonging to another user behaves exactly
-    like an unknown id (404), never a 403 that would confirm it exists.
-    """
     key = await service.update_key(key_id, user.id, payload)
     return APIKeyRead.model_validate(key)
 
@@ -94,7 +80,6 @@ async def reset_cooldown(
     user: User = Depends(get_current_user),
     service: KeyPoolService = Depends(get_key_pool_service),
 ) -> APIKeyRead:
-    """Force a key back to ACTIVE and clear its cooldown timestamp early."""
     key = await service.reset_cooldown(key_id, user.id)
     return APIKeyRead.model_validate(key)
 
@@ -114,9 +99,6 @@ async def check_key(
     user: User = Depends(get_current_user),
     service: KeyPoolService = Depends(get_key_pool_service),
 ) -> APIKeyHealthCheckResult:
-    """On-demand probe: makes a cheap upstream call with this key and updates
-    its status based on the result (see KeyPoolService.check_key_health).
-    """
     return await service.check_key_health(key_id, user.id)
 
 
@@ -126,7 +108,6 @@ async def check_all_keys(
     user: User = Depends(get_current_user),
     service: KeyPoolService = Depends(get_key_pool_service),
 ) -> list[APIKeyHealthCheckResult]:
-    """Health-check every non-disabled key belonging to the caller (optionally scoped to one provider)."""
     return await service.check_all_keys(user.id, provider=provider)
 
 
@@ -137,14 +118,6 @@ async def hourly_usage(
     service: KeyPoolService = Depends(get_key_pool_service),
     publisher: RequestEventPublisher = Depends(get_event_publisher),
 ) -> HourlyUsageResponse:
-    """Real per-hour request counts for this key, for the current UTC day.
-
-    Derived from the live-monitor's Redis event history rather than a
-    separate table, so coverage is bounded by that history's capped size —
-    see RequestEventPublisher.hourly_usage_for_key for the exact caveat.
-    Raises 404 (via KeyNotFoundError) if key_id doesn't belong to the
-    caller, same as every other per-key endpoint here.
-    """
     await service.get_key(key_id, user.id)
     counts = await publisher.hourly_usage_for_key(user.id, key_id)
     points = [HourlyUsagePoint(hour=h, requests=c) for h, c in enumerate(counts)]
@@ -158,11 +131,6 @@ async def hourly_token_usage(
     service: KeyPoolService = Depends(get_key_pool_service),
     publisher: RequestEventPublisher = Depends(get_event_publisher),
 ) -> HourlyTokenUsageResponse:
-    """Real per-hour token counts (prompt/completion/total) for this key,
-    for the current UTC day. Same Redis-history source and coverage caveat
-    as /hourly-usage — see RequestEventPublisher.hourly_token_usage_for_key.
-    Only successful requests carry token counts.
-    """
     await service.get_key(key_id, user.id)
     triples = await publisher.hourly_token_usage_for_key(user.id, key_id)
     points = [

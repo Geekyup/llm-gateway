@@ -34,7 +34,6 @@ def test_system_messages_become_system_instruction() -> None:
     )
     payload = openai_request_to_gemini_payload(request)
     assert payload["systemInstruction"] == {"parts": [{"text": "Be terse."}]}
-    # system message must not leak into contents
     assert len(payload["contents"]) == 1
     assert payload["contents"][0]["role"] == "user"
 

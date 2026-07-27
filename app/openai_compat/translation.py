@@ -1,12 +1,3 @@
-"""Translates between the OpenAI chat/completions wire format and Gemini's
-generateContent format, so clients can point any OpenAI-compatible SDK
-(openai-python, LangChain, etc.) at this gateway with base_url + api_key
-and nothing else changes.
-
-Deliberately narrow: text-only messages, no streaming, no tool calls, no
-images. Extend here as those needs come up rather than guessing ahead.
-"""
-
 from app.openai_compat.schemas import (
     ChatCompletionChoice,
     ChatCompletionChoiceMessage,
@@ -15,13 +6,11 @@ from app.openai_compat.schemas import (
     ChatCompletionUsage,
 )
 
-# Gemini has no "system" role — system messages are folded into
-# systemInstruction instead, per Gemini's own convention.
+
 _GEMINI_ROLE_MAP = {"user": "user", "assistant": "model"}
 
 
 def gemini_path_for_model(model: str) -> str:
-    """e.g. "gemini-3.5-flash" -> "v1beta/models/gemini-3.5-flash:generateContent" """
     return f"v1beta/models/{model}:generateContent"
 
 
@@ -60,9 +49,6 @@ def gemini_response_to_openai(gemini_body: dict, *, model: str) -> ChatCompletio
         first = candidates[0]
         parts = (first.get("content") or {}).get("parts") or []
         text = "".join(part.get("text", "") for part in parts)
-        # Gemini's finishReason ("STOP", "MAX_TOKENS", ...) roughly maps to
-        # OpenAI's ("stop", "length", ...); anything unrecognised passes
-        # through lowercased rather than being silently dropped.
         raw_reason = (first.get("finishReason") or "STOP").lower()
         finish_reason = "length" if raw_reason == "max_tokens" else "stop" if raw_reason == "stop" else raw_reason
 

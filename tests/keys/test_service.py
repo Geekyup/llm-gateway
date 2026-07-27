@@ -1,7 +1,3 @@
-"""Tests for KeyPoolService's model-pinning behaviour: a key can be
-configured to serve one specific upstream model, and a request that asks
-for a model should only draw from keys pinned to that exact model.
-"""
 import pytest
 
 from app.keys.cache import KeyStatusCache
@@ -40,10 +36,6 @@ async def test_candidates_for_a_model_only_include_keys_pinned_to_it(key_pool, t
 
 @pytest.mark.asyncio
 async def test_unpinned_keys_never_match_a_model_specific_request(key_pool, test_user):
-    """A key with no model set (model=None) is not a wildcard — it must
-    not be silently used for a request that specifies a model, since the
-    admin never configured it for that model.
-    """
     await _create_key(key_pool, test_user.id, "unpinned", model=None)
 
     candidates = await key_pool.get_candidate_keys(test_user.id, ProviderType.GEMINI, model="gemini-3.6-flash")
@@ -53,9 +45,6 @@ async def test_unpinned_keys_never_match_a_model_specific_request(key_pool, test
 
 @pytest.mark.asyncio
 async def test_model_specific_keys_never_match_a_request_with_no_model(key_pool, test_user):
-    """Symmetric to the above: a key pinned to a specific model should not
-    be picked up for a request that didn't ask for that model.
-    """
     await _create_key(key_pool, test_user.id, "pinned", model="gemini-3.6-flash")
 
     candidates = await key_pool.get_candidate_keys(test_user.id, ProviderType.GEMINI, model=None)
@@ -93,24 +82,14 @@ async def test_select_key_round_robins_within_the_matching_subset_only(key_pool,
         chosen = await key_pool.select_key(test_user.id, ProviderType.GEMINI, model="gemini-3.6-flash")
         picks.add(chosen.id)
 
-    # Only the two flash-pinned keys should ever be picked — the pro-only
-    # key must never appear no matter how many times we rotate.
     assert picks == {flash_a.id, flash_b.id}
 
 
 @pytest.mark.asyncio
 async def test_cache_hit_still_gets_filtered_by_model(key_pool, test_user, fake_redis):
-    """The active-key cache stores the full per-(user, provider) list — the
-    model filter must still apply on a cache hit, not just on a cold read
-    from Postgres.
-    """
     flash = await _create_key(key_pool, test_user.id, "flash", model="gemini-3.6-flash")
     await _create_key(key_pool, test_user.id, "pro", model="gemini-3.6-pro")
 
-    # Warm the cache with a call that returns everything unfiltered isn't
-    # possible through the public API anymore (model filtering always
-    # applies) — instead, call twice with the same model to force a cache
-    # hit on the second call and confirm filtering still holds.
     first = await key_pool.get_candidate_keys(test_user.id, ProviderType.GEMINI, model="gemini-3.6-flash")
     second = await key_pool.get_candidate_keys(test_user.id, ProviderType.GEMINI, model="gemini-3.6-flash")
 

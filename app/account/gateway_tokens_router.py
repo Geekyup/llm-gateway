@@ -15,12 +15,6 @@ async def create_token(
     user: User = Depends(get_current_user),
     service: GatewayTokenService = Depends(get_gateway_token_service),
 ) -> GatewayTokenCreated:
-    """Generates a new gateway token owned by the caller. The plaintext is
-
-    returned exactly once, here, and never again — the dashboard must show
-    it to the user immediately and cannot retrieve it later. A token
-    minted this way can only ever draw on its owner's own key pool.
-    """
     return await service.create_token(user.id, payload)
 
 

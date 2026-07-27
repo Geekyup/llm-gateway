@@ -14,7 +14,6 @@ from app.auth.jwt import (
 from app.auth.service import AuthService
 from app.core.exceptions import InactiveUserError, TokenRevokedError
 
-# --- jwt.py ------------------------------------------------------------------
 
 def test_access_and_refresh_tokens_carry_correct_type():
     access = create_access_token(user_id=42)
@@ -42,8 +41,6 @@ def test_hash_refresh_token_is_deterministic_and_one_way():
     assert h1 == h2
     assert h1 != token
 
-
-# --- repository.py -------------------------------------------------------------
 
 @pytest.mark.asyncio
 async def test_user_create_and_get_by_google_sub(user_repo):
@@ -106,8 +103,6 @@ async def test_revoke_all_for_user_only_touches_that_user(refresh_token_repo, us
     assert (await refresh_token_repo.get_by_hash("hash-b")).revoked is False
 
 
-# --- service.py ----------------------------------------------------------------
-
 @pytest.fixture
 def auth_service(user_repo, refresh_token_repo):
     return AuthService(user_repo, refresh_token_repo)
@@ -136,7 +131,6 @@ async def test_login_with_google_reuses_existing_user_and_updates_profile(auth_s
     assert user.email == "new@example.com"
     assert user.display_name == "New Name"
 
-    # No duplicate row created for the same google_sub.
     all_users_with_sub = await user_repo.get_by_google_sub("existing")
     assert all_users_with_sub.id == user.id
 
@@ -174,8 +168,6 @@ async def test_refresh_reuse_of_revoked_token_revokes_whole_session(auth_service
     )
     new_pair = await auth_service.refresh(pair.refresh_token)
 
-    # Replaying the now-rotated-away-from token should be treated as
-    # suspicious and burn the whole session, not just fail quietly.
     with pytest.raises(TokenRevokedError):
         await auth_service.refresh(pair.refresh_token)
 
@@ -189,7 +181,7 @@ async def test_refresh_with_expired_token_raises(auth_service):
     with patch("app.auth.jwt.get_settings") as mock_settings:
         mock_settings.return_value.JWT_SECRET_KEY = "test-jwt-secret-key"
         mock_settings.return_value.JWT_ALGORITHM = "HS256"
-        mock_settings.return_value.REFRESH_TOKEN_EXPIRE_DAYS = -1  # already expired
+        mock_settings.return_value.REFRESH_TOKEN_EXPIRE_DAYS = -1  
         expired_refresh = create_refresh_token(user_id=1)
 
     with pytest.raises(TokenExpiredError):
@@ -209,7 +201,4 @@ async def test_logout_revokes_token(auth_service, refresh_token_repo):
 
 @pytest.mark.asyncio
 async def test_logout_with_unknown_token_is_a_noop(auth_service):
-    # Logging out with a token that was never issued shouldn't raise —
-    # there's nothing to revoke, and the end state (not logged in) is
-    # the same either way.
     await auth_service.logout("never-issued-token-value")

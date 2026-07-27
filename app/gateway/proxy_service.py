@@ -16,14 +16,6 @@ logger = logging.getLogger(__name__)
 
 
 class GatewayService:
-    """Orchestrates: pick a key -> call upstream -> on 429 mark cooldown and
-    retry with a different key -> give up after N attempts.
-
-    This is the only place that knows the failover *policy*; KeyPoolService
-    only knows how to select/mark keys, Provider only knows how to talk to
-    one upstream API.
-    """
-
     def __init__(
         self,
         key_pool: KeyPoolService,
@@ -111,21 +103,17 @@ class GatewayService:
                     latency_ms=None,
                 )
                 if tried_key_ids:
-                    # We had candidates earlier but exhausted them all this request.
                     raise UpstreamExhaustedError(provider=provider_type.value, attempts=len(tried_key_ids))
                 provider_label = f"{provider_type.value}' for model '{model}" if model else provider_type.value
                 raise NoAvailableKeysError(provider=provider_label)
 
             if dto.id in tried_key_ids:
-                # Round-robin cursor looped back before we hit max_attempts
-                # because the pool is smaller than max_attempts — stop here
-                # rather than hammering the same key again.
                 break
             tried_key_ids.add(dto.id)
 
             started = time.monotonic()
             response = await provider.forward(
-                key=dto.decrypted_key,  # type: ignore[arg-type]  # always set by select_key
+                key=dto.decrypted_key, 
                 path=path,
                 method=method,
                 payload=payload,
@@ -175,14 +163,11 @@ class GatewayService:
             try:
                 body = response.json()
                 if "usageMetadata" in body:
-                    # Gemini-native shape.
                     usage = body.get("usageMetadata") or {}
                     prompt_tokens = usage.get("promptTokenCount")
                     completion_tokens = usage.get("candidatesTokenCount")
                     total_tokens = usage.get("totalTokenCount")
                 else:
-                    # OpenAI-compatible shape (OpenRouter, and any provider
-                    # that already speaks the /v1/chat/completions format).
                     usage = body.get("usage") or {}
                     prompt_tokens = usage.get("prompt_tokens")
                     completion_tokens = usage.get("completion_tokens")
@@ -208,9 +193,6 @@ class GatewayService:
             return response
 
         if last_response is not None:
-            # Every attempt came back 429/403 — surface the last upstream
-            # response's status/body rather than inventing a generic 503,
-            # so the client sees exactly what Gemini said.
             raise UpstreamExhaustedError(provider=provider_type.value, attempts=len(tried_key_ids))
 
         raise NoAvailableKeysError(provider=provider_type.value)

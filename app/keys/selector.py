@@ -6,24 +6,12 @@ from app.keys.schemas import APIKeyDTO
 
 
 class KeySelector(ABC):
-    """Strategy interface for picking one key out of a candidate list.
-
-    Deliberately stateless from the caller's point of view — any state
-    the strategy needs (like a round-robin cursor) is its own concern and
-    must be shared across API replicas (i.e. live in Redis, not memory).
-    """
-
     @abstractmethod
     async def select(self, user_id: int, provider: str, candidates: list[APIKeyDTO]) -> APIKeyDTO | None:
-        """Return the next key to try, or None if candidates is empty."""
+        pass
 
 
 class RoundRobinSelector(KeySelector):
-    """Cursor lives in Redis under `keyselector:cursor:{user_id}:{provider}`
-    so that multiple API replicas rotate through the same sequence instead
-    of each starting from index 0, and each user's rotation is independent.
-    """
-
     def __init__(self, redis: Redis) -> None:
         self._redis = redis
 

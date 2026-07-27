@@ -1,8 +1,6 @@
 import os
 from typing import Self
 
-# Settings requires ENCRYPTION_KEY / ADMIN_API_KEY — set dummies before any
-# llm_gateway import happens, so get_settings() doesn't blow up on import.
 os.environ.setdefault("ENCRYPTION_KEY", "kQ80G5wq1v3o2r7m6b8p3s5t9u1w4y6a8c0e2g4i6k8=")
 os.environ.setdefault("ADMIN_API_KEY", "test-admin-key")
 os.environ.setdefault("DATABASE_URL", "postgresql+asyncpg://test:test@localhost/test")
@@ -22,13 +20,6 @@ from app.tokens.repository import GatewayTokenRepository
 
 @pytest_asyncio.fixture
 async def db_session() -> AsyncSession:
-    """In-memory SQLite for repository-level tests — fast, no external deps.
-
-    Note: SQLite's ENUM handling and lack of true concurrency mean this is
-    fine for unit tests of query logic, but integration tests against real
-    Postgres (e.g. in CI with a service container) are recommended before
-    relying on this alone for anything concurrency-sensitive.
-    """
     engine = create_async_engine("sqlite+aiosqlite:///:memory:")
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
@@ -57,9 +48,6 @@ async def user_repo(db_session: AsyncSession) -> UserRepository:
 
 @pytest_asyncio.fixture
 async def test_user(db_session: AsyncSession) -> User:
-    """A real persisted User row — api_keys/gateway_tokens now have a
-    NOT NULL FK to users.id, so key/token tests need an owner to point at.
-    """
     user = User(google_sub="test-google-sub-1", email="owner@example.com", display_name="Owner")
     db_session.add(user)
     await db_session.commit()
@@ -69,9 +57,6 @@ async def test_user(db_session: AsyncSession) -> User:
 
 @pytest_asyncio.fixture
 async def other_user(db_session: AsyncSession) -> User:
-    """A second, distinct owner — for isolation tests (user A can't touch
-    user B's keys/tokens/events).
-    """
     user = User(google_sub="test-google-sub-2", email="other@example.com", display_name="Other")
     db_session.add(user)
     await db_session.commit()
@@ -85,13 +70,6 @@ async def refresh_token_repo(db_session: AsyncSession) -> RefreshTokenRepository
 
 
 class FakePipeline:
-    """Minimal stand-in for redis.asyncio.Redis.pipeline(transaction=False).
-
-    Just queues (method_name, args) tuples and replays them against the
-    parent FakeRedis on execute() — enough for RequestEventPublisher, which
-    only needs publish/lpush/ltrim batched together.
-    """
-
     def __init__(self, redis: "FakeRedis") -> None:
         self._redis = redis
         self._ops: list[tuple[str, tuple]] = []
@@ -119,11 +97,6 @@ class FakePipeline:
 
 
 class FakeRedis:
-    """Minimal in-memory stand-in for redis.asyncio.Redis, covering just
-    the operations our code actually uses (get/set/delete/incr, plus
-    pub/sub-adjacent list ops for the live monitoring feature).
-    """
-
     def __init__(self) -> None:
         self._store: dict[str, str] = {}
         self._lists: dict[str, list[str]] = {}
@@ -151,7 +124,6 @@ class FakeRedis:
 
     async def ltrim(self, key: str, start: int, end: int) -> None:
         items = self._lists.get(key, [])
-        # Redis LTRIM end index is inclusive.
         self._lists[key] = items[start : end + 1]
 
     async def lrange(self, key: str, start: int, end: int) -> list[str]:

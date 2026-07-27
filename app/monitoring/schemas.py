@@ -1,15 +1,13 @@
 from datetime import datetime
+from typing import Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
+
+Outcome = Literal["success", "rate_limited", "exhausted", "no_keys", "upstream_exhausted", "error"]
 
 
 class RequestEvent(BaseModel):
-    """One hop of a proxied request: a single (key, upstream call) pair.
-
-    A single incoming client request can produce several of these if the
-    gateway retries with a different key after a 429/exhausted response —
-    they share `request_id` so the frontend can render them as one chain.
-    """
+    model_config = ConfigDict(frozen=True)
 
     user_id: int = Field(..., description="Owner of the gateway token that made this request")
     request_id: str = Field(..., description="Shared across all attempts of the same client request")
@@ -23,26 +21,26 @@ class RequestEvent(BaseModel):
     key_id: int | None = Field(default=None, description="None if no key was available at all")
     key_label: str | None = None
 
-    upstream_status: int | None = Field(default=None, description="HTTP status from upstream, if the call was made")
-    outcome: str = Field(
-        ...,
-        description="One of: success, rate_limited, exhausted, no_keys, upstream_exhausted, error",
-    )
+    upstream_status: int | None = None
+    outcome: Outcome
     latency_ms: int | None = Field(default=None, description="Time spent on this specific upstream call")
     is_retry: bool = Field(default=False, description="True for attempt > 1")
     error_detail: str | None = None
 
-    prompt_tokens: int | None = Field(default=None, description="From upstream usageMetadata, success only")
-    completion_tokens: int | None = Field(default=None, description="From upstream usageMetadata, success only")
-    total_tokens: int | None = Field(default=None, description="From upstream usageMetadata, success only")
+    prompt_tokens: int | None = Field(default=None, description="From upstream usage data, success only")
+    completion_tokens: int | None = None
+    total_tokens: int | None = None
 
 
 class RequestEventList(BaseModel):
     events: list[RequestEvent]
 
 
-class HourlyUsagePoint(BaseModel):
+class HourlyPoint(BaseModel):
     hour: int = Field(..., ge=0, le=23, description="UTC hour of day, 0-23")
+
+
+class HourlyUsagePoint(HourlyPoint):
     requests: int = Field(..., ge=0)
 
 
@@ -51,8 +49,7 @@ class HourlyUsageResponse(BaseModel):
     points: list[HourlyUsagePoint]
 
 
-class HourlyTokenPoint(BaseModel):
-    hour: int = Field(..., ge=0, le=23, description="UTC hour of day, 0-23")
+class HourlyTokenPoint(HourlyPoint):
     prompt_tokens: int = Field(..., ge=0)
     completion_tokens: int = Field(..., ge=0)
     total_tokens: int = Field(..., ge=0)

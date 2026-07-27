@@ -18,20 +18,6 @@ async def _proxy_impl(
     gateway: GatewayService,
     user_id: int,
 ) -> Response:
-    """Transparent proxy: POST /v1/gemini/v1beta/models/gemini-1.5-flash:generateContent
-
-    Client never sees which underlying API key served the request, nor
-    that a 429 caused a silent retry against a different key. The bearer
-    token resolves to user_id (require_gateway_token), which scopes every
-    key lookup below to that caller's own pool.
-
-    NoAvailableKeysError / UpstreamExhaustedError / ProviderNotSupportedError
-    raised by the service layer aren't caught here — the global handler in
-    main.py turns them into the same GatewayErrorBody shape this endpoint
-    always returned. Only the "not even a valid provider name" case is
-    handled locally, since ProviderType(...) rejects it before any service
-    call happens.
-    """
     try:
         provider_type = ProviderType(provider_name)
     except ValueError:

@@ -18,8 +18,6 @@ def get_engine() -> AsyncEngine:
         str(settings.DATABASE_URL),
         echo=settings.DB_ECHO,
         pool_pre_ping=True,
-        # A pet-project-scale pool: generous enough for a few concurrent
-        # requests, small enough not to overwhelm a small Postgres instance.
         pool_size=5,
         max_overflow=10,
     )
@@ -35,7 +33,6 @@ def get_sessionmaker() -> async_sessionmaker[AsyncSession]:
 
 
 async def get_db() -> AsyncGenerator[AsyncSession, None]:
-    """FastAPI dependency yielding a request-scoped AsyncSession."""
     session_factory = get_sessionmaker()
     async with session_factory() as session:
         yield session

@@ -32,12 +32,6 @@ async def get_current_user(
     credentials: Annotated[HTTPAuthorizationCredentials, Depends(_bearer_scheme)],
     user_repo: Annotated[UserRepository, Depends(get_user_repository)],
 ) -> User:
-    """Every /me/* endpoint depends on this — it's the actual data boundary.
-
-    A valid access token only proves *who* the caller is; it's this
-    lookup (not the token) that a query then filters by, e.g.
-    APIKeyRepository.list_all(user_id=user.id).
-    """
     try:
         user_id = decode_token(credentials.credentials, expected_type="access")
     except TokenExpiredError:

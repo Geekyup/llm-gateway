@@ -1,5 +1,4 @@
 class LLMGatewayError(Exception):
-
     status_code: int = 400
     detail: str = "Application error"
 
@@ -14,15 +13,11 @@ class LLMGatewayError(Exception):
 
 
 class NoAvailableKeysError(LLMGatewayError):
-    """Raised when the pool has no active key for the requested provider."""
-
     status_code = 503
     detail = "No available API keys for provider '{provider}'"
 
 
 class UpstreamExhaustedError(LLMGatewayError):
-    """Raised when every candidate key was tried and all were rate-limited/exhausted."""
-
     status_code = 503
     detail = "All {attempts} candidate key(s) for '{provider}' were rate-limited or exhausted"
 
@@ -38,17 +33,7 @@ class ProviderNotSupportedError(LLMGatewayError):
 
 
 class ProviderRequestError(LLMGatewayError):
-    """Raised when a direct, on-demand call to a provider (not part of the
-    key-pool failover path) fails — currently just Provider.list_models,
-    invoked synchronously for the Add/Edit Key model picker so the person
-    gets an immediate, specific reason rather than a silent empty list.
-    """
-
     status_code = 502
-    # NOTE: the format placeholder is deliberately `{reason}`, not
-    # `{detail}` — LLMGatewayError.__init__ takes `detail` as its own
-    # positional/reserved parameter name, so a fmt_kwargs key called
-    # "detail" would never reach .format() and raise KeyError instead.
     detail = "Request to '{provider}' failed: {reason}"
 
 
@@ -58,14 +43,10 @@ class GatewayTokenNotFoundError(LLMGatewayError):
 
 
 class InactiveUserError(LLMGatewayError):
-    """Raised when a login attempt targets a user marked is_active=False."""
-
     status_code = 403
     detail = "This account has been deactivated"
 
 
 class TokenRevokedError(LLMGatewayError):
-    """Raised when a refresh token is unknown or was already revoked/rotated."""
-
     status_code = 401
     detail = "Refresh token has been revoked"

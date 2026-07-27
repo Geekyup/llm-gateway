@@ -8,8 +8,6 @@ from app.tokens.models import GatewayToken
 
 
 class GatewayTokenRepository:
-    """Pure persistence layer for GatewayToken — no hashing, no plaintext handling."""
-
     def __init__(self, session: AsyncSession) -> None:
         self._session = session
 
@@ -23,9 +21,6 @@ class GatewayTokenRepository:
         return token
 
     async def get(self, token_id: int, *, user_id: int) -> GatewayToken:
-        """Scoped to the owner — a token belonging to someone else looks
-        identical to a nonexistent one from the caller's point of view.
-        """
         stmt = select(GatewayToken).where(GatewayToken.id == token_id, GatewayToken.user_id == user_id)
         result = await self._session.execute(stmt)
         token = result.scalar_one_or_none()
@@ -34,10 +29,6 @@ class GatewayTokenRepository:
         return token
 
     async def get_by_hash(self, token_hash: str) -> GatewayToken | None:
-        """Deliberately NOT user_id-scoped: this is how an inbound /v1/*
-        request's bearer token gets resolved to its owning user in the
-        first place — see GatewayTokenService.authenticate.
-        """
         stmt = select(GatewayToken).where(GatewayToken.token_hash == token_hash)
         result = await self._session.execute(stmt)
         return result.scalar_one_or_none()

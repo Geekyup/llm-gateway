@@ -74,8 +74,6 @@ async def test_check_key_health_never_reactivates_disabled_key(key_repo, key_poo
 
     assert result.ok is True
     refreshed = await key_repo.get(key.id, user_id=test_user.id)
-    # A manually-disabled key stays disabled even if the upstream key works —
-    # health checks should never override an explicit admin decision.
     assert refreshed.status == KeyStatus.DISABLED
 
 
@@ -95,8 +93,6 @@ async def test_check_key_health_leaves_cooldown_key_alone_on_failure(key_repo, k
 
     assert result.ok is False
     refreshed = await key_repo.get(key.id, user_id=test_user.id)
-    # Cooldown already has its own recovery timer — a failed health check
-    # shouldn't reclassify it as EXHAUSTED.
     assert refreshed.status == KeyStatus.COOLDOWN
 
 

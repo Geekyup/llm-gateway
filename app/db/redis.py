@@ -12,5 +12,4 @@ def get_redis_pool() -> ConnectionPool:
 
 
 def get_redis() -> Redis:
-    """Cheap to call repeatedly — Redis client is a thin wrapper over the shared pool."""
     return Redis(connection_pool=get_redis_pool())

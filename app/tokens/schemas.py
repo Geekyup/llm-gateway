@@ -1,5 +1,4 @@
 from datetime import datetime
-
 from pydantic import BaseModel, ConfigDict, Field
 
 
@@ -8,10 +7,6 @@ class GatewayTokenCreate(BaseModel):
 
 
 class GatewayTokenRead(BaseModel):
-    """Metadata only — never includes the plaintext token."""
-
-    model_config = ConfigDict(from_attributes=True)
-
     id: int
     label: str
     token_preview: str
@@ -20,11 +15,9 @@ class GatewayTokenRead(BaseModel):
     created_at: datetime
     updated_at: datetime
 
+    model_config = ConfigDict(from_attributes=True)
+
 
 class GatewayTokenCreated(BaseModel):
-    """Returned exactly once, right after creation — the only time the
-    plaintext token is ever available. The caller must copy it now.
-    """
-
     token: GatewayTokenRead
     plaintext: str

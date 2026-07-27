@@ -30,9 +30,6 @@ async def test_authenticate_resolves_to_owning_user(token_service, test_user):
 
 @pytest.mark.asyncio
 async def test_authenticate_never_confuses_two_users_tokens(token_service, test_user, other_user):
-    """The core isolation guarantee for inbound auth: each token resolves
-    only to its own owner, never to another account.
-    """
     mine = await token_service.create_token(test_user.id, GatewayTokenCreate(label="mine"))
     theirs = await token_service.create_token(other_user.id, GatewayTokenCreate(label="theirs"))
 
@@ -62,7 +59,6 @@ async def test_set_active_cannot_touch_another_users_token(token_service, test_u
     with pytest.raises(GatewayTokenNotFoundError):
         await token_service.set_active(theirs.token.id, test_user.id, is_active=False)
 
-    # Confirm the real owner's token is untouched and still authenticates.
     assert await token_service.authenticate(theirs.plaintext) == other_user.id
 
 

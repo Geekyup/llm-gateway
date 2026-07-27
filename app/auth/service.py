@@ -17,13 +17,6 @@ logger = logging.getLogger(__name__)
 
 
 class AuthService:
-    """Google-only auth: there is no password anywhere in this system.
-
-    Every session starts at /auth/google/callback (see router.py), which
-    calls login_with_google. Everything else here is just standard
-    access/refresh-pair plumbing on top of that one identity source.
-    """
-
     def __init__(self, user_repo: UserRepository, token_repo: RefreshTokenRepository) -> None:
         self._user_repo = user_repo
         self._token_repo = token_repo
@@ -47,19 +40,12 @@ class AuthService:
         return user, await self._issue_and_store(user.id)
 
     async def refresh(self, refresh_token: str) -> TokenPair:
-        # decode_token raises TokenExpiredError/InvalidTokenError itself;
-        # nothing extra to do here, so let them propagate to the caller.
         user_id = decode_token(refresh_token, expected_type="refresh")
 
         token_hash = hash_refresh_token(refresh_token)
         stored = await self._token_repo.get_by_hash(token_hash)
 
         if stored is None or stored.revoked:
-            # Either an unknown token, or one we already rotated away from.
-            # The latter is a strong reuse signal (e.g. a stolen refresh
-            # token being replayed after the legitimate client already
-            # rotated it) — burn every session for this user rather than
-            # just rejecting the one request.
             await self._token_repo.revoke_all_for_user(user_id)
             raise TokenRevokedError()
 

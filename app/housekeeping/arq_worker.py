@@ -31,12 +31,7 @@ class WorkerSettings:
     on_startup = startup
     on_shutdown = shutdown
     cron_jobs: ClassVar[list] = [
-        # Revive keys whose temporary cooldown window has passed.
         cron(clear_expired_cooldowns, minute=set(range(0, 60, 5)), run_at_startup=True),
-        # Daily reset of requests_today / EXHAUSTED status at the top of the hour
-        # configured in settings (default: hour boundary, minute 0).
         cron(reset_daily_limits, hour=0, minute=0),
-        # Probe EXHAUSTED keys every 30 min in case they recovered upstream
-        # (unrevoked, quota reset out of band) before the daily reset.
         cron(health_check_exhausted_keys, minute={0, 30}, run_at_startup=True),
     ]

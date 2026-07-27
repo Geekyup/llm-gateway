@@ -19,10 +19,7 @@ from app.gateway.schemas import GatewayErrorBody
 from app.monitoring.router import router as monitoring_router
 from app.openai_compat.router import router as openai_compat_router
 
-# Maps a domain exception to the "error" slug the gateway's public JSON
-# error body uses. Only exceptions the /v1/* proxy path can actually raise
-# need an entry here — anything else falls through to the generic
-# {"detail": ...} handler below.
+
 _GATEWAY_ERROR_SLUGS: dict[type[LLMGatewayError], str] = {
     NoAvailableKeysError: "no_available_keys",
     UpstreamExhaustedError: "upstream_exhausted",
@@ -47,22 +44,10 @@ def create_app() -> FastAPI:
         allow_methods=["*"],
         allow_headers=["*"],
     )
-    # Only used to carry the OAuth nonce between /auth/google/login and
-    # /auth/google/callback — unrelated to the access/refresh JWTs issued
-    # after login, which are stateless and never touch this cookie.
     app.add_middleware(SessionMiddleware, secret_key=settings.SESSION_SECRET_KEY, same_site="lax")
 
     @app.exception_handler(LLMGatewayError)
     async def llm_gateway_error_handler(request: Request, exc: LLMGatewayError) -> JSONResponse:
-        """Single seam for every domain exception in app.core.exceptions.
-
-        Routers raise these directly instead of each wrapping calls in
-        their own try/except HTTPException block. The /v1/{provider}/...
-        proxy path is the one exception: its public contract is the
-        {error, provider, detail} shape (GatewayErrorBody), which existing
-        client integrations already depend on, so it's preserved here
-        rather than folded into the generic {"detail": ...} body below.
-        """
         if request.url.path.startswith("/v1/") and type(exc) in _GATEWAY_ERROR_SLUGS:
             provider = getattr(exc, "provider", "unknown")
             body = GatewayErrorBody(
@@ -72,10 +57,6 @@ def create_app() -> FastAPI:
 
         return JSONResponse(status_code=exc.status_code, content={"detail": str(exc)})
 
-    # openai_compat_router must be registered before gateway_router: FastAPI
-    # matches routes in registration order, and gateway_router's catch-all
-    # POST /v1/{provider_name}/{path:path} would otherwise swallow
-    # POST /v1/chat/completions (provider_name="chat", path="completions").
     app.include_router(openai_compat_router)
     app.include_router(gateway_router)
     app.include_router(keys_router)
@@ -86,7 +67,6 @@ def create_app() -> FastAPI:
     @app.get("/health", tags=["meta"])
     async def health() -> dict[str, str]:
         return {"status": "ok"}
-
     return app
 
 

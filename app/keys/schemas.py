@@ -26,10 +26,6 @@ class APIKeyUpdate(BaseModel):
 
 
 class APIKeyRead(BaseModel):
-    """Never includes the decrypted key — admin endpoints only expose metadata."""
-
-    model_config = ConfigDict(from_attributes=True)
-
     id: int
     label: str
     provider: ProviderType
@@ -42,27 +38,15 @@ class APIKeyRead(BaseModel):
     created_at: datetime
     updated_at: datetime
 
+    model_config = ConfigDict(from_attributes=True)
 
 class APIKeyHealthCheckResult(BaseModel):
-    """Response for a health-check probe — either a single POST /{id}/check
-    or one entry in the list returned by POST /check-all.
-    """
-
     key_id: int
     ok: bool
     detail: str | None = Field(default=None, description="Reason for failure; never set when ok=True")
 
 
 class APIKeyDTO(BaseModel):
-    """Internal, in-process transfer object used by selector/cache/service.
-
-    Distinct from APIKeyRead: this one MAY carry the decrypted key when
-    the gateway needs it to make an upstream call, so it must never be
-    returned directly from an HTTP endpoint.
-    """
-
-    model_config = ConfigDict(from_attributes=True)
-
     id: int
     user_id: int
     label: str
@@ -72,3 +56,5 @@ class APIKeyDTO(BaseModel):
     daily_limit: int
     model: str | None = None
     decrypted_key: str | None = None
+
+    model_config = ConfigDict(from_attributes=True)

@@ -21,22 +21,6 @@ def _history_key(user_id: int) -> str:
 
 
 class RequestEventPublisher:
-    """Fire-and-forget event bus for the live request monitor.
-
-    Two Redis structures per user, deliberately simple:
-    - Pub/Sub channel (monitoring:requests:{user_id}): fan-out to whatever
-      dashboards that user currently has connected via SSE. Nobody
-      listening -> message is just dropped. A user can never subscribe to
-      another user's channel because the channel name is derived from the
-      authenticated caller, not from anything client-supplied.
-    - Capped List (monitoring:requests:history:{user_id}): last
-      HISTORY_MAX_LEN events for that user, so a dashboard opened *after*
-      traffic already happened isn't staring at a blank screen.
-
-    Publishing must never break the actual proxy request — any Redis
-    failure here is logged and swallowed, not raised.
-    """
-
     def __init__(self, redis: Redis) -> None:
         self._redis = redis
 
@@ -67,19 +51,6 @@ class RequestEventPublisher:
         return events
 
     async def hourly_usage_for_key(self, user_id: int, key_id: int) -> list[int]:
-        """Real per-hour request counts for one key, for the current UTC day.
-
-        Built from the same capped history list the live monitor reads —
-        no separate storage, so this is only as deep as HISTORY_MAX_LEN
-        events for the *whole account* (all keys combined). For a busy
-        account that can mean the earliest hours of a heavy day have
-        already scrolled out of the window; there's no persistent request
-        log to fall back on, so this is the best available signal without
-        adding a database table.
-
-        Only successful upstream calls count as "usage" here (skips
-        no_keys/error attempts that never reached the provider).
-        """
         counts = [0] * 24
         raw = await self._redis.lrange(_history_key(user_id), 0, HISTORY_MAX_LEN - 1)
         today = datetime.now(UTC).date()
@@ -103,15 +74,6 @@ class RequestEventPublisher:
         return counts
 
     async def hourly_token_usage_for_key(self, user_id: int, key_id: int) -> list[tuple[int, int, int]]:
-        """Real per-hour token counts (prompt, completion, total) for one
-        key, for the current UTC day.
-
-        Same Redis-history source and same coverage caveat as
-        hourly_usage_for_key. Only "success" events carry usageMetadata
-        (rate_limited/exhausted attempts never reached generation, so
-        there's nothing to count) — events missing token fields (e.g.
-        published before this feature existed) are skipped.
-        """
         prompt = [0] * 24
         completion = [0] * 24
         total = [0] * 24

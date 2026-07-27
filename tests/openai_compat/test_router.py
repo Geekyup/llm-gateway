@@ -1,13 +1,3 @@
-"""Tests for the provider-selection logic in openai_compat/router.py.
-
-These exercise chat_completions() as a plain async function (not through a
-real HTTP client — there's no TestClient/AsyncClient pattern elsewhere in
-this test suite, see test_proxy_service.py for the same style) with a fake
-GatewayService that just records what it was asked to send upstream. That's
-enough to verify routing/translation decisions without needing a live
-KeyPoolService, DB, or network.
-"""
-
 import httpx
 import pytest
 
@@ -18,8 +8,6 @@ from app.openai_compat.schemas import ChatCompletionRequest, ChatMessage
 
 
 class RecordingGateway:
-    """Fake GatewayService — records the call and returns a canned response."""
-
     def __init__(self, response: httpx.Response | None = None, raise_: Exception | None = None) -> None:
         self.response = response
         self.raise_ = raise_
@@ -43,7 +31,6 @@ async def test_default_provider_is_gemini_and_translates_payload():
     call = gateway.calls[0]
     assert call["provider_type"] is ProviderType.GEMINI
     assert call["path"] == "v1beta/models/gemini-3.6-flash:generateContent"
-    # Gemini payload shape, not OpenAI shape — confirms translation ran.
     assert "contents" in call["payload"]
     assert "messages" not in call["payload"]
 
@@ -63,8 +50,6 @@ async def test_explicit_openrouter_provider_passes_payload_through():
     call = gateway.calls[0]
     assert call["provider_type"] is ProviderType.OPENROUTER
     assert call["path"] == "v1/chat/completions"
-    # OpenAI-shaped payload passed through as-is — no Gemini translation,
-    # and our own routing field must not leak upstream.
     assert call["payload"]["model"] == "openai/gpt-4o-mini"
     assert call["payload"]["messages"] == [{"role": "user", "content": "hi"}]
     assert "provider" not in call["payload"]

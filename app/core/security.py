@@ -12,10 +12,8 @@ def _fernet() -> Fernet:
 
 
 def encrypt_key(plaintext: str) -> str:
-    """Encrypt a raw API key for storage. Returns a str safe for a text/String column."""
     return _fernet().encrypt(plaintext.encode()).decode()
 
 
 def decrypt_key(ciphertext: str) -> str:
-    """Decrypt a stored API key. Only call this at the point of use (provider.forward)."""
     return _fernet().decrypt(ciphertext.encode()).decode()

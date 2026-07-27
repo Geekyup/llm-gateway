@@ -9,7 +9,6 @@ def configure_logging(debug: bool = False) -> None:
         format="%(asctime)s | %(levelname)-8s | %(name)s | %(message)s",
         stream=sys.stdout,
     )
-    # Quiet down noisy libraries unless we're actually debugging them.
     if not debug:
         logging.getLogger("httpx").setLevel(logging.WARNING)
         logging.getLogger("sqlalchemy.engine").setLevel(logging.WARNING)

@@ -116,8 +116,6 @@ async def test_publish_failure_is_swallowed_not_raised(fake_redis, monkeypatch):
 
     monkeypatch.setattr(fake_redis, "pipeline", _broken_pipeline)
 
-    # Must not raise — monitoring is best-effort and should never break the
-    # actual gateway request path.
     await publisher.publish(_event())
 
 
@@ -201,10 +199,7 @@ async def test_hourly_token_usage_skips_non_success_and_missing_tokens(fake_redi
     publisher = RequestEventPublisher(fake_redis)
     now = datetime.now(UTC)
 
-    # rate_limited never reaches generation, so no usageMetadata to count.
     await publisher.publish(_event(request_id="limited", outcome="rate_limited", timestamp=now))
-    # A success event published before this feature existed (or a parse
-    # failure) has no token fields — must not crash or count as zero-usage noise.
     await publisher.publish(_event(request_id="legacy-success", outcome="success", timestamp=now))
 
     triples = await publisher.hourly_token_usage_for_key(1, key_id=1)

@@ -4,8 +4,7 @@ from sqlalchemy import DateTime, MetaData
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 from sqlalchemy.sql import func
 
-# Explicit naming convention so Alembic autogenerate produces stable,
-# predictable constraint/index names instead of DB-driver defaults.
+
 NAMING_CONVENTION = {
     "ix": "ix_%(column_0_label)s",
     "uq": "uq_%(table_name)s_%(column_0_name)s",
@@ -20,8 +19,6 @@ class Base(DeclarativeBase):
 
 
 class TimestampMixin:
-    """Adds created_at / updated_at columns managed by the DB itself."""
-
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )

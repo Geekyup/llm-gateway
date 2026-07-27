@@ -21,9 +21,6 @@ async def test_get_missing_raises(token_repo, test_user):
 
 @pytest.mark.asyncio
 async def test_get_other_users_token_raises(token_repo, test_user, other_user):
-    """A token belonging to someone else must behave exactly like a
-    nonexistent one — this is the isolation guarantee itself.
-    """
     token = await token_repo.create(
         user_id=other_user.id, label="not-yours", token_hash="hash1", token_preview="gwk_...ab12"
     )
@@ -43,9 +40,6 @@ async def test_list_all_excludes_other_users_tokens(token_repo, test_user, other
 
 @pytest.mark.asyncio
 async def test_get_by_hash_is_not_user_scoped(token_repo, test_user):
-    """get_by_hash is the one deliberately-unscoped lookup: it's how an
-    inbound bearer token resolves to its owner in the first place.
-    """
     token = await token_repo.create(user_id=test_user.id, label="mine", token_hash="hash1", token_preview="p1")
 
     found = await token_repo.get_by_hash("hash1")
@@ -70,6 +64,5 @@ async def test_delete_scoped_to_owner(token_repo, test_user, other_user):
     with pytest.raises(GatewayTokenNotFoundError):
         await token_repo.delete(token.id, user_id=test_user.id)
 
-    # Confirm it's untouched from the real owner's perspective.
     still_there = await token_repo.get(token.id, user_id=other_user.id)
     assert still_there.id == token.id

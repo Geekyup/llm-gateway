@@ -11,8 +11,6 @@ def _registry() -> dict[str, Provider]:
     return {
         GeminiProvider.name: GeminiProvider(),
         OpenRouterProvider.name: OpenRouterProvider(),
-        # Add new providers here as they're implemented, e.g.:
-        # OpenAIProvider.name: OpenAIProvider(),
     }
 
 

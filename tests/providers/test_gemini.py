@@ -38,7 +38,7 @@ async def test_list_models_strips_models_prefix_and_filters_to_generate_content(
 
     models = await provider.list_models("AIza-real-key")
 
-    assert [m.id for m in models] == ["gemini-3.6-flash"]
+    assert [m.model_id for m in models] == ["gemini-3.6-flash"]
     assert models[0].label == "Gemini 3.6 Flash"
 
 

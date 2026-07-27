@@ -11,23 +11,12 @@ logger = logging.getLogger(__name__)
 
 
 class OpenRouterProvider(Provider):
-    """Adapter for OpenRouter (https://openrouter.ai).
-
-    Unlike Gemini, OpenRouter's API is already OpenAI-compatible — the
-    same request/response shape our /v1/chat/completions endpoint accepts
-    from clients. So `path`/`payload` here are expected to already be in
-    OpenAI chat-completions form and are forwarded close to 1:1, with no
-    Gemini-style request/response translation needed.
-    """
-
     name: ClassVar[str] = "openrouter"
 
     def __init__(self, client: httpx.AsyncClient | None = None) -> None:
         settings = get_settings()
         self._base_url = settings.OPENROUTER_BASE_URL.rstrip("/")
         self._timeout = settings.UPSTREAM_TIMEOUT_SECONDS
-        # Allow injecting a client (tests / connection reuse); otherwise
-        # build a short-lived one per call — fine for MVP traffic levels.
         self._client = client
 
     async def forward(
@@ -55,17 +44,9 @@ class OpenRouterProvider(Provider):
         return response.status_code == 429
 
     def is_key_exhausted(self, response: httpx.Response) -> bool:
-        # OpenRouter returns 402 Payment Required when the account is out
-        # of credits — the closest equivalent to Gemini's "permanently
-        # exhausted" 403. Distinct from 429 (temporary throttle, recovers
-        # on its own): 402 means the key needs a human to add funds, so it
-        # should be parked rather than retried on a cooldown timer.
         return response.status_code == 402
 
     async def health_check(self, key: str) -> HealthCheckResult:
-        # GET /api/v1/key returns the calling key's own credit/rate-limit
-        # info — authenticated, but doesn't run a completion, so it's free
-        # and doesn't touch generation quota.
         try:
             response = await self.forward(key=key, path="v1/key", method="GET", payload=None, headers={})
         except httpx.HTTPError as exc:
@@ -85,13 +66,6 @@ class OpenRouterProvider(Provider):
         return HealthCheckResult(ok=False, detail=detail)
 
     async def list_models(self, key: str) -> list[ModelInfo]:
-        # GET /api/v1/models is actually a public, unauthenticated catalog
-        # of every model on the platform (not filtered to what this key
-        # can afford/access) — OpenRouter doesn't offer a per-key model
-        # list. We still send the key so this fails the same way other
-        # calls would if it were ever revoked, and so a future
-        # personalized-list endpoint would just work here without callers
-        # changing.
         try:
             response = await self.forward(key=key, path="v1/models", method="GET", payload=None, headers={})
         except httpx.HTTPError as exc:
@@ -113,5 +87,5 @@ class OpenRouterProvider(Provider):
             model_id = entry.get("id")
             if not model_id:
                 continue
-            models.append(ModelInfo(id=model_id, label=entry.get("name")))
+            models.append(ModelInfo(model_id=model_id, label=entry.get("name")))
         return models

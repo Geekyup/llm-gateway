@@ -30,8 +30,6 @@ class UserRepository:
     async def update_profile(
         self, user: User, *, email: str, display_name: str | None, avatar_url: str | None
     ) -> User:
-        # Refresh display fields from Google on every login — a person's
-        # name/avatar/email can change on Google's side over time.
         user.email = email
         user.display_name = display_name
         user.avatar_url = avatar_url
@@ -64,7 +62,6 @@ class RefreshTokenRepository:
         await self._session.commit()
 
     async def revoke_all_for_user(self, user_id: int) -> None:
-        """Used on logout-everywhere and on reuse-detection (see AuthService.refresh)."""
         await self._session.execute(
             update(RefreshToken)
             .where(RefreshToken.user_id == user_id, RefreshToken.revoked.is_(False))
