@@ -12,7 +12,7 @@ class HealthCheckResult:
 
 
 class ModelInfo:
-    __slots__ = ("model_id", "label")
+    __slots__ = ("label", "model_id")
 
     def __init__(self, model_id: str, label: str | None = None) -> None:
         self.model_id = model_id

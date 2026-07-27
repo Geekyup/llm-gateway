@@ -6,7 +6,6 @@ from app.openai_compat.schemas import (
     ChatCompletionUsage,
 )
 
-
 _GEMINI_ROLE_MAP = {"user": "user", "assistant": "model"}
 
 

@@ -19,7 +19,6 @@ from app.gateway.schemas import GatewayErrorBody
 from app.monitoring.router import router as monitoring_router
 from app.openai_compat.router import router as openai_compat_router
 
-
 _GATEWAY_ERROR_SLUGS: dict[type[LLMGatewayError], str] = {
     NoAvailableKeysError: "no_available_keys",
     UpstreamExhaustedError: "upstream_exhausted",
