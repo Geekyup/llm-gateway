@@ -12,7 +12,6 @@ import {
   type GatewayTokenRead, type GatewayTokenCreated, type UserRead, type ModelOption,
 } from "./lib/api";
 
-// ─── Types ────────────────────────────────────────────────────────────────────
 type Status = "active" | "cooldown" | "exhausted" | "disabled";
 type Provider = "gemini" | "openrouter";
 type View = "dashboard" | "monitor" | "access";
@@ -33,7 +32,6 @@ interface LR {
 
 interface FormState { label: string; provider: Provider; rawKey: string; limit: string; model: string }
 
-// ─── Mapping between backend schema and UI view-model ─────────────────────────
 function toAK(k: ApiKeyRead): AK {
   return {
     id: String(k.id),
@@ -63,7 +61,6 @@ function toLR(e: ApiRequestEvent): LR {
   };
 }
 
-// ─── Constants ────────────────────────────────────────────────────────────────
 const S: Record<Status, { text: string; color: string; bg: string; bd: string }> = {
   active:    { text: "Active",    color: "#00D68F", bg: "rgba(0,214,143,0.08)",  bd: "rgba(0,214,143,0.22)"  },
   cooldown:  { text: "Cooldown",  color: "#F59E0B", bg: "rgba(245,158,11,0.08)", bd: "rgba(245,158,11,0.22)" },
@@ -79,7 +76,6 @@ function providerMeta(provider: string) {
   return P[provider] ?? { name: provider, color: "#71717A", bg: "rgba(113,113,122,0.1)" };
 }
 
-// ─── Helpers ──────────────────────────────────────────────────────────────────
 function rel(ts: number, now: number) {
   const d = now - ts;
   if (d < 60000)   return `${Math.floor(d / 1000)}s ago`;
@@ -98,7 +94,6 @@ function cd(until: number, now: number) {
   return `${m}:${String(s).padStart(2, "0")}`;
 }
 
-// ─── Atom components ──────────────────────────────────────────────────────────
 function SBadge({ status }: { status: Status }) {
   const s = S[status];
   return (
@@ -156,7 +151,6 @@ function CircP({ used, limit, color }: { used: number; limit: number; color: str
   );
 }
 
-// ─── TopBar ───────────────────────────────────────────────────────────────────
 function TopBar({ view, onView, onAdd, operational, onLogout, userEmail }: {
   view: View; onView: (v: View) => void; onAdd: () => void; operational: boolean; onLogout: () => void;
   userEmail?: string | null;
@@ -232,7 +226,6 @@ function TopBar({ view, onView, onAdd, operational, onLogout, userEmail }: {
   );
 }
 
-// ─── MetricCards ──────────────────────────────────────────────────────────────
 function MetricCards({ keys }: { keys: AK[] }) {
   const total  = keys.length;
   const active = keys.filter(k => k.status === "active").length;
@@ -275,7 +268,6 @@ function MetricCards({ keys }: { keys: AK[] }) {
   );
 }
 
-// ─── KeysTable ────────────────────────────────────────────────────────────────
 function KeysTable({ keys, filter, onFilter, onSelect, onEdit, onToggle, onCheck, checkingIds, now }: {
   keys: AK[]; filter: PF; onFilter: (f: PF) => void; now: number;
   onSelect: (id: string) => void; onEdit: (id: string) => void; onToggle: (id: string) => void;
@@ -316,7 +308,6 @@ function KeysTable({ keys, filter, onFilter, onSelect, onEdit, onToggle, onCheck
         </div>
       ) : (
         <>
-          {/* Mobile: stacked cards */}
           <div className="sm:hidden" style={{ background: "#111113" }}>
             {filtered.map((k, i) => (
               <div key={k.id} className="px-4 py-3.5 transition-colors active:bg-white/[0.03] cursor-pointer"
@@ -366,7 +357,6 @@ function KeysTable({ keys, filter, onFilter, onSelect, onEdit, onToggle, onCheck
             ))}
           </div>
 
-          {/* Desktop / tablet: table */}
           <div className="hidden sm:block overflow-x-auto" style={{ background: "#111113" }}>
             <table className="w-full min-w-[760px]">
               <thead>
@@ -438,7 +428,6 @@ function KeysTable({ keys, filter, onFilter, onSelect, onEdit, onToggle, onCheck
   );
 }
 
-// ─── AddEditModal ─────────────────────────────────────────────────────────────
 function AddEditModal({ editKey, onSave, onClose, error, saving }: {
   editKey: AK | null; onSave: (f: FormState) => void; onClose: () => void;
   error?: string | null; saving?: boolean;
@@ -457,12 +446,10 @@ function AddEditModal({ editKey, onSave, onClose, error, saving }: {
   const [modelError, setModelError] = useState<string | null>(null);
 
   async function fetchModels() {
-    if (!form.rawKey.trim() && !editKey) return; // nothing to try the call with yet
+    if (!form.rawKey.trim() && !editKey) return;
     setModelLoading(true);
     setModelError(null);
     try {
-      // Editing an existing key with a blank "leave unchanged" key field —
-      // there's no raw key to try live, so this can't fetch a fresh list.
       if (!form.rawKey.trim() && editKey) {
         setModelError("Enter the API key above to look up models for it.");
         return;
@@ -661,7 +648,6 @@ function AddEditModal({ editKey, onSave, onClose, error, saving }: {
   );
 }
 
-// ─── KeyDetailDrawer ──────────────────────────────────────────────────────────
 function KeyDetailDrawer({ keyData, now, onClose, onDisable, onReset, onDelete, onCheck, checking, resetting }: {
   keyData: AK; now: number;
   onClose: () => void; onDisable: () => void; onReset: () => void; onDelete: () => void;
@@ -698,8 +684,6 @@ function KeyDetailDrawer({ keyData, now, onClose, onDisable, onReset, onDelete, 
     return () => { cancelled = true; };
   }, [keyData.id]);
 
-  // Token usage is fetched lazily — only once the person actually switches
-  // to that view, so opening the panel doesn't always cost two requests.
   useEffect(() => {
     if (chartMode !== "tokens" || tokenData !== null || tokenError) return;
     let cancelled = false;
@@ -892,7 +876,6 @@ function KeyDetailDrawer({ keyData, now, onClose, onDisable, onReset, onDelete, 
   );
 }
 
-// ─── LiveMonitor ──────────────────────────────────────────────────────────────
 function LiveMonitor({ reqs, now }: { reqs: LR[]; now: number }) {
   return (
     <div className="rounded-xl overflow-hidden" style={{ border: "1px solid rgba(255,255,255,0.06)" }}>
@@ -906,7 +889,6 @@ function LiveMonitor({ reqs, now }: { reqs: LR[]; now: number }) {
       </div>
 
       <div style={{ background: "#111113" }}>
-        {/* Header row — desktop/tablet only */}
         <div className="hidden sm:grid px-4 py-2"
           style={{ gridTemplateColumns: "72px 88px 1fr 52px 64px 56px", borderBottom: "1px solid rgba(255,255,255,0.04)" }}>
           {["Time", "Provider", "Key / Chain", "Status", "Tokens", "Latency"].map(h => (
@@ -919,7 +901,6 @@ function LiveMonitor({ reqs, now }: { reqs: LR[]; now: number }) {
           const isNewest = i === 0;
           return (
             <div key={r.id} className={isNewest ? "animate-in fade-in slide-in-from-top-2 duration-300 ease-out" : undefined}>
-              {/* Mobile: stacked row */}
               <div className="sm:hidden px-4 py-2.5"
                 style={{ borderBottom: "1px solid rgba(255,255,255,0.03)" }}>
                 <div className="flex items-center justify-between gap-2 mb-1.5">
@@ -957,7 +938,6 @@ function LiveMonitor({ reqs, now }: { reqs: LR[]; now: number }) {
                 </div>
               </div>
 
-              {/* Desktop/tablet: grid row */}
               <div className="hidden sm:grid items-center px-4 py-2.5 transition-colors"
                 style={{
                   gridTemplateColumns: "72px 88px 1fr 52px 64px 56px",
@@ -997,7 +977,6 @@ function LiveMonitor({ reqs, now }: { reqs: LR[]; now: number }) {
   );
 }
 
-// ─── LoginGate ──────────────────────────────────────────────────────────────
 function LoginGate({ error }: { error?: string | null }) {
   return (
     <div className="min-h-screen flex items-center justify-center px-4"
@@ -1039,7 +1018,6 @@ function LoginGate({ error }: { error?: string | null }) {
   );
 }
 
-// ─── App ──────────────────────────────────────────────────────────────────────
 export default function App() {
   const [authed, setAuthed] = useState(false);
   const [checkingAuth, setCheckingAuth] = useState(true);
@@ -1048,8 +1026,6 @@ export default function App() {
 
   useEffect(() => {
     (async () => {
-      // Google OAuth callback lands back here with tokens in the URL
-      // fragment (never sent to a server on subsequent requests).
       if (location.hash.includes("access_token=")) {
         const params = new URLSearchParams(location.hash.slice(1));
         const accessToken = params.get("access_token");
@@ -1099,8 +1075,6 @@ export default function App() {
   );
 }
 
-// ─── Dashboard (authenticated app) ─────────────────────────────────────────────
-// ─── Gateway Access panel ───────────────────────────────────────────────────
 function GatewayAccessPanel() {
   const [tokens, setTokens] = useState<GatewayTokenRead[]>([]);
   const [loading, setLoading] = useState(true);
@@ -1236,7 +1210,6 @@ function GatewayAccessPanel() {
           <div className="py-16 text-center text-xs text-zinc-600">Токенов ещё нет — сгенерируй первый выше.</div>
         ) : (
           <>
-            {/* Mobile: stacked cards */}
             <div className="sm:hidden">
               {tokens.map((t, i) => (
                 <div key={t.id} className="px-4 py-3"
@@ -1271,7 +1244,6 @@ function GatewayAccessPanel() {
               ))}
             </div>
 
-            {/* Desktop/tablet: table */}
             <table className="hidden sm:table w-full text-sm">
               <thead>
                 <tr className="text-left text-[11px] uppercase tracking-wide text-zinc-600"
@@ -1364,11 +1336,7 @@ function Dashboard({ user, onLogout }: { user: UserRead | null; onLogout: () => 
     return () => clearInterval(id);
   }, [refreshKeys]);
 
-  // Live request feed via SSE, plus an initial snapshot so the monitor isn't empty on load.
   useEffect(() => {
-    // recentEvents comes back newest-first already (Redis LPUSH puts the
-    // latest event at index 0) — no reversal needed. Index 0 stays "newest"
-    // throughout the app, matching how the SSE handler below prepends.
     api.recentEvents(50).then(events => setReqs(events.map(toLR))).catch(() => {});
     const stop = streamEvents(
       evt => setReqs(prev => [toLR(evt), ...prev.slice(0, 49)]),
@@ -1389,8 +1357,6 @@ function Dashboard({ user, onLogout }: { user: UserRead | null; onLogout: () => 
         await api.updateKey(Number(editId), {
           label: form.label || undefined,
           daily_limit: Number(form.limit) || undefined,
-          // Always sent (never `undefined`) so clearing the model via the
-          // "x" button actually persists as unset, not "leave unchanged".
           model: form.model.trim() || null,
         });
         setEditId(null);
@@ -1427,7 +1393,7 @@ function Dashboard({ user, onLogout }: { user: UserRead | null; onLogout: () => 
       await api.updateKey(Number(id), { status: key.status === "disabled" ? "active" : "disabled" });
       await refreshKeys();
     } catch {
-      await refreshKeys(); // revert optimistic update on failure
+      await refreshKeys();
     }
   }
 
@@ -1437,7 +1403,6 @@ function Dashboard({ user, onLogout }: { user: UserRead | null; onLogout: () => 
       await api.resetCooldown(Number(id));
       await refreshKeys();
     } catch {
-      // surfaced via loadError on next refresh
     } finally {
       setResettingIds(prev => {
         const next = new Set(prev);

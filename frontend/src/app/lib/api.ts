@@ -1,9 +1,3 @@
-// ─── API client for llm-gateway backend ────────────────────────────────────
-// Talks to /me/keys* and /me/monitor* on the FastAPI backend.
-// Auth is Google OAuth: the backend issues a JWT access/refresh pair after
-// /auth/google/callback, which lands back on the frontend with the
-// pair in the URL fragment (#access_token=...&refresh_token=...).
-
 export const API_BASE_URL: string =
   (import.meta as any).env?.VITE_API_URL ?? "http://localhost:8000";
 
@@ -28,12 +22,10 @@ export function clearTokenPair(): void {
   localStorage.removeItem(REFRESH_TOKEN_KEY);
 }
 
-/** Redirects the whole page to Google's consent screen via the backend. */
 export function startGoogleLogin(): void {
   window.location.href = `${API_BASE_URL}/auth/google/login`;
 }
 
-// ─── Types mirroring backend Pydantic schemas ──────────────────────────────
 export type ApiKeyStatus = "active" | "cooldown" | "exhausted" | "disabled";
 export type ApiProvider = "gemini";
 
@@ -151,9 +143,6 @@ export class ApiError extends Error {
 
 let refreshInFlight: Promise<boolean> | null = null;
 
-/** Exchanges the stored refresh token for a new pair. Single-flight so
- * concurrent 401s don't each fire their own refresh call.
- */
 async function tryRefresh(): Promise<boolean> {
   if (!refreshInFlight) {
     refreshInFlight = (async () => {
@@ -201,7 +190,6 @@ async function request<T>(path: string, init?: RequestInit, _retried = false): P
       const body = await res.json();
       detail = body.detail ?? JSON.stringify(body);
     } catch {
-      // ignore parse errors, fall back to statusText
     }
     throw new ApiError(res.status, detail);
   }
@@ -293,7 +281,6 @@ export const api = {
     return request<void>(`/me/gateway-tokens/${id}`, { method: "DELETE" });
   },
 
-  /** Fetches the signed-in user's profile — also doubles as an auth check. */
   async me(): Promise<UserRead> {
     return request<UserRead>("/auth/me");
   },
@@ -307,16 +294,10 @@ export const api = {
         body: JSON.stringify({ refresh_token: refreshToken }),
       });
     } catch {
-      // best-effort — clear local tokens regardless of server response
     }
   },
 };
 
-/**
- * Opens a Server-Sent Events connection to /me/monitor/stream.
- * Native EventSource can't send custom headers, so this is proxied through
- * fetch's streaming body instead, same as the rest of the client.
- */
 export function streamEvents(
   onEvent: (evt: RequestEvent) => void,
   onError?: (err: unknown) => void
@@ -337,7 +318,7 @@ export function streamEvents(
         const reader = res.body.getReader();
         const decoder = new TextDecoder();
         let buffer = "";
-        retryDelayMs = 1000; // connected successfully — reset backoff
+        retryDelayMs = 1000;
 
         while (true) {
           const { done, value } = await reader.read();
@@ -359,13 +340,10 @@ export function streamEvents(
               try {
                 onEvent(JSON.parse(data) as RequestEvent);
               } catch {
-                // ignore malformed event
               }
             }
           }
         }
-        // Server closed the stream cleanly (e.g. proxy idle timeout) —
-        // fall through to reconnect below rather than staying dead.
       } catch (err) {
         if ((err as any)?.name === "AbortError" || stopped) return;
         onError?.(err);
