@@ -114,7 +114,7 @@ function SBadge({ status }: { status: Status }) {
 function PBadge({ provider }: { provider: string }) {
   const p = providerMeta(provider);
   return (
-    <span className="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-medium"
+    <span className="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-medium max-w-full truncate"
       style={{ color: p.color, background: p.bg }}>
       {p.name}
     </span>
@@ -908,7 +908,7 @@ function LiveMonitor({ reqs, now }: { reqs: LR[]; now: number }) {
       <div style={{ background: "#111113" }}>
         {/* Header row — desktop/tablet only */}
         <div className="hidden sm:grid px-4 py-2"
-          style={{ gridTemplateColumns: "72px 60px 1fr 52px 64px 56px", borderBottom: "1px solid rgba(255,255,255,0.04)" }}>
+          style={{ gridTemplateColumns: "72px 88px 1fr 52px 64px 56px", borderBottom: "1px solid rgba(255,255,255,0.04)" }}>
           {["Time", "Provider", "Key / Chain", "Status", "Tokens", "Latency"].map(h => (
             <span key={h} className="text-[10px] font-semibold text-zinc-600 uppercase tracking-widest">{h}</span>
           ))}
@@ -960,7 +960,7 @@ function LiveMonitor({ reqs, now }: { reqs: LR[]; now: number }) {
               {/* Desktop/tablet: grid row */}
               <div className="hidden sm:grid items-center px-4 py-2.5 transition-colors"
                 style={{
-                  gridTemplateColumns: "72px 60px 1fr 52px 64px 56px",
+                  gridTemplateColumns: "72px 88px 1fr 52px 64px 56px",
                   borderBottom: "1px solid rgba(255,255,255,0.03)",
                 }}
                 onMouseEnter={e => (e.currentTarget.style.background = "rgba(255,255,255,0.015)")}
