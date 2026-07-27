@@ -8,7 +8,12 @@ from app.keys.enums import ProviderType
 from app.keys.schemas import APIKeyCreate, APIKeyHealthCheckResult, APIKeyRead, APIKeyUpdate
 from app.keys.service import KeyPoolService
 from app.monitoring.publisher import RequestEventPublisher
-from app.monitoring.schemas import HourlyTokenPoint, HourlyTokenUsageResponse, HourlyUsagePoint, HourlyUsageResponse
+from app.monitoring.schemas import (
+    HourlyTokenPoint,
+    HourlyTokenUsageResponse,
+    HourlyUsagePoint,
+    HourlyUsageResponse,
+)
 from app.providers.registry import get_provider
 
 router = APIRouter(prefix="/me/keys", tags=["keys"])
@@ -41,7 +46,7 @@ async def create_key(
 @router.post("/list-models", response_model=ListModelsResponse)
 async def list_models(
     payload: ListModelsRequest,
-    user: User = Depends(get_current_user),  # noqa: ARG001 - auth-gated even though no key is looked up
+    user: User = Depends(get_current_user),
 ) -> ListModelsResponse:
     """Live model catalog for a not-yet-saved key, for the Add/Edit Key
     form's model picker. Tries `payload.raw_key` directly against the

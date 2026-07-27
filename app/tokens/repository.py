@@ -1,4 +1,4 @@
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -63,7 +63,7 @@ class GatewayTokenRepository:
         stmt = (
             update(GatewayToken)
             .where(GatewayToken.id == token_id)
-            .values(last_used_at=datetime.now(timezone.utc))
+            .values(last_used_at=datetime.now(UTC))
             .execution_options(synchronize_session=False)
         )
         await self._session.execute(stmt)

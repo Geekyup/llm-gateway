@@ -1,4 +1,4 @@
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -114,7 +114,7 @@ class APIKeyRepository:
             .where(APIKey.id == key_id, APIKey.user_id == user_id)
             .values(
                 requests_today=APIKey.requests_today + 1,
-                last_used_at=datetime.now(timezone.utc),
+                last_used_at=datetime.now(UTC),
             )
             .execution_options(synchronize_session="fetch")
         )
@@ -163,7 +163,7 @@ class APIKeyRepository:
         invalidate each (user_id, provider) cache entry precisely instead
         of flushing every user's cache.
         """
-        now = now or datetime.now(timezone.utc)
+        now = now or datetime.now(UTC)
         select_stmt = select(APIKey).where(APIKey.status == KeyStatus.COOLDOWN, APIKey.cooldown_until <= now)
         result = await self._session.execute(select_stmt)
         affected = list(result.scalars().all())

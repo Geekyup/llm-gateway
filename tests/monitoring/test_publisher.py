@@ -1,4 +1,4 @@
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 import pytest
 
@@ -21,7 +21,7 @@ def _event(
         user_id=user_id,
         request_id=request_id,
         attempt=attempt,
-        timestamp=timestamp or datetime.now(timezone.utc),
+        timestamp=timestamp or datetime.now(UTC),
         provider="gemini",
         path="v1beta/models/gemini-1.5-flash:generateContent",
         method="POST",
@@ -124,7 +124,7 @@ async def test_publish_failure_is_swallowed_not_raised(fake_redis, monkeypatch):
 @pytest.mark.asyncio
 async def test_hourly_usage_buckets_by_hour_for_today(fake_redis):
     publisher = RequestEventPublisher(fake_redis)
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     nine_am = now.replace(hour=9, minute=15, second=0, microsecond=0)
     two_pm = now.replace(hour=14, minute=50, second=0, microsecond=0)
 
@@ -143,7 +143,7 @@ async def test_hourly_usage_buckets_by_hour_for_today(fake_redis):
 @pytest.mark.asyncio
 async def test_hourly_usage_ignores_other_keys_and_users(fake_redis):
     publisher = RequestEventPublisher(fake_redis)
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
 
     await publisher.publish(_event(request_id="mine", key_id=1, timestamp=now))
     await publisher.publish(_event(request_id="other-key", key_id=2, timestamp=now))
@@ -157,7 +157,7 @@ async def test_hourly_usage_ignores_other_keys_and_users(fake_redis):
 @pytest.mark.asyncio
 async def test_hourly_usage_excludes_events_from_previous_days(fake_redis):
     publisher = RequestEventPublisher(fake_redis)
-    yesterday = datetime.now(timezone.utc) - timedelta(days=1)
+    yesterday = datetime.now(UTC) - timedelta(days=1)
 
     await publisher.publish(_event(request_id="stale", timestamp=yesterday))
 
@@ -169,7 +169,7 @@ async def test_hourly_usage_excludes_events_from_previous_days(fake_redis):
 @pytest.mark.asyncio
 async def test_hourly_usage_ignores_events_with_no_upstream_call(fake_redis):
     publisher = RequestEventPublisher(fake_redis)
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
 
     await publisher.publish(_event(request_id="dropped", outcome="no_keys", timestamp=now))
 
@@ -181,7 +181,7 @@ async def test_hourly_usage_ignores_events_with_no_upstream_call(fake_redis):
 @pytest.mark.asyncio
 async def test_hourly_token_usage_sums_by_hour_for_today(fake_redis):
     publisher = RequestEventPublisher(fake_redis)
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     nine_am = now.replace(hour=9, minute=0, second=0, microsecond=0)
     two_pm = now.replace(hour=14, minute=0, second=0, microsecond=0)
 
@@ -199,7 +199,7 @@ async def test_hourly_token_usage_sums_by_hour_for_today(fake_redis):
 @pytest.mark.asyncio
 async def test_hourly_token_usage_skips_non_success_and_missing_tokens(fake_redis):
     publisher = RequestEventPublisher(fake_redis)
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
 
     # rate_limited never reaches generation, so no usageMetadata to count.
     await publisher.publish(_event(request_id="limited", outcome="rate_limited", timestamp=now))
@@ -215,7 +215,7 @@ async def test_hourly_token_usage_skips_non_success_and_missing_tokens(fake_redi
 @pytest.mark.asyncio
 async def test_hourly_token_usage_excludes_other_keys_and_stale_days(fake_redis):
     publisher = RequestEventPublisher(fake_redis)
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     yesterday = now - timedelta(days=1)
 
     await publisher.publish(_event(request_id="mine", key_id=1, timestamp=now, prompt_tokens=10, completion_tokens=5, total_tokens=15))

@@ -1,5 +1,5 @@
 import logging
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 from app.core.security import decrypt_key, encrypt_key
 from app.keys.cache import KeyStatusCache
@@ -145,7 +145,7 @@ class KeyPoolService:
         *,
         cooldown_seconds: int = 3600,
     ) -> None:
-        cooldown_until = datetime.now(timezone.utc) + timedelta(seconds=cooldown_seconds)
+        cooldown_until = datetime.now(UTC) + timedelta(seconds=cooldown_seconds)
         await self._repo.mark_status(key_id, KeyStatus.COOLDOWN, user_id=user_id, cooldown_until=cooldown_until)
         await self._cache.invalidate(user_id, provider.value)
         logger.warning("user_id=%s key_id=%s provider=%s -> COOLDOWN until %s", user_id, key_id, provider, cooldown_until)

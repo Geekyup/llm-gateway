@@ -1,5 +1,6 @@
 import logging
 
+from app.config import get_settings
 from app.db.redis import get_redis
 from app.db.session import get_sessionmaker
 from app.keys.cache import KeyStatusCache
@@ -7,7 +8,6 @@ from app.keys.enums import KeyStatus
 from app.keys.repository import APIKeyRepository
 from app.keys.selector import RoundRobinSelector
 from app.keys.service import KeyPoolService
-from app.config import get_settings
 
 logger = logging.getLogger(__name__)
 

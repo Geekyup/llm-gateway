@@ -1,7 +1,7 @@
 import logging
 import time
 import uuid
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 import httpx
 
@@ -60,7 +60,7 @@ class GatewayService:
                 user_id=user_id,
                 request_id=request_id,
                 attempt=attempt,
-                timestamp=datetime.now(timezone.utc),
+                timestamp=datetime.now(UTC),
                 provider=provider_type.value,
                 path=path,
                 method=method,
@@ -187,7 +187,7 @@ class GatewayService:
                     prompt_tokens = usage.get("prompt_tokens")
                     completion_tokens = usage.get("completion_tokens")
                     total_tokens = usage.get("total_tokens")
-            except Exception:  # noqa: BLE001 - token accounting is best-effort, never block the response
+            except Exception:
                 logger.warning("failed to parse usage data for token accounting", exc_info=True)
             await self._emit(
                 user_id=user_id,

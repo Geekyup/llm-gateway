@@ -1,5 +1,5 @@
 import logging
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from redis.asyncio import Redis
 
@@ -52,7 +52,7 @@ class RequestEventPublisher:
                 "monitoring publish: user_id=%s channel=%s subscribers_notified=%s",
                 event.user_id, channel_for(event.user_id), results[0] if results else "?",
             )
-        except Exception:  # noqa: BLE001 - monitoring must never break the gateway hot path
+        except Exception:
             logger.warning("failed to publish monitoring event request_id=%s", event.request_id, exc_info=True)
 
     async def recent(self, user_id: int, limit: int = 50) -> list[RequestEvent]:
@@ -62,7 +62,7 @@ class RequestEventPublisher:
         for item in raw:
             try:
                 events.append(RequestEvent.model_validate_json(item))
-            except Exception:  # noqa: BLE001 - skip malformed/legacy entries, don't fail the whole read
+            except Exception:
                 logger.warning("failed to parse monitoring history entry", exc_info=True)
         return events
 
@@ -82,11 +82,12 @@ class RequestEventPublisher:
         """
         counts = [0] * 24
         raw = await self._redis.lrange(_history_key(user_id), 0, HISTORY_MAX_LEN - 1)
-        today = datetime.now(timezone.utc).date()
+        today = datetime.now(UTC).date()
         for item in raw:
             try:
                 event = RequestEvent.model_validate_json(item)
-            except Exception:  # noqa: BLE001 - skip malformed/legacy entries
+            except Exception:
+                logger.debug("skipping malformed history entry", exc_info=True)
                 continue
             if event.key_id != key_id:
                 continue
@@ -94,8 +95,8 @@ class RequestEventPublisher:
                 continue
             ts = event.timestamp
             if ts.tzinfo is None:
-                ts = ts.replace(tzinfo=timezone.utc)
-            ts = ts.astimezone(timezone.utc)
+                ts = ts.replace(tzinfo=UTC)
+            ts = ts.astimezone(UTC)
             if ts.date() != today:
                 continue
             counts[ts.hour] += 1
@@ -115,11 +116,12 @@ class RequestEventPublisher:
         completion = [0] * 24
         total = [0] * 24
         raw = await self._redis.lrange(_history_key(user_id), 0, HISTORY_MAX_LEN - 1)
-        today = datetime.now(timezone.utc).date()
+        today = datetime.now(UTC).date()
         for item in raw:
             try:
                 event = RequestEvent.model_validate_json(item)
-            except Exception:  # noqa: BLE001 - skip malformed/legacy entries
+            except Exception:
+                logger.debug("skipping malformed history entry", exc_info=True)
                 continue
             if event.key_id != key_id or event.outcome != "success":
                 continue
@@ -127,8 +129,8 @@ class RequestEventPublisher:
                 continue
             ts = event.timestamp
             if ts.tzinfo is None:
-                ts = ts.replace(tzinfo=timezone.utc)
-            ts = ts.astimezone(timezone.utc)
+                ts = ts.replace(tzinfo=UTC)
+            ts = ts.astimezone(UTC)
             if ts.date() != today:
                 continue
             h = ts.hour
