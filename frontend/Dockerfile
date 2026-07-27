@@ -1,4 +1,4 @@
-FROM nginx:1.27-alpine
+FROM nginx:1.31-alpine
 
 # Собери фронтенд на хосте перед докер-сборкой (см. README):
 #   cd frontend && npm install && npm run build
