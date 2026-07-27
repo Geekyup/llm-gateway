@@ -71,7 +71,7 @@ async def stream_events(
 
                 try:
                     RequestEvent.model_validate_json(message["data"])
-                except Exception:  # noqa: BLE001 - never let a malformed event kill the stream
+                except Exception:
                     logger.warning("dropping malformed monitoring event", exc_info=True)
                     continue
 

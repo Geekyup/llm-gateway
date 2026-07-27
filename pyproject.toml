@@ -43,3 +43,16 @@ testpaths = ["tests"]
 [tool.ruff]
 line-length = 100
 target-version = "py312"
+
+[tool.ruff.lint]
+ignore = [
+    # FastAPI's dependency-injection pattern is `param: X = Depends(get_x)`.
+    # That's idiomatic FastAPI, not the "mutable default argument" bug B008
+    # is meant to catch — safe to ignore project-wide.
+    "B008",
+]
+
+[tool.ruff.lint.per-file-ignores]
+# Tests intentionally use asserts, and swallow-and-continue is a deliberate
+# pattern in a few fake/fixture helpers, not a security concern.
+"tests/**" = ["S101"]

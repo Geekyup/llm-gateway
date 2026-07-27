@@ -1,4 +1,4 @@
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 import pytest
 
@@ -132,7 +132,7 @@ async def test_clear_expired_cooldowns_only_touches_past_deadlines(key_repo, tes
     future_key = await key_repo.create(
         user_id=test_user.id, label="future", provider=ProviderType.GEMINI, key_encrypted="c2", daily_limit=100
     )
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     await key_repo.mark_status(
         past_key.id, KeyStatus.COOLDOWN, user_id=test_user.id, cooldown_until=now - timedelta(minutes=1)
     )

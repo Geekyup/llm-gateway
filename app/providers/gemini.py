@@ -1,3 +1,4 @@
+import logging
 from typing import ClassVar
 
 import httpx
@@ -5,6 +6,8 @@ import httpx
 from app.config import get_settings
 from app.core.exceptions import ProviderRequestError
 from app.providers.base import HealthCheckResult, ModelInfo, Provider
+
+logger = logging.getLogger(__name__)
 
 
 class GeminiProvider(Provider):
@@ -78,8 +81,8 @@ class GeminiProvider(Provider):
             message = body.get("error", {}).get("message")
             if message:
                 detail = f"HTTP {response.status_code}: {message}"
-        except Exception:  # noqa: BLE001 - best-effort detail extraction only
-            pass
+        except Exception:
+            logger.debug("failed to parse error detail from response body", exc_info=True)
         return HealthCheckResult(ok=False, detail=detail)
 
     async def list_models(self, key: str) -> list[ModelInfo]:
@@ -94,8 +97,8 @@ class GeminiProvider(Provider):
                 message = response.json().get("error", {}).get("message")
                 if message:
                     detail = f"HTTP {response.status_code}: {message}"
-            except Exception:  # noqa: BLE001 - best-effort detail extraction only
-                pass
+            except Exception:
+                logger.debug("failed to parse error detail from response body", exc_info=True)
             raise ProviderRequestError(provider=self.name, reason=detail)
 
         body = response.json()

@@ -1,8 +1,7 @@
 import logging
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 from app.auth.jwt import (
-    InvalidTokenError,
     TokenExpiredError,
     TokenPair,
     decode_token,
@@ -48,12 +47,9 @@ class AuthService:
         return user, await self._issue_and_store(user.id)
 
     async def refresh(self, refresh_token: str) -> TokenPair:
-        try:
-            user_id = decode_token(refresh_token, expected_type="refresh")
-        except TokenExpiredError:
-            raise
-        except InvalidTokenError:
-            raise
+        # decode_token raises TokenExpiredError/InvalidTokenError itself;
+        # nothing extra to do here, so let them propagate to the caller.
+        user_id = decode_token(refresh_token, expected_type="refresh")
 
         token_hash = hash_refresh_token(refresh_token)
         stored = await self._token_repo.get_by_hash(token_hash)
@@ -69,8 +65,8 @@ class AuthService:
 
         expires_at = stored.expires_at
         if expires_at.tzinfo is None:
-            expires_at = expires_at.replace(tzinfo=timezone.utc)
-        if expires_at < datetime.now(timezone.utc):
+            expires_at = expires_at.replace(tzinfo=UTC)
+        if expires_at < datetime.now(UTC):
             raise TokenExpiredError()
 
         await self._token_repo.revoke(stored)
@@ -84,7 +80,7 @@ class AuthService:
     async def _issue_and_store(self, user_id: int) -> TokenPair:
         settings = get_settings()
         pair = issue_token_pair(user_id)
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         await self._token_repo.create(
             user_id=user_id,
             token_hash=hash_refresh_token(pair.refresh_token),

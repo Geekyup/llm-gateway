@@ -1,4 +1,5 @@
 import os
+from typing import Self
 
 # Settings requires ENCRYPTION_KEY / ADMIN_API_KEY — set dummies before any
 # llm_gateway import happens, so get_settings() doesn't blow up on import.
@@ -110,7 +111,7 @@ class FakePipeline:
             results.append(await getattr(self._redis, name)(*args))
         return results
 
-    async def __aenter__(self) -> "FakePipeline":
+    async def __aenter__(self) -> Self:
         return self
 
     async def __aexit__(self, *exc_info) -> None:

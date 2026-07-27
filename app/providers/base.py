@@ -12,7 +12,7 @@ class HealthCheckResult:
     where `ok` is False, e.g. "HTTP 401: API key not valid".
     """
 
-    __slots__ = ("ok", "detail")
+    __slots__ = ("detail", "ok")
 
     def __init__(self, ok: bool, detail: str | None = None) -> None:
         self.ok = ok

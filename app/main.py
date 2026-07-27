@@ -7,7 +7,12 @@ from app.admin.gateway_tokens_router import router as gateway_tokens_router
 from app.admin.router import router as admin_router
 from app.auth.router import router as auth_router
 from app.config import get_settings
-from app.core.exceptions import LLMGatewayError, NoAvailableKeysError, ProviderNotSupportedError, UpstreamExhaustedError
+from app.core.exceptions import (
+    LLMGatewayError,
+    NoAvailableKeysError,
+    ProviderNotSupportedError,
+    UpstreamExhaustedError,
+)
 from app.core.logging import configure_logging
 from app.gateway.router import router as gateway_router
 from app.gateway.schemas import GatewayErrorBody

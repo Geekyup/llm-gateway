@@ -1,3 +1,5 @@
+from typing import ClassVar
+
 from arq import cron
 from arq.connections import RedisSettings
 
@@ -28,7 +30,7 @@ class WorkerSettings:
     redis_settings = _redis_settings()
     on_startup = startup
     on_shutdown = shutdown
-    cron_jobs = [
+    cron_jobs: ClassVar[list] = [
         # Revive keys whose temporary cooldown window has passed.
         cron(clear_expired_cooldowns, minute=set(range(0, 60, 5)), run_at_startup=True),
         # Daily reset of requests_today / EXHAUSTED status at the top of the hour

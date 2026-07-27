@@ -13,7 +13,7 @@ Two token types, both signed with the same JWT_SECRET_KEY but carrying a
 import hashlib
 import secrets
 from dataclasses import dataclass
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 import jwt
 
@@ -36,7 +36,7 @@ class TokenExpiredError(Exception):
 
 def _encode(*, subject: str, token_type: str, expires_delta: timedelta) -> str:
     settings = get_settings()
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     payload = {
         "sub": subject,
         "type": token_type,

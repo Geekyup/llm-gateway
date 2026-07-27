@@ -1,4 +1,4 @@
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from unittest.mock import patch
 
 import pytest
@@ -13,7 +13,6 @@ from app.auth.jwt import (
 )
 from app.auth.service import AuthService
 from app.core.exceptions import InactiveUserError, TokenRevokedError
-
 
 # --- jwt.py ------------------------------------------------------------------
 
@@ -78,7 +77,7 @@ async def test_update_profile_refreshes_display_fields(user_repo):
 @pytest.mark.asyncio
 async def test_refresh_token_create_and_lookup_by_hash(refresh_token_repo, user_repo):
     user = await user_repo.create(google_sub="g1", email="a@example.com", display_name=None, avatar_url=None)
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     token = await refresh_token_repo.create(
         user_id=user.id, token_hash="abc123", expires_at=now + timedelta(days=30), created_at=now
     )
@@ -92,12 +91,12 @@ async def test_refresh_token_create_and_lookup_by_hash(refresh_token_repo, user_
 async def test_revoke_all_for_user_only_touches_that_user(refresh_token_repo, user_repo):
     user_a = await user_repo.create(google_sub="a", email="a@example.com", display_name=None, avatar_url=None)
     user_b = await user_repo.create(google_sub="b", email="b@example.com", display_name=None, avatar_url=None)
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
 
-    token_a = await refresh_token_repo.create(
+    await refresh_token_repo.create(
         user_id=user_a.id, token_hash="hash-a", expires_at=now + timedelta(days=30), created_at=now
     )
-    token_b = await refresh_token_repo.create(
+    await refresh_token_repo.create(
         user_id=user_b.id, token_hash="hash-b", expires_at=now + timedelta(days=30), created_at=now
     )
 

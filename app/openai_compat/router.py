@@ -5,7 +5,11 @@ from fastapi import APIRouter, Depends
 from fastapi.responses import JSONResponse
 
 from app.api.deps import get_gateway_service
-from app.core.exceptions import NoAvailableKeysError, ProviderNotSupportedError, UpstreamExhaustedError
+from app.core.exceptions import (
+    NoAvailableKeysError,
+    ProviderNotSupportedError,
+    UpstreamExhaustedError,
+)
 from app.gateway.dependencies import require_gateway_token
 from app.gateway.proxy_service import GatewayService
 from app.keys.enums import ProviderType

@@ -18,7 +18,7 @@ class Settings(BaseSettings):
     CORS_ORIGINS_RAW: str = Field(default="http://localhost:5173", alias="CORS_ORIGINS")
 
     @property
-    def CORS_ORIGINS(self) -> list[str]:  # noqa: N802
+    def CORS_ORIGINS(self) -> list[str]:
         return [origin.strip() for origin in self.CORS_ORIGINS_RAW.split(",") if origin.strip()]
 
     DATABASE_URL: PostgresDsn = "postgresql+asyncpg://llm_gateway:llm_gateway@localhost:5432/llm_gateway"
