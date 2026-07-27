@@ -1,0 +1,125 @@
+From 9a8d0662e52ccaa9adaa084669ea811303718ac1 Mon Sep 17 00:00:00 2001
+From: Jop <jop@example.com>
+Date: Mon, 27 Jul 2026 13:11:09 +0000
+Subject: [PATCH] refactor: rename app/admin -> app/account
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+The 'admin' folder held no privileged/operator functionality — it was
+already per-user self-service endpoints (/me/keys, /me/gateway-tokens)
+protected by regular JWT auth (get_current_user), not by the unused
+ADMIN_API_KEY / require_admin dependency. The naming was misleading:
+it suggested superuser-only operations that don't exist here.
+
+- app/admin/ -> app/account/
+- app/admin/router.py -> app/account/keys_router.py (name now matches
+  its actual content: CRUD + health-check + usage stats for the
+  caller's own API keys)
+- gateway_tokens_router.py keeps its name, only moves folder
+- tests/admin/ -> tests/account/, imports updated accordingly
+- app/main.py: admin_router -> keys_router (import + include_router)
+- app/tokens/models.py: fixed a stale comment claiming ADMIN_API_KEY
+  guards '/admin/*' endpoints — it doesn't guard anything right now;
+  require_admin (kept as-is in app/account/dependencies.py) is unused,
+  reserved for a possible future cross-account operator feature
+
+require_admin / ADMIN_API_KEY themselves are untouched — still dead
+code, still not wired to any router. Renamed with them rather than
+deleted, since that's a separate decision.
+
+All 116 existing tests pass unchanged.
+---
+ app/{admin => account}/__init__.py              | 0
+ app/{admin => account}/dependencies.py          | 0
+ app/{admin => account}/gateway_tokens_router.py | 0
+ app/{admin/router.py => account/keys_router.py} | 0
+ app/main.py                                     | 6 +++---
+ app/tokens/models.py                            | 3 ++-
+ tests/{admin => account}/__init__.py            | 0
+ tests/{admin => account}/test_list_models.py    | 2 +-
+ 8 files changed, 6 insertions(+), 5 deletions(-)
+ rename app/{admin => account}/__init__.py (100%)
+ rename app/{admin => account}/dependencies.py (100%)
+ rename app/{admin => account}/gateway_tokens_router.py (100%)
+ rename app/{admin/router.py => account/keys_router.py} (100%)
+ rename tests/{admin => account}/__init__.py (100%)
+ rename tests/{admin => account}/test_list_models.py (97%)
+
+diff --git a/app/admin/__init__.py b/app/account/__init__.py
+similarity index 100%
+rename from app/admin/__init__.py
+rename to app/account/__init__.py
+diff --git a/app/admin/dependencies.py b/app/account/dependencies.py
+similarity index 100%
+rename from app/admin/dependencies.py
+rename to app/account/dependencies.py
+diff --git a/app/admin/gateway_tokens_router.py b/app/account/gateway_tokens_router.py
+similarity index 100%
+rename from app/admin/gateway_tokens_router.py
+rename to app/account/gateway_tokens_router.py
+diff --git a/app/admin/router.py b/app/account/keys_router.py
+similarity index 100%
+rename from app/admin/router.py
+rename to app/account/keys_router.py
+diff --git a/app/main.py b/app/main.py
+index 22cc9d3..344e5a6 100644
+--- a/app/main.py
++++ b/app/main.py
+@@ -3,8 +3,8 @@ from fastapi.middleware.cors import CORSMiddleware
+ from fastapi.responses import JSONResponse
+ from starlette.middleware.sessions import SessionMiddleware
+ 
+-from app.admin.gateway_tokens_router import router as gateway_tokens_router
+-from app.admin.router import router as admin_router
++from app.account.gateway_tokens_router import router as gateway_tokens_router
++from app.account.keys_router import router as keys_router
+ from app.auth.router import router as auth_router
+ from app.config import get_settings
+ from app.core.exceptions import (
+@@ -78,7 +78,7 @@ def create_app() -> FastAPI:
+     # POST /v1/chat/completions (provider_name="chat", path="completions").
+     app.include_router(openai_compat_router)
+     app.include_router(gateway_router)
+-    app.include_router(admin_router)
++    app.include_router(keys_router)
+     app.include_router(gateway_tokens_router)
+     app.include_router(monitoring_router)
+     app.include_router(auth_router)
+diff --git a/app/tokens/models.py b/app/tokens/models.py
+index 7397e9d..dbe8690 100644
+--- a/app/tokens/models.py
++++ b/app/tokens/models.py
+@@ -10,7 +10,8 @@ class GatewayToken(TimestampMixin, Base):
+     """A client-facing token that unifies access to one user's key pool.
+ 
+     This is deliberately separate from APIKey (the upstream provider keys)
+-    and from ADMIN_API_KEY (which guards /admin/* management endpoints).
++    and from ADMIN_API_KEY (a currently-unused static token reserved for
++    future cross-account operator actions — see app.account.dependencies).
+     A GatewayToken is what an external application uses to call
+     POST /v1/{provider}/... — it never sees which upstream key served the
+     request, only that the call succeeded. Every GatewayToken belongs to
+diff --git a/tests/admin/__init__.py b/tests/account/__init__.py
+similarity index 100%
+rename from tests/admin/__init__.py
+rename to tests/account/__init__.py
+diff --git a/tests/admin/test_list_models.py b/tests/account/test_list_models.py
+similarity index 97%
+rename from tests/admin/test_list_models.py
+rename to tests/account/test_list_models.py
+index ca24bb9..5a3cf07 100644
+--- a/tests/admin/test_list_models.py
++++ b/tests/account/test_list_models.py
+@@ -7,7 +7,7 @@ TestClient/AsyncClient pattern exists elsewhere in this suite).
+ """
+ import pytest
+ 
+-from app.admin.router import ListModelsRequest, list_models
++from app.account.keys_router import ListModelsRequest, list_models
+ from app.core.exceptions import ProviderNotSupportedError, ProviderRequestError
+ from app.keys.enums import ProviderType
+ from app.providers.base import ModelInfo
+-- 
+2.43.0
+

@@ -7,7 +7,7 @@ TestClient/AsyncClient pattern exists elsewhere in this suite).
 """
 import pytest
 
-from app.admin.router import ListModelsRequest, list_models
+from app.account.keys_router import ListModelsRequest, list_models
 from app.core.exceptions import ProviderNotSupportedError, ProviderRequestError
 from app.keys.enums import ProviderType
 from app.providers.base import ModelInfo

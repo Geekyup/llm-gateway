@@ -3,8 +3,8 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from starlette.middleware.sessions import SessionMiddleware
 
-from app.admin.gateway_tokens_router import router as gateway_tokens_router
-from app.admin.router import router as admin_router
+from app.account.gateway_tokens_router import router as gateway_tokens_router
+from app.account.keys_router import router as keys_router
 from app.auth.router import router as auth_router
 from app.config import get_settings
 from app.core.exceptions import (
@@ -78,7 +78,7 @@ def create_app() -> FastAPI:
     # POST /v1/chat/completions (provider_name="chat", path="completions").
     app.include_router(openai_compat_router)
     app.include_router(gateway_router)
-    app.include_router(admin_router)
+    app.include_router(keys_router)
     app.include_router(gateway_tokens_router)
     app.include_router(monitoring_router)
     app.include_router(auth_router)

@@ -8,3 +8,5 @@ venv/
 .env
 .DS_Store
 llm_gateway.egg-info/
+hammer.py
+chat.py

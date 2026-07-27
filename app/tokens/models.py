@@ -10,7 +10,8 @@ class GatewayToken(TimestampMixin, Base):
     """A client-facing token that unifies access to one user's key pool.
 
     This is deliberately separate from APIKey (the upstream provider keys)
-    and from ADMIN_API_KEY (which guards /admin/* management endpoints).
+    and from ADMIN_API_KEY (a currently-unused static token reserved for
+    future cross-account operator actions — see app.account.dependencies).
     A GatewayToken is what an external application uses to call
     POST /v1/{provider}/... — it never sees which upstream key served the
     request, only that the call succeeded. Every GatewayToken belongs to
