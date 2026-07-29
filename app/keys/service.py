@@ -4,6 +4,7 @@ from datetime import UTC, datetime, timedelta
 from app.core.security import decrypt_key, encrypt_key
 from app.keys.cache import KeyStatusCache
 from app.keys.enums import KeyStatus, ProviderType
+from app.keys.models import APIKey
 from app.keys.repository import APIKeyRepository
 from app.keys.schemas import APIKeyCreate, APIKeyDTO, APIKeyHealthCheckResult, APIKeyUpdate
 from app.keys.selector import KeySelector
@@ -36,7 +37,7 @@ class KeyPoolService:
         await self._cache.invalidate(user_id, payload.provider.value)
         return key  
 
-    async def list_keys(self, user_id: int, *, provider: ProviderType | None = None):
+    async def list_keys(self, user_id: int, provider: ProviderType | None = None):
         return await self._repo.list_all(user_id=user_id, provider=provider)  
 
     async def get_key(self, key_id: int, user_id: int):
@@ -70,7 +71,7 @@ class KeyPoolService:
         await self._repo.delete(key_id, user_id=user_id)
 
     async def get_candidate_keys(
-        self, user_id: int, provider: ProviderType, *, model: str | None = None
+        self, user_id: int, provider: ProviderType, model: str | None = None
     ) -> list[APIKeyDTO]:
         cached = await self._cache.get_active(user_id, provider.value)
         if cached is not None:
@@ -84,7 +85,7 @@ class KeyPoolService:
             return [k for k in all_active if k.model is None]
         return [k for k in all_active if k.model == model]
 
-    async def select_key(self, user_id: int, provider: ProviderType, *, model: str | None = None) -> APIKeyDTO | None:
+    async def select_key(self, user_id: int, provider: ProviderType, model: str | None = None) -> APIKeyDTO | None:
         candidates = await self.get_candidate_keys(user_id, provider, model=model)
         chosen = await self._selector.select(user_id, provider.value, candidates)
         if chosen is None:
@@ -140,7 +141,7 @@ class KeyPoolService:
 
         return APIKeyHealthCheckResult(key_id=key_id, ok=result.ok, detail=result.detail)
 
-    async def check_all_keys(self, user_id: int, *, provider: ProviderType | None = None) -> list[APIKeyHealthCheckResult]:
+    async def check_all_keys(self, user_id: int, provider: ProviderType | None = None) -> list[APIKeyHealthCheckResult]:
         keys = await self._repo.list_all(user_id=user_id, provider=provider)
         results: list[APIKeyHealthCheckResult] = []
         for key in keys:
@@ -148,3 +149,17 @@ class KeyPoolService:
                 continue
             results.append(await self.check_key_health(key.id, user_id))
         return results
+
+    async def clear_expired_cooldowns(self) -> list[APIKey]:
+        revived = await self._repo.clear_expired_cooldowns()
+        touched = {(key.user_id, key.provider.value) for key in revived}
+        for user_id, provider_value in touched:
+            await self._cache.invalidate(user_id, provider_value)
+        return revived
+
+    async def reset_daily_counters(self, provider: ProviderType | None = None) -> list[APIKey]:
+        reset_keys = await self._repo.reset_daily_counters(provider=provider)
+        touched = {(key.user_id, key.provider.value) for key in reset_keys}
+        for user_id, provider_value in touched:
+            await self._cache.invalidate(user_id, provider_value)
+        return reset_keys

@@ -8,9 +8,8 @@ from app.config import Settings, get_settings
 from app.db.redis import get_redis
 from app.db.session import get_db
 from app.gateway.proxy_service import GatewayService
-from app.keys.cache import KeyStatusCache
+from app.keys.factory import build_key_pool_service
 from app.keys.repository import APIKeyRepository
-from app.keys.selector import KeySelector, RoundRobinSelector
 from app.keys.service import KeyPoolService
 from app.monitoring.publisher import RequestEventPublisher
 from app.tokens.repository import GatewayTokenRepository
@@ -31,23 +30,12 @@ def get_gateway_token_service(
     return GatewayTokenService(repository)
 
 
-def get_key_cache(
+def get_key_pool_service(
+    session: Annotated[AsyncSession, Depends(get_db)],
     redis: Annotated[Redis, Depends(get_redis)],
     settings: Annotated[Settings, Depends(get_settings)],
-) -> KeyStatusCache:
-    return KeyStatusCache(redis, ttl_seconds=settings.KEY_STATUS_CACHE_TTL_SECONDS)
-
-
-def get_key_selector(redis: Annotated[Redis, Depends(get_redis)]) -> KeySelector:
-    return RoundRobinSelector(redis)
-
-
-def get_key_pool_service(
-    repository: Annotated[APIKeyRepository, Depends(get_key_repository)],
-    cache: Annotated[KeyStatusCache, Depends(get_key_cache)],
-    selector: Annotated[KeySelector, Depends(get_key_selector)],
 ) -> KeyPoolService:
-    return KeyPoolService(repository, cache, selector)
+    return build_key_pool_service(session, redis, settings)
 
 
 def get_event_publisher(redis: Annotated[Redis, Depends(get_redis)]) -> RequestEventPublisher:
