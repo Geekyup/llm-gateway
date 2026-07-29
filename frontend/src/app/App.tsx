@@ -11,6 +11,7 @@ import {
   ApiError, type ApiKeyRead, type RequestEvent as ApiRequestEvent,
   type GatewayTokenRead, type GatewayTokenCreated, type UserRead, type ModelOption,
 } from "./lib/api";
+import { CodeSnippetTabs } from "./components/CodeSnippetTabs";
 
 type Status = "active" | "cooldown" | "exhausted" | "disabled";
 type Provider = "gemini" | "openrouter";
@@ -1194,7 +1195,13 @@ function GatewayAccessPanel() {
                 {copied ? "Copied!" : "Copy"}
               </button>
             </div>
-            <button onClick={() => setFreshToken(null)} className="mt-2 text-[11px] text-zinc-500 hover:text-zinc-300">
+
+            <p className="mt-3 text-[11px] text-zinc-500">
+              Готовый код для интеграции — просто вставь в свой проект:
+            </p>
+            <CodeSnippetTabs token={freshToken.plaintext} baseUrl={window.location.origin} />
+
+            <button onClick={() => setFreshToken(null)} className="mt-3 text-[11px] text-zinc-500 hover:text-zinc-300">
               Закрыть
             </button>
           </div>
