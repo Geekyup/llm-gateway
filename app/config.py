@@ -38,6 +38,7 @@ class Settings(BaseSettings):
     GEMINI_BASE_URL: str = "https://generativelanguage.googleapis.com"
     OPENROUTER_BASE_URL: str = "https://openrouter.ai/api"
     UPSTREAM_TIMEOUT_SECONDS: float = 60.0
+    DEFAULT_GEMINI_MODEL: str = "gemini-2.0-flash"
 
     HOUSEKEEPING_RESET_CRON_MINUTE: int = 0
 

@@ -70,24 +70,33 @@ class KeyPoolService:
         await self._cache.invalidate(user_id, key.provider.value)
         await self._repo.delete(key_id, user_id=user_id)
 
+    _ALL_PROVIDERS_CACHE_KEY = "__all__"
+
     async def get_candidate_keys(
-        self, user_id: int, provider: ProviderType, model: str | None = None
+        self, user_id: int, provider: ProviderType | None = None, model: str | None = None
     ) -> list[APIKeyDTO]:
-        cached = await self._cache.get_active(user_id, provider.value)
+        cache_namespace = provider.value if provider is not None else self._ALL_PROVIDERS_CACHE_KEY
+        cached = await self._cache.get_active(user_id, cache_namespace)
         if cached is not None:
             all_active = cached
         else:
             keys = await self._repo.list_active(user_id=user_id, provider=provider)
             all_active = [APIKeyDTO.model_validate(k) for k in keys]
-            await self._cache.set_active(user_id, provider.value, all_active)
+            await self._cache.set_active(user_id, cache_namespace, all_active)
 
+        # Клиент не указал модель -> любой активный ключ пула подходит.
         if model is None:
-            return [k for k in all_active if k.model is None]
-        return [k for k in all_active if k.model == model]
+            return all_active
+        # Ключ без привязки к конкретной модели считается универсальным
+        # и участвует в подборе наравне с ключами, у которых модель совпала.
+        return [k for k in all_active if k.model is None or k.model == model]
 
-    async def select_key(self, user_id: int, provider: ProviderType, model: str | None = None) -> APIKeyDTO | None:
+    async def select_key(
+        self, user_id: int, provider: ProviderType | None = None, model: str | None = None
+    ) -> APIKeyDTO | None:
         candidates = await self.get_candidate_keys(user_id, provider, model=model)
-        chosen = await self._selector.select(user_id, provider.value, candidates)
+        selector_namespace = provider.value if provider is not None else self._ALL_PROVIDERS_CACHE_KEY
+        chosen = await self._selector.select(user_id, selector_namespace, candidates)
         if chosen is None:
             return None
 

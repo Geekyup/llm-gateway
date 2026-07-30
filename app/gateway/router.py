@@ -3,10 +3,9 @@ from fastapi.responses import JSONResponse
 
 from app.api.deps import get_gateway_service
 from app.gateway.dependencies import require_gateway_token
-from app.gateway.proxy_service import GatewayService
+from app.gateway.proxy_service import GatewayService, UpstreamRequestSpec
 from app.gateway.schemas import GatewayErrorBody
 from app.keys.enums import ProviderType
-from app.providers.registry import get_provider
 
 router = APIRouter(prefix="/v1", tags=["gateway"])
 
@@ -28,17 +27,18 @@ async def _proxy_impl(
             ).model_dump(),
         )
 
-    provider = get_provider(provider_type.value)
     payload = await request.json() if await request.body() else None
+    method = request.method
+    headers = dict(request.headers)
+
+
+    def build_request(_key_provider_type: ProviderType) -> UpstreamRequestSpec:
+        return UpstreamRequestSpec(path=path, method=method, payload=payload, headers=headers)
 
     upstream_response = await gateway.proxy_request(
         user_id=user_id,
-        provider=provider,
+        build_request=build_request,
         provider_type=provider_type,
-        path=path,
-        method=request.method,
-        payload=payload,
-        headers=dict(request.headers),
     )
 
     return Response(

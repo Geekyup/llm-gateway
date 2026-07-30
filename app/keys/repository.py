@@ -59,14 +59,14 @@ class APIKeyRepository:
         result = await self._session.execute(query)
         return list(result.scalars().all())
 
-    async def list_active(self, user_id: int, provider: ProviderType) -> list[APIKey]:
-        result = await self._session.execute(
-            select(APIKey).where(
-                APIKey.user_id == user_id,
-                APIKey.provider == provider,
-                APIKey.status == KeyStatus.ACTIVE,
-            )
+    async def list_active(self, user_id: int, provider: ProviderType | None = None) -> list[APIKey]:
+        query = select(APIKey).where(
+            APIKey.user_id == user_id,
+            APIKey.status == KeyStatus.ACTIVE,
         )
+        if provider is not None:
+            query = query.where(APIKey.provider == provider)
+        result = await self._session.execute(query)
         return list(result.scalars().all())
 
     async def update_fields(self, key_id: int, user_id: int, **fields) -> APIKey:

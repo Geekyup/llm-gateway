@@ -5,16 +5,16 @@ from pydantic import BaseModel, Field
 
 
 class ChatMessage(BaseModel):
-    role: str  # "system" | "user" | "assistant"
+    role: str  
     content: str
 
 
 class ChatCompletionRequest(BaseModel):
-    model: str
+    model: str | None = None
     messages: list[ChatMessage]
     temperature: float | None = None
     max_tokens: int | None = None
-    provider: str = "gemini"
+    provider: str | None = None
 
 
 class ChatCompletionChoiceMessage(BaseModel):

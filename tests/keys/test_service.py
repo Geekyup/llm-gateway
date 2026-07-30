@@ -35,31 +35,31 @@ async def test_candidates_for_a_model_only_include_keys_pinned_to_it(key_pool, t
 
 
 @pytest.mark.asyncio
-async def test_unpinned_keys_never_match_a_model_specific_request(key_pool, test_user):
-    await _create_key(key_pool, test_user.id, "unpinned", model=None)
+async def test_unpinned_keys_match_any_model_specific_request(key_pool, test_user):
+    unpinned = await _create_key(key_pool, test_user.id, "unpinned", model=None)
 
     candidates = await key_pool.get_candidate_keys(test_user.id, ProviderType.GEMINI, model="gemini-3.6-flash")
 
-    assert candidates == []
-
-
-@pytest.mark.asyncio
-async def test_model_specific_keys_never_match_a_request_with_no_model(key_pool, test_user):
-    await _create_key(key_pool, test_user.id, "pinned", model="gemini-3.6-flash")
-
-    candidates = await key_pool.get_candidate_keys(test_user.id, ProviderType.GEMINI, model=None)
-
-    assert candidates == []
-
-
-@pytest.mark.asyncio
-async def test_no_model_filter_matches_only_unpinned_keys(key_pool, test_user):
-    unpinned = await _create_key(key_pool, test_user.id, "unpinned", model=None)
-    await _create_key(key_pool, test_user.id, "pinned", model="gemini-3.6-flash")
-
-    candidates = await key_pool.get_candidate_keys(test_user.id, ProviderType.GEMINI, model=None)
-
     assert [c.id for c in candidates] == [unpinned.id]
+
+
+@pytest.mark.asyncio
+async def test_a_request_with_no_model_matches_any_key(key_pool, test_user):
+    pinned = await _create_key(key_pool, test_user.id, "pinned", model="gemini-3.6-flash")
+
+    candidates = await key_pool.get_candidate_keys(test_user.id, ProviderType.GEMINI, model=None)
+
+    assert [c.id for c in candidates] == [pinned.id]
+
+
+@pytest.mark.asyncio
+async def test_no_model_filter_matches_every_active_key(key_pool, test_user):
+    unpinned = await _create_key(key_pool, test_user.id, "unpinned", model=None)
+    pinned = await _create_key(key_pool, test_user.id, "pinned", model="gemini-3.6-flash")
+
+    candidates = await key_pool.get_candidate_keys(test_user.id, ProviderType.GEMINI, model=None)
+
+    assert {c.id for c in candidates} == {unpinned.id, pinned.id}
 
 
 @pytest.mark.asyncio
