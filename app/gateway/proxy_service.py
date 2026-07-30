@@ -1,9 +1,9 @@
 import logging
 import time
 import uuid
+from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import UTC, datetime
-from typing import Callable
 
 import httpx
 
@@ -20,23 +20,11 @@ logger = logging.getLogger(__name__)
 
 @dataclass(frozen=True, slots=True)
 class UpstreamRequestSpec:
-    """Path/payload built for the specific provider a candidate key belongs to.
-
-    Two different upstream providers speak different wire formats (e.g. Gemini
-    needs the model baked into the URL and a translated body, while an
-    OpenAI-compatible provider like OpenRouter can take the request mostly
-    as-is). Because failover can hop between keys of different providers,
-    this has to be (re)built for whichever key is actually being tried, not
-    computed once up front for a single fixed provider.
-    """
-
     path: str
     method: str
     payload: dict | None
     headers: dict
 
-
-# Given the ProviderType of a candidate key, return the request spec to send to it.
 RequestSpecBuilder = Callable[[ProviderType], UpstreamRequestSpec]
 
 
@@ -102,15 +90,6 @@ class GatewayService:
         provider_type: ProviderType | None = None,
         model: str | None = None,
     ) -> httpx.Response:
-        """Send a request through the key pool, failing over across keys — and,
-        when provider_type is None, across providers too — until one succeeds
-        or every candidate has been tried.
-
-        provider_type=None means "any provider the user has active keys for":
-        the pool is searched across every provider, and each candidate key's
-        own provider decides how build_request() translates the request for
-        that specific attempt.
-        """
         request_id = uuid.uuid4().hex
         tried_key_ids: set[int] = set()
         last_response: httpx.Response | None = None
