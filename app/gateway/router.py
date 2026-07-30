@@ -6,6 +6,7 @@ from app.gateway.dependencies import require_gateway_token
 from app.gateway.proxy_service import GatewayService, UpstreamRequestSpec
 from app.gateway.schemas import GatewayErrorBody
 from app.keys.enums import ProviderType
+from app.keys.schemas import APIKeyDTO
 
 router = APIRouter(prefix="/v1", tags=["gateway"])
 
@@ -31,8 +32,7 @@ async def _proxy_impl(
     method = request.method
     headers = dict(request.headers)
 
-
-    def build_request(_key_provider_type: ProviderType) -> UpstreamRequestSpec:
+    def build_request(_dto: APIKeyDTO) -> UpstreamRequestSpec:
         return UpstreamRequestSpec(path=path, method=method, payload=payload, headers=headers)
 
     upstream_response = await gateway.proxy_request(

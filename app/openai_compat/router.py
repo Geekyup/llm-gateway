@@ -14,6 +14,7 @@ from app.core.exceptions import (
 from app.gateway.dependencies import require_gateway_token
 from app.gateway.proxy_service import GatewayService, UpstreamRequestSpec
 from app.keys.enums import ProviderType
+from app.keys.schemas import APIKeyDTO
 from app.openai_compat.schemas import ChatCompletionRequest, OpenAIErrorDetail, OpenAIErrorResponse
 from app.openai_compat.translation import (
     gemini_path_for_model,
@@ -50,11 +51,12 @@ async def chat_completions(
 
     requested_model = request.model
     default_gemini_model = get_settings().DEFAULT_GEMINI_MODEL
+    default_openrouter_model = get_settings().DEFAULT_OPENROUTER_MODEL
 
 
-    def build_request(key_provider_type: ProviderType) -> UpstreamRequestSpec:
-        if key_provider_type is ProviderType.GEMINI:
-            gemini_model = requested_model or default_gemini_model
+    def build_request(dto: APIKeyDTO) -> UpstreamRequestSpec:
+        if dto.provider is ProviderType.GEMINI:
+            gemini_model = dto.model or requested_model or default_gemini_model
             return UpstreamRequestSpec(
                 path=gemini_path_for_model(gemini_model),
                 method="POST",
@@ -62,8 +64,7 @@ async def chat_completions(
                 headers={},
             )
         payload = request.model_dump(exclude={"provider"}, exclude_none=True)
-        if requested_model is None:
-            payload.pop("model", None)
+        payload["model"] = dto.model or requested_model or default_openrouter_model
         return UpstreamRequestSpec(
             path="v1/chat/completions",
             method="POST",

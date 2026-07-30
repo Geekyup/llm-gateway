@@ -39,6 +39,7 @@ class Settings(BaseSettings):
     OPENROUTER_BASE_URL: str = "https://openrouter.ai/api"
     UPSTREAM_TIMEOUT_SECONDS: float = 60.0
     DEFAULT_GEMINI_MODEL: str = "gemini-2.0-flash"
+    DEFAULT_OPENROUTER_MODEL: str = "google/gemini-2.0-flash-001"
 
     HOUSEKEEPING_RESET_CRON_MINUTE: int = 0
 

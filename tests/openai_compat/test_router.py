@@ -4,9 +4,17 @@ import httpx
 import pytest
 
 from app.core.exceptions import NoAvailableKeysError
-from app.keys.enums import ProviderType
+from app.keys.enums import KeyStatus, ProviderType
+from app.keys.schemas import APIKeyDTO
 from app.openai_compat.router import chat_completions
 from app.openai_compat.schemas import ChatCompletionRequest, ChatMessage
+
+
+def _fake_dto(provider: ProviderType, model: str | None = None) -> APIKeyDTO:
+    return APIKeyDTO(
+        id=1, user_id=1, label="k", provider=provider, status=KeyStatus.ACTIVE,
+        requests_today=0, daily_limit=100, model=model, decrypted_key="raw",
+    )
 
 
 class RecordingGateway:
@@ -31,14 +39,11 @@ async def test_no_explicit_provider_searches_across_all_providers():
 
     assert len(gateway.calls) == 1
     call = gateway.calls[0]
-    # No provider given -> pool search spans every provider (provider_type=None),
-    # not just Gemini.
+
     assert call["provider_type"] is None
     assert call["model"] == "gemini-3.6-flash"
 
-    # The request actually sent for a Gemini-provider key must still be
-    # translated to Gemini's wire format.
-    spec = call["build_request"](ProviderType.GEMINI)
+    spec = call["build_request"](_fake_dto(ProviderType.GEMINI))
     assert spec.path == "v1beta/models/gemini-3.6-flash:generateContent"
     assert "contents" in spec.payload
     assert "messages" not in spec.payload
@@ -73,7 +78,7 @@ async def test_explicit_openrouter_provider_passes_payload_through():
     call = gateway.calls[0]
     assert call["provider_type"] is ProviderType.OPENROUTER
 
-    spec = call["build_request"](ProviderType.OPENROUTER)
+    spec = call["build_request"](_fake_dto(ProviderType.OPENROUTER))
     assert spec.path == "v1/chat/completions"
     assert spec.payload["model"] == "openai/gpt-4o-mini"
     assert spec.payload["messages"] == [{"role": "user", "content": "hi"}]
@@ -81,10 +86,22 @@ async def test_explicit_openrouter_provider_passes_payload_through():
 
 
 @pytest.mark.asyncio
-async def test_no_model_no_provider_omits_model_for_openrouter_style_key():
-    """A request with neither model nor provider set that ends up on an
-    OpenRouter-provider key must not send a null/absent 'model' the upstream
-    would choke on — it's simply omitted, letting the upstream pick."""
+async def test_key_pinned_model_wins_over_request_model():
+    gateway = RecordingGateway(httpx.Response(200, json={"candidates": []}))
+    request = ChatCompletionRequest(
+        model="gemini-3.6-flash", messages=[ChatMessage(role="user", content="hi")]
+    )
+
+    await chat_completions(request, gateway=gateway, user_id=1)
+
+    call = gateway.calls[0]
+    pinned_dto = _fake_dto(ProviderType.GEMINI, model="gemini-1.5-pro")
+    spec = call["build_request"](pinned_dto)
+    assert spec.path == "v1beta/models/gemini-1.5-pro:generateContent"
+
+
+@pytest.mark.asyncio
+async def test_no_model_no_provider_falls_back_to_default_model_for_openrouter_key():
     gateway = RecordingGateway(httpx.Response(200, json={"id": "gen-1", "choices": [], "usage": {}}))
     request = ChatCompletionRequest(messages=[ChatMessage(role="user", content="hi")])
 
@@ -94,8 +111,8 @@ async def test_no_model_no_provider_omits_model_for_openrouter_style_key():
     assert call["provider_type"] is None
     assert call["model"] is None
 
-    spec = call["build_request"](ProviderType.OPENROUTER)
-    assert "model" not in spec.payload
+    spec = call["build_request"](_fake_dto(ProviderType.OPENROUTER, model=None))
+    assert spec.payload["model"]  # some default model string, non-empty
 
 
 @pytest.mark.asyncio

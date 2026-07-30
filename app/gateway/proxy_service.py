@@ -9,6 +9,7 @@ import httpx
 
 from app.core.exceptions import NoAvailableKeysError, UpstreamExhaustedError
 from app.keys.enums import ProviderType
+from app.keys.schemas import APIKeyDTO
 from app.keys.service import KeyPoolService
 from app.monitoring.publisher import RequestEventPublisher
 from app.monitoring.schemas import RequestEvent
@@ -25,7 +26,7 @@ class UpstreamRequestSpec:
     payload: dict | None
     headers: dict
 
-RequestSpecBuilder = Callable[[ProviderType], UpstreamRequestSpec]
+RequestSpecBuilder = Callable[[APIKeyDTO], UpstreamRequestSpec]
 
 
 class GatewayService:
@@ -126,7 +127,7 @@ class GatewayService:
             key_provider_type = dto.provider
             last_provider_type = key_provider_type
             provider: Provider = get_provider(key_provider_type.value)
-            spec = build_request(key_provider_type)
+            spec = build_request(dto)
 
             started = time.monotonic()
             response = await provider.forward(

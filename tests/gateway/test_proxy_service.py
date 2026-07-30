@@ -77,7 +77,7 @@ async def _create_active_key(key_pool: KeyPoolService, user_id: int, label: str,
 
 
 def _build_request(path="p", payload=None, headers=None):
-    def build(_key_provider_type):
+    def build(_dto):
         return UpstreamRequestSpec(path=path, method="POST", payload=payload, headers=headers or {})
     return build
 
@@ -373,9 +373,9 @@ async def test_cross_provider_failover_rebuilds_request_per_attempt(key_pool, te
 
     seen_provider_types = []
 
-    def build_request(key_provider_type):
-        seen_provider_types.append(key_provider_type)
-        if key_provider_type is ProviderType.GEMINI:
+    def build_request(dto):
+        seen_provider_types.append(dto.provider)
+        if dto.provider is ProviderType.GEMINI:
             return UpstreamRequestSpec(path="gemini-path", method="POST", payload={"gemini": True}, headers={})
         return UpstreamRequestSpec(path="v1/chat/completions", method="POST", payload={"openrouter": True}, headers={})
 
