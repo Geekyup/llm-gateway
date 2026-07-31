@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import {
   Plus, Eye, EyeOff, X, Activity, RefreshCw, Trash2, Edit2,
   Power, Clock, ArrowRight, CheckCircle2, Shield, AlertTriangle,
-  LayoutDashboard, KeyRound, Zap, LogOut, Loader2, Stethoscope, ChevronDown,
+  LayoutDashboard, KeyRound, Zap, LogOut, Loader2, Stethoscope, ChevronDown, Search,
 } from "lucide-react";
 import { AreaChart, Area, XAxis, Tooltip, ResponsiveContainer } from "recharts";
 import {
@@ -446,6 +446,7 @@ function AddEditModal({ editKey, onSave, onClose, error, saving }: {
   const [modelPickerOpen, setModelPickerOpen] = useState(false);
   const [modelLoading, setModelLoading] = useState(false);
   const [modelError, setModelError] = useState<string | null>(null);
+  const [modelSearch, setModelSearch] = useState("");
 
   async function fetchModels() {
     if (!form.rawKey.trim() && !editKey) return;
@@ -580,8 +581,8 @@ function AddEditModal({ editKey, onSave, onClose, error, saving }: {
                 </button>
               </div>
             ) : (
-              <div className="relative">
-                <button onClick={fetchModels} disabled={modelLoading}
+              <div>
+                <button onClick={() => { fetchModels(); setModelSearch(""); }} disabled={modelLoading}
                   className="w-full flex items-center justify-center gap-2 py-2 rounded-lg text-xs font-medium transition-all active:scale-[0.98] disabled:active:scale-100 disabled:opacity-60"
                   style={{ background: "rgba(255,255,255,0.04)", color: "#A1A1AA", border: "1px solid rgba(255,255,255,0.08)" }}>
                   {modelLoading ? <Loader2 size={13} className="animate-spin" /> : <ChevronDown size={13} />}
@@ -589,20 +590,45 @@ function AddEditModal({ editKey, onSave, onClose, error, saving }: {
                 </button>
 
                 {modelPickerOpen && modelOptions && (
-                  <div className="absolute z-10 mt-1.5 w-full max-h-56 overflow-y-auto rounded-lg shadow-lg animate-in fade-in slide-in-from-top-1 duration-150"
+                  <div className="relative z-10 mt-1.5 w-full rounded-lg shadow-lg animate-in fade-in slide-in-from-top-1 duration-150 overflow-hidden"
                     style={{ background: "#1C1C1E", border: "1px solid rgba(255,255,255,0.1)" }}>
-                    {modelOptions.length === 0 ? (
-                      <p className="px-3 py-2.5 text-xs text-zinc-500">No models available for this key.</p>
-                    ) : (
-                      modelOptions.map(m => (
-                        <button key={m.id}
-                          onClick={() => { setForm({ ...form, model: m.id }); setModelPickerOpen(false); }}
-                          className="w-full text-left px-3 py-2 text-xs transition-colors hover:bg-white/5">
-                          <div className="text-zinc-200 truncate">{m.label}</div>
-                          {m.label !== m.id && <div className="text-[10px] font-mono text-zinc-600 truncate">{m.id}</div>}
-                        </button>
-                      ))
+                    {modelOptions.length > 5 && (
+                      <div className="p-1.5 sticky top-0" style={{ background: "#1C1C1E", borderBottom: "1px solid rgba(255,255,255,0.08)" }}>
+                        <div className="relative">
+                          <Search size={12} color="#52525B" className="absolute left-2 top-1/2 -translate-y-1/2" />
+                          <input
+                            autoFocus
+                            value={modelSearch}
+                            onChange={e => setModelSearch(e.target.value)}
+                            placeholder="Search models…"
+                            className="w-full pl-6.5 pr-2 py-1.5 rounded-md text-xs outline-none"
+                            style={{ background: "rgba(255,255,255,0.05)", color: "#ECECF0", border: "1px solid transparent" }}
+                          />
+                        </div>
+                      </div>
                     )}
+                    <div className="max-h-40 overflow-y-auto">
+                      {(() => {
+                        const q = modelSearch.trim().toLowerCase();
+                        const filtered = q
+                          ? modelOptions.filter(m => m.label.toLowerCase().includes(q) || m.id.toLowerCase().includes(q))
+                          : modelOptions;
+                        if (modelOptions.length === 0) {
+                          return <p className="px-3 py-2.5 text-xs text-zinc-500">No models available for this key.</p>;
+                        }
+                        if (filtered.length === 0) {
+                          return <p className="px-3 py-2.5 text-xs text-zinc-500">No models match "{modelSearch}".</p>;
+                        }
+                        return filtered.map(m => (
+                          <button key={m.id}
+                            onClick={() => { setForm({ ...form, model: m.id }); setModelPickerOpen(false); setModelSearch(""); }}
+                            className="w-full text-left px-3 py-2 text-xs transition-colors hover:bg-white/5">
+                            <div className="text-zinc-200 truncate">{m.label}</div>
+                            {m.label !== m.id && <div className="text-[10px] font-mono text-zinc-600 truncate">{m.id}</div>}
+                          </button>
+                        ));
+                      })()}
+                    </div>
                   </div>
                 )}
               </div>
