@@ -10,7 +10,7 @@ const LANG_LABELS: Record<Lang, string> = {
   fetch: "JS fetch",
 };
 
-function buildSnippet(lang: Lang, baseUrl: string, token: string, model: string): string {
+function buildSnippet(lang: Lang, baseUrl: string, token: string): string {
   switch (lang) {
     case "python":
       return `from openai import OpenAI
@@ -21,7 +21,7 @@ client = OpenAI(
 )
 
 response = client.chat.completions.create(
-    model="${model}",
+    model=None,  # необязательно — гейтвей сам подберёт ключ из пула
     messages=[{"role": "user", "content": "Привет!"}],
 )
 print(response.choices[0].message.content)`;
@@ -35,7 +35,7 @@ const client = new OpenAI({
 });
 
 const response = await client.chat.completions.create({
-  model: "${model}",
+  // model не обязателен — гейтвей сам подберёт ключ из пула
   messages: [{ role: "user", content: "Привет!" }],
 });
 console.log(response.choices[0].message.content);`;
@@ -45,7 +45,6 @@ console.log(response.choices[0].message.content);`;
   -H "Authorization: Bearer ${token}" \\
   -H "Content-Type: application/json" \\
   -d '{
-    "model": "${model}",
     "messages": [{"role": "user", "content": "Привет!"}]
   }'`;
 
@@ -57,7 +56,7 @@ console.log(response.choices[0].message.content);`;
     "Content-Type": "application/json",
   },
   body: JSON.stringify({
-    model: "${model}",
+    // model не обязателен — гейтвей сам подберёт ключ из пула
     messages: [{ role: "user", content: "Привет!" }],
   }),
 });
@@ -69,16 +68,14 @@ console.log(data.choices[0].message.content);`;
 export function CodeSnippetTabs({
   token,
   baseUrl,
-  model = "gemini-2.0-flash",
 }: {
   token: string;
   baseUrl: string;
-  model?: string;
 }) {
   const [active, setActive] = useState<Lang>("python");
   const [copied, setCopied] = useState(false);
 
-  const snippet = buildSnippet(active, baseUrl, token, model);
+  const snippet = buildSnippet(active, baseUrl, token);
 
   function copy() {
     navigator.clipboard.writeText(snippet).then(() => {
