@@ -10,6 +10,7 @@ import {
   startGoogleLogin,
   ApiError, type ApiKeyRead, type RequestEvent as ApiRequestEvent,
   type GatewayTokenRead, type GatewayTokenCreated, type UserRead, type ModelOption,
+  API_BASE_URL,
 } from "./lib/api";
 import { CodeSnippetTabs } from "./components/CodeSnippetTabs";
 
@@ -565,8 +566,8 @@ function AddEditModal({ editKey, onSave, onClose, error, saving }: {
               Model <span className="text-zinc-600 font-normal">(optional)</span>
             </label>
             <p className="text-[11px] text-zinc-600 mb-2">
-              Pin this key to one model — requests for that exact model will only use keys pinned to it.
-              Leave unset to only serve requests that also don't specify a model.
+              Pin this key to one model — it will still be used for requests to that model, plus any request
+              that doesn't specify a model. Leave unset to serve requests for any model.
             </p>
 
             {form.model ? (
@@ -1199,7 +1200,7 @@ function GatewayAccessPanel() {
             <p className="mt-3 text-[11px] text-zinc-500">
               Готовый код для интеграции — просто вставь в свой проект:
             </p>
-            <CodeSnippetTabs token={freshToken.plaintext} baseUrl={window.location.origin} />
+            <CodeSnippetTabs token={freshToken.plaintext} baseUrl={API_BASE_URL} />
 
             <button onClick={() => setFreshToken(null)} className="mt-3 text-[11px] text-zinc-500 hover:text-zinc-300">
               Закрыть
