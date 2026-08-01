@@ -3,6 +3,7 @@ import {
   Plus, Eye, EyeOff, X, Activity, RefreshCw, Trash2, Edit2,
   Power, Clock, ArrowRight, CheckCircle2, Shield, AlertTriangle,
   LayoutDashboard, KeyRound, Zap, LogOut, Loader2, Stethoscope, ChevronDown, Search,
+  Sparkles, Route,
 } from "lucide-react";
 import { AreaChart, Area, XAxis, Tooltip, ResponsiveContainer } from "recharts";
 import {
@@ -70,12 +71,12 @@ const S: Record<Status, { text: string; color: string; bg: string; bd: string }>
   disabled:  { text: "Disabled",  color: "#52525B", bg: "rgba(82,82,91,0.08)",   bd: "rgba(82,82,91,0.18)"   },
 };
 
-const P: Record<string, { name: string; color: string; bg: string }> = {
-  gemini:     { name: "Gemini",     color: "#4F8EF7", bg: "rgba(79,142,247,0.1)"  },
-  openrouter: { name: "OpenRouter", color: "#A78BFA", bg: "rgba(167,139,250,0.1)" },
+const P: Record<string, { name: string; color: string; bg: string; Icon: typeof Sparkles }> = {
+  gemini:     { name: "Gemini",     color: "#4F8EF7", bg: "rgba(79,142,247,0.1)",  Icon: Sparkles },
+  openrouter: { name: "OpenRouter", color: "#A78BFA", bg: "rgba(167,139,250,0.1)", Icon: Route    },
 };
 function providerMeta(provider: string) {
-  return P[provider] ?? { name: provider, color: "#71717A", bg: "rgba(113,113,122,0.1)" };
+  return P[provider] ?? { name: provider, color: "#71717A", bg: "rgba(113,113,122,0.1)", Icon: KeyRound };
 }
 
 function rel(ts: number, now: number) {
@@ -442,6 +443,7 @@ function AddEditModal({ editKey, onSave, onClose, error, saving }: {
     model: editKey?.model ?? "",
   });
   const [showKey, setShowKey] = useState(false);
+  const [providerPickerOpen, setProviderPickerOpen] = useState(false);
   const [modelOptions, setModelOptions] = useState<ModelOption[] | null>(null);
   const [modelPickerOpen, setModelPickerOpen] = useState(false);
   const [modelLoading, setModelLoading] = useState(false);
@@ -471,6 +473,18 @@ function AddEditModal({ editKey, onSave, onClose, error, saving }: {
     window.addEventListener("keydown", h);
     return () => window.removeEventListener("keydown", h);
   }, [onClose]);
+
+  const providerPickerRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!providerPickerOpen) return;
+    const h = (e: MouseEvent) => {
+      if (providerPickerRef.current && !providerPickerRef.current.contains(e.target as Node)) {
+        setProviderPickerOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", h);
+    return () => document.removeEventListener("mousedown", h);
+  }, [providerPickerOpen]);
 
   const baseInp: React.CSSProperties = {
     background: "rgba(255,255,255,0.04)",
@@ -521,22 +535,48 @@ function AddEditModal({ editKey, onSave, onClose, error, saving }: {
 
           <div>
             <label className="block text-xs font-medium text-zinc-400 mb-1.5">Provider</label>
-            <div className="flex gap-2">
-              {(["gemini", "openrouter"] as Provider[]).map(p => (
-                <button key={p} onClick={() => {
-                  setForm({ ...form, provider: p, model: "" });
-                  setModelOptions(null);
-                  setModelError(null);
-                }}
-                  className="flex-1 py-2 rounded-lg text-xs font-medium transition-all"
-                  style={{
-                    color: form.provider === p ? P[p].color : "#52525B",
-                    background: form.provider === p ? P[p].bg : "rgba(255,255,255,0.03)",
-                    border: form.provider === p ? `1px solid ${P[p].color}30` : "1px solid rgba(255,255,255,0.06)",
-                  }}>
-                  {P[p].name}
-                </button>
-              ))}
+            <div className="relative" ref={providerPickerRef}>
+              <button onClick={() => setProviderPickerOpen(o => !o)}
+                className="w-full flex items-center justify-between px-3 py-2 rounded-lg text-sm outline-none transition-all"
+                style={{ ...baseInp, borderColor: providerPickerOpen ? "rgba(0,214,143,0.4)" : baseInp.border as string }}>
+                <span className="flex items-center gap-2">
+                  <span className="w-5 h-5 rounded-md flex items-center justify-center shrink-0"
+                    style={{ background: P[form.provider].bg }}>
+                    {(() => { const Icon = P[form.provider].Icon; return <Icon size={12} color={P[form.provider].color} />; })()}
+                  </span>
+                  <span style={{ color: P[form.provider].color }} className="font-medium">{P[form.provider].name}</span>
+                </span>
+                <ChevronDown size={14} color="#52525B"
+                  style={{ transform: providerPickerOpen ? "rotate(180deg)" : "none", transition: "transform 0.15s ease" }} />
+              </button>
+
+              {providerPickerOpen && (
+                <div className="absolute z-10 mt-1.5 w-full rounded-lg shadow-lg animate-in fade-in slide-in-from-top-1 duration-150 overflow-hidden"
+                  style={{ background: "#1C1C1E", border: "1px solid rgba(255,255,255,0.1)" }}>
+                  {(["gemini", "openrouter"] as Provider[]).map(p => {
+                    const meta = P[p];
+                    const Icon = meta.Icon;
+                    const active = form.provider === p;
+                    return (
+                      <button key={p}
+                        onClick={() => {
+                          setForm({ ...form, provider: p, model: "" });
+                          setModelOptions(null);
+                          setModelError(null);
+                          setProviderPickerOpen(false);
+                        }}
+                        className="w-full flex items-center gap-2.5 text-left px-3 py-2.5 text-sm transition-colors hover:bg-white/5"
+                        style={{ background: active ? "rgba(255,255,255,0.04)" : "transparent" }}>
+                        <span className="w-5 h-5 rounded-md flex items-center justify-center shrink-0" style={{ background: meta.bg }}>
+                          <Icon size={12} color={meta.color} />
+                        </span>
+                        <span className="flex-1" style={{ color: active ? meta.color : "#ECECF0" }}>{meta.name}</span>
+                        {active && <CheckCircle2 size={14} color={meta.color} className="shrink-0" />}
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
             </div>
           </div>
 
