@@ -79,6 +79,13 @@ function providerMeta(provider: string) {
   return P[provider] ?? { name: provider, color: "#71717A", bg: "rgba(113,113,122,0.1)", Icon: KeyRound };
 }
 
+// Нейтральная (белая/серая) палитра — используется только в Provider-переключателе модалки AddEditModal,
+// чтобы не менять цвета бейджей провайдера по всему остальному интерфейсу.
+const PN: Record<Provider, { name: string; Icon: typeof Sparkles }> = {
+  gemini:     { name: "Gemini",     Icon: Sparkles },
+  openrouter: { name: "OpenRouter", Icon: Route    },
+};
+
 function rel(ts: number, now: number) {
   const d = now - ts;
   if (d < 60000)   return `${Math.floor(d / 1000)}s ago`;
@@ -541,10 +548,10 @@ function AddEditModal({ editKey, onSave, onClose, error, saving }: {
                 style={{ ...baseInp, borderColor: providerPickerOpen ? "rgba(0,214,143,0.4)" : baseInp.border as string }}>
                 <span className="flex items-center gap-2">
                   <span className="w-5 h-5 rounded-md flex items-center justify-center shrink-0"
-                    style={{ background: P[form.provider].bg }}>
-                    {(() => { const Icon = P[form.provider].Icon; return <Icon size={12} color={P[form.provider].color} />; })()}
+                    style={{ background: "rgba(255,255,255,0.06)" }}>
+                    {(() => { const Icon = PN[form.provider].Icon; return <Icon size={12} color="#ECECF0" />; })()}
                   </span>
-                  <span style={{ color: P[form.provider].color }} className="font-medium">{P[form.provider].name}</span>
+                  <span className="font-medium text-zinc-100">{PN[form.provider].name}</span>
                 </span>
                 <ChevronDown size={14} color="#52525B"
                   style={{ transform: providerPickerOpen ? "rotate(180deg)" : "none", transition: "transform 0.15s ease" }} />
@@ -554,7 +561,7 @@ function AddEditModal({ editKey, onSave, onClose, error, saving }: {
                 <div className="absolute z-10 mt-1.5 w-full rounded-lg shadow-lg animate-in fade-in slide-in-from-top-1 duration-150 overflow-hidden"
                   style={{ background: "#1C1C1E", border: "1px solid rgba(255,255,255,0.1)" }}>
                   {(["gemini", "openrouter"] as Provider[]).map(p => {
-                    const meta = P[p];
+                    const meta = PN[p];
                     const Icon = meta.Icon;
                     const active = form.provider === p;
                     return (
@@ -567,11 +574,11 @@ function AddEditModal({ editKey, onSave, onClose, error, saving }: {
                         }}
                         className="w-full flex items-center gap-2.5 text-left px-3 py-2.5 text-sm transition-colors hover:bg-white/5"
                         style={{ background: active ? "rgba(255,255,255,0.04)" : "transparent" }}>
-                        <span className="w-5 h-5 rounded-md flex items-center justify-center shrink-0" style={{ background: meta.bg }}>
-                          <Icon size={12} color={meta.color} />
+                        <span className="w-5 h-5 rounded-md flex items-center justify-center shrink-0" style={{ background: "rgba(255,255,255,0.06)" }}>
+                          <Icon size={12} color="#ECECF0" />
                         </span>
-                        <span className="flex-1" style={{ color: active ? meta.color : "#ECECF0" }}>{meta.name}</span>
-                        {active && <CheckCircle2 size={14} color={meta.color} className="shrink-0" />}
+                        <span className="flex-1" style={{ color: active ? "#ECECF0" : "#A1A1AA" }}>{meta.name}</span>
+                        {active && <CheckCircle2 size={14} color="#ECECF0" className="shrink-0" />}
                       </button>
                     );
                   })}
