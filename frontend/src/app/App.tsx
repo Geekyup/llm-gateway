@@ -119,7 +119,7 @@ function PBadge({ provider }: { provider: string }) {
 }
 
 function UBar({ used, limit, status }: { used: number; limit: number; status: Status }) {
-  const pct = Math.min(100, (used / limit) * 100);
+  const pct = limit > 0 ? Math.min(100, Math.max(0, (used / limit) * 100)) : 0;
   const color = S[status].color;
   return (
     <div className="min-w-[140px]">
@@ -136,7 +136,7 @@ function UBar({ used, limit, status }: { used: number; limit: number; status: St
 }
 
 function CircP({ used, limit, color }: { used: number; limit: number; color: string }) {
-  const r = 48, circ = 2 * Math.PI * r, pct = Math.min(1, used / limit), dash = pct * circ;
+  const r = 48, circ = 2 * Math.PI * r, pct = limit > 0 ? Math.min(1, Math.max(0, used / limit)) : 0, dash = pct * circ;
   return (
     <div className="relative inline-flex items-center justify-center shrink-0">
       <svg width={120} height={120} style={{ transform: "rotate(-90deg)" }}>
@@ -449,14 +449,13 @@ function AddEditModal({ editKey, onSave, onClose, error, saving }: {
   const [modelSearch, setModelSearch] = useState("");
 
   async function fetchModels() {
-    if (!form.rawKey.trim() && !editKey) return;
+    if (!form.rawKey.trim()) {
+      setModelError("Enter the API key above to look up models for it.");
+      return;
+    }
     setModelLoading(true);
     setModelError(null);
     try {
-      if (!form.rawKey.trim() && editKey) {
-        setModelError("Enter the API key above to look up models for it.");
-        return;
-      }
       const models = await api.listModels(form.provider, form.rawKey.trim());
       setModelOptions(models);
       setModelPickerOpen(true);
@@ -944,7 +943,7 @@ function LiveMonitor({ reqs, now }: { reqs: LR[]; now: number }) {
                 {r.chain && r.chain.length > 0 && (
                   <div className="flex items-center gap-1.5 flex-wrap mb-1.5">
                     {r.chain.map((c, i) => (
-                      <div key={i} className="flex items-center gap-1.5 shrink-0">
+                      <div key={`${c.label}-${c.code}-${i}`} className="flex items-center gap-1.5 shrink-0">
                         <span className="text-[11px] font-mono text-zinc-500 truncate max-w-[100px]">{c.label}</span>
                         <span className="text-[11px] font-mono px-1 py-0.5 rounded shrink-0"
                           style={{ color: "#F59E0B", background: "rgba(245,158,11,0.1)" }}>{c.code}</span>
@@ -979,7 +978,7 @@ function LiveMonitor({ reqs, now }: { reqs: LR[]; now: number }) {
                 <PBadge provider={r.provider} />
                 <div className="flex items-center gap-1.5 min-w-0">
                   {r.chain?.map((c, i) => (
-                    <div key={i} className="flex items-center gap-1.5 shrink-0">
+                    <div key={`${c.label}-${c.code}-${i}`} className="flex items-center gap-1.5 shrink-0">
                       <span className="text-[11px] font-mono text-zinc-500 truncate max-w-[100px]">{c.label}</span>
                       <span className="text-[11px] font-mono px-1 py-0.5 rounded shrink-0"
                         style={{ color: "#F59E0B", background: "rgba(245,158,11,0.1)" }}>{c.code}</span>
@@ -1181,10 +1180,10 @@ function GatewayAccessPanel() {
           <h2 className="text-sm font-semibold text-zinc-100">Gateway Access Tokens</h2>
         </div>
         <p className="text-xs text-zinc-500 leading-relaxed mb-4">
-          Один такой токен объединяет доступ ко всему пулу ключей ниже на вкладке Dashboard.
-          Твоё приложение отправляет запросы на <code className="px-1 py-0.5 rounded font-mono" style={{ background: "rgba(255,255,255,0.06)" }}>/v1/gemini/...</code> с
-          этим токеном в заголовке <code className="px-1 py-0.5 rounded font-mono" style={{ background: "rgba(255,255,255,0.06)" }}>Authorization: Bearer</code> — а какой
-          именно ключ из пула был использован, приложение не знает и знать не должно: ротацию и failover гейтвей делает сам.
+          One token gives access to the entire key pool on the Dashboard tab.
+          Your app sends requests to <code className="px-1 py-0.5 rounded font-mono" style={{ background: "rgba(255,255,255,0.06)" }}>/v1/gemini/...</code> with
+          this token in the <code className="px-1 py-0.5 rounded font-mono" style={{ background: "rgba(255,255,255,0.06)" }}>Authorization: Bearer</code> header —
+          which key from the pool actually gets used is up to the gateway; your app doesn't need to know or care about rotation and failover.
         </p>
 
         <div className="flex flex-col sm:flex-row gap-2">
@@ -1215,7 +1214,7 @@ function GatewayAccessPanel() {
           <div className="mt-4 p-3 rounded-lg" style={{ background: "rgba(0,214,143,0.06)", border: "1px solid rgba(0,214,143,0.25)" }}>
             <p className="text-xs font-medium text-zinc-200 mb-2 flex items-center gap-1.5">
               <CheckCircle2 size={13} color="#00D68F" />
-              Токен создан — сохрани его сейчас, второй раз он нигде не покажется
+              Token created — save it now, it won't be shown again
             </p>
             <div className="flex items-center gap-2">
               <code className="flex-1 px-2 py-1.5 rounded text-xs font-mono break-all"
@@ -1230,12 +1229,12 @@ function GatewayAccessPanel() {
             </div>
 
             <p className="mt-3 text-[11px] text-zinc-500">
-              Готовый код для интеграции — просто вставь в свой проект:
+              Ready-to-use integration code — just drop it into your project:
             </p>
             <CodeSnippetTabs token={freshToken.plaintext} baseUrl={API_BASE_URL} />
 
             <button onClick={() => setFreshToken(null)} className="mt-3 text-[11px] text-zinc-500 hover:text-zinc-300">
-              Закрыть
+              Close
             </button>
           </div>
         )}
@@ -1247,7 +1246,7 @@ function GatewayAccessPanel() {
             <Loader2 size={18} className="animate-spin" color="#52525B" />
           </div>
         ) : tokens.length === 0 ? (
-          <div className="py-16 text-center text-xs text-zinc-600">Токенов ещё нет — сгенерируй первый выше.</div>
+          <div className="py-16 text-center text-xs text-zinc-600">No tokens yet — generate your first one above.</div>
         ) : (
           <>
             <div className="sm:hidden">
