@@ -5,7 +5,12 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.monitoring.models import RequestEventRecord
-from app.monitoring.publisher import HISTORY_MAX_LEN, RequestEventPublisher, channel_for, purge_old_request_events
+from app.monitoring.publisher import (
+    HISTORY_MAX_LEN,
+    RequestEventPublisher,
+    channel_for,
+    purge_old_request_events,
+)
 from app.monitoring.schemas import RequestEvent
 
 
