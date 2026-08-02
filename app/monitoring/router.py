@@ -1,10 +1,10 @@
 import logging
-from typing import Annotated
 
 from fastapi import APIRouter, Depends, Query, Request
 from redis.asyncio import Redis
 from sse_starlette.sse import EventSourceResponse
 
+from app.api.deps import get_event_publisher
 from app.auth.deps import get_current_user
 from app.auth.models import User
 from app.db.redis import get_redis
@@ -16,10 +16,6 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/me/monitor", tags=["monitoring"])
 
 _KEEPALIVE_SECONDS = 15.0
-
-
-def get_event_publisher(redis: Annotated[Redis, Depends(get_redis)]) -> RequestEventPublisher:
-    return RequestEventPublisher(redis)
 
 
 @router.get("/recent", response_model=RequestEventList)

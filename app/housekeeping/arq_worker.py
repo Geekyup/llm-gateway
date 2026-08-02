@@ -8,6 +8,7 @@ from app.core.logging import configure_logging
 from app.housekeeping.tasks import (
     clear_expired_cooldowns,
     health_check_exhausted_keys,
+    purge_old_monitoring_events,
     reset_daily_limits,
 )
 
@@ -34,4 +35,5 @@ class WorkerSettings:
         cron(clear_expired_cooldowns, minute=set(range(0, 60, 5)), run_at_startup=True),
         cron(reset_daily_limits, hour=0, minute=0),
         cron(health_check_exhausted_keys, minute={0, 30}, run_at_startup=True),
+        cron(purge_old_monitoring_events, hour=3, minute=0),
     ]

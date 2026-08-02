@@ -1,12 +1,16 @@
 import logging
+from datetime import timedelta
 
 from app.config import get_settings
 from app.db.redis import get_redis
 from app.db.session import get_sessionmaker
 from app.keys.enums import KeyStatus
 from app.keys.factory import build_key_pool_service
+from app.monitoring.publisher import purge_old_request_events
 
 logger = logging.getLogger(__name__)
+
+REQUEST_EVENTS_RETENTION = timedelta(days=30)
 
 
 async def clear_expired_cooldowns(ctx: dict) -> None:
@@ -52,3 +56,12 @@ async def health_check_exhausted_keys(ctx: dict) -> None:
 
     if exhausted:
         logger.info("health_check_exhausted_keys: checked %d, revived %d", len(exhausted), revived)
+
+
+async def purge_old_monitoring_events(ctx: dict) -> None:
+    session_factory = get_sessionmaker()
+
+    async with session_factory() as session:
+        deleted = await purge_old_request_events(session, older_than=REQUEST_EVENTS_RETENTION)
+
+    logger.info("purge_old_monitoring_events: deleted %d row(s) older than %s", deleted, REQUEST_EVENTS_RETENTION)

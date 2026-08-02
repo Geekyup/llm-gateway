@@ -1,8 +1,11 @@
 from datetime import UTC, datetime, timedelta
 
 import pytest
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.monitoring.publisher import HISTORY_MAX_LEN, RequestEventPublisher, channel_for
+from app.monitoring.models import RequestEventRecord
+from app.monitoring.publisher import HISTORY_MAX_LEN, RequestEventPublisher, channel_for, purge_old_request_events
 from app.monitoring.schemas import RequestEvent
 
 
@@ -73,7 +76,6 @@ async def test_recent_respects_limit(fake_redis):
     events = await publisher.recent(1, limit=2)
 
     assert len(events) == 2
-    # Newest first: req-4 published last.
     assert events[0].request_id == "req-4"
 
 
@@ -90,7 +92,6 @@ async def test_history_capped_at_max_len(fake_redis):
 
 @pytest.mark.asyncio
 async def test_events_isolated_per_user(fake_redis):
-    """Two users' event histories and channels must never mix."""
     publisher = RequestEventPublisher(fake_redis)
     await publisher.publish(_event(user_id=1, request_id="mine"))
     await publisher.publish(_event(user_id=2, request_id="theirs"))
@@ -120,8 +121,8 @@ async def test_publish_failure_is_swallowed_not_raised(fake_redis, monkeypatch):
 
 
 @pytest.mark.asyncio
-async def test_hourly_usage_buckets_by_hour_for_today(fake_redis):
-    publisher = RequestEventPublisher(fake_redis)
+async def test_hourly_usage_buckets_by_hour_for_today(fake_redis, db_session: AsyncSession):
+    publisher = RequestEventPublisher(fake_redis, session=db_session)
     now = datetime.now(UTC)
     nine_am = now.replace(hour=9, minute=15, second=0, microsecond=0)
     two_pm = now.replace(hour=14, minute=50, second=0, microsecond=0)
@@ -139,8 +140,8 @@ async def test_hourly_usage_buckets_by_hour_for_today(fake_redis):
 
 
 @pytest.mark.asyncio
-async def test_hourly_usage_ignores_other_keys_and_users(fake_redis):
-    publisher = RequestEventPublisher(fake_redis)
+async def test_hourly_usage_ignores_other_keys_and_users(fake_redis, db_session: AsyncSession):
+    publisher = RequestEventPublisher(fake_redis, session=db_session)
     now = datetime.now(UTC)
 
     await publisher.publish(_event(request_id="mine", key_id=1, timestamp=now))
@@ -153,8 +154,8 @@ async def test_hourly_usage_ignores_other_keys_and_users(fake_redis):
 
 
 @pytest.mark.asyncio
-async def test_hourly_usage_excludes_events_from_previous_days(fake_redis):
-    publisher = RequestEventPublisher(fake_redis)
+async def test_hourly_usage_excludes_events_from_previous_days(fake_redis, db_session: AsyncSession):
+    publisher = RequestEventPublisher(fake_redis, session=db_session)
     yesterday = datetime.now(UTC) - timedelta(days=1)
 
     await publisher.publish(_event(request_id="stale", timestamp=yesterday))
@@ -165,8 +166,8 @@ async def test_hourly_usage_excludes_events_from_previous_days(fake_redis):
 
 
 @pytest.mark.asyncio
-async def test_hourly_usage_ignores_events_with_no_upstream_call(fake_redis):
-    publisher = RequestEventPublisher(fake_redis)
+async def test_hourly_usage_ignores_events_with_no_upstream_call(fake_redis, db_session: AsyncSession):
+    publisher = RequestEventPublisher(fake_redis, session=db_session)
     now = datetime.now(UTC)
 
     await publisher.publish(_event(request_id="dropped", outcome="no_keys", timestamp=now))
@@ -177,8 +178,8 @@ async def test_hourly_usage_ignores_events_with_no_upstream_call(fake_redis):
 
 
 @pytest.mark.asyncio
-async def test_hourly_token_usage_sums_by_hour_for_today(fake_redis):
-    publisher = RequestEventPublisher(fake_redis)
+async def test_hourly_token_usage_sums_by_hour_for_today(fake_redis, db_session: AsyncSession):
+    publisher = RequestEventPublisher(fake_redis, session=db_session)
     now = datetime.now(UTC)
     nine_am = now.replace(hour=9, minute=0, second=0, microsecond=0)
     two_pm = now.replace(hour=14, minute=0, second=0, microsecond=0)
@@ -195,8 +196,8 @@ async def test_hourly_token_usage_sums_by_hour_for_today(fake_redis):
 
 
 @pytest.mark.asyncio
-async def test_hourly_token_usage_skips_non_success_and_missing_tokens(fake_redis):
-    publisher = RequestEventPublisher(fake_redis)
+async def test_hourly_token_usage_skips_non_success_and_missing_tokens(fake_redis, db_session: AsyncSession):
+    publisher = RequestEventPublisher(fake_redis, session=db_session)
     now = datetime.now(UTC)
 
     await publisher.publish(_event(request_id="limited", outcome="rate_limited", timestamp=now))
@@ -208,8 +209,8 @@ async def test_hourly_token_usage_skips_non_success_and_missing_tokens(fake_redi
 
 
 @pytest.mark.asyncio
-async def test_hourly_token_usage_excludes_other_keys_and_stale_days(fake_redis):
-    publisher = RequestEventPublisher(fake_redis)
+async def test_hourly_token_usage_excludes_other_keys_and_stale_days(fake_redis, db_session: AsyncSession):
+    publisher = RequestEventPublisher(fake_redis, session=db_session)
     now = datetime.now(UTC)
     yesterday = now - timedelta(days=1)
 
@@ -220,3 +221,53 @@ async def test_hourly_token_usage_excludes_other_keys_and_stale_days(fake_redis)
     triples = await publisher.hourly_token_usage_for_key(1, key_id=1)
 
     assert sum(t[2] for t in triples) == 15
+
+
+@pytest.mark.asyncio
+async def test_publish_without_session_skips_persistence(fake_redis):
+    publisher = RequestEventPublisher(fake_redis)
+
+    await publisher.publish(_event(request_id="no-session"))
+
+    assert len(fake_redis.published) == 1
+
+
+@pytest.mark.asyncio
+async def test_persist_failure_does_not_raise_or_break_publish(fake_redis, db_session: AsyncSession, monkeypatch):
+    publisher = RequestEventPublisher(fake_redis, session=db_session)
+
+    async def _broken_commit():
+        raise RuntimeError("db is down")
+
+    monkeypatch.setattr(db_session, "commit", _broken_commit)
+
+    await publisher.publish(_event(request_id="db-down"))
+
+    assert len(fake_redis.published) == 1
+
+
+@pytest.mark.asyncio
+async def test_purge_deletes_rows_older_than_cutoff(fake_redis, db_session: AsyncSession):
+    publisher = RequestEventPublisher(fake_redis, session=db_session)
+    now = datetime.now(UTC)
+    old = now - timedelta(days=40)
+    recent = now - timedelta(days=5)
+
+    await publisher.publish(_event(request_id="old", timestamp=old))
+    await publisher.publish(_event(request_id="recent", timestamp=recent))
+
+    deleted = await purge_old_request_events(db_session, older_than=timedelta(days=30))
+
+    assert deleted == 1
+    remaining = (await db_session.execute(select(RequestEventRecord))).scalars().all()
+    assert [r.request_id for r in remaining] == ["recent"]
+
+
+@pytest.mark.asyncio
+async def test_purge_returns_zero_when_nothing_to_delete(fake_redis, db_session: AsyncSession):
+    publisher = RequestEventPublisher(fake_redis, session=db_session)
+    await publisher.publish(_event(request_id="fresh", timestamp=datetime.now(UTC)))
+
+    deleted = await purge_old_request_events(db_session, older_than=timedelta(days=30))
+
+    assert deleted == 0
