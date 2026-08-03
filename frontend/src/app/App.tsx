@@ -357,10 +357,9 @@ function KeysTable({ keys, filter, onFilter, onSelect, onEdit, onToggle, onCheck
         </div>
       ) : (
         <>
-          <div className="sm:hidden" style={{ background: "#111113" }}>
-            {filtered.map((k, i) => (
+          <div className="sm:hidden divide-y divide-white/[0.03]" style={{ background: "#111113" }}>
+            {filtered.map(k => (
               <div key={k.id} className="px-4 py-3.5 transition-colors active:bg-white/[0.03] cursor-pointer"
-                style={{ borderBottom: i < filtered.length - 1 ? "1px solid rgba(255,255,255,0.03)" : "none" }}
                 onClick={() => onSelect(k.id)}>
                 <div className="flex items-start justify-between gap-2 mb-2">
                   <div className="min-w-0">
@@ -418,10 +417,9 @@ function KeysTable({ keys, filter, onFilter, onSelect, onEdit, onToggle, onCheck
                   ))}
                 </tr>
               </thead>
-              <tbody>
-                {filtered.map((k, i) => (
+              <tbody className="divide-y divide-white/[0.03]">
+                {filtered.map(k => (
                   <tr key={k.id} className="group cursor-pointer transition-colors hover:bg-white/[0.02]"
-                    style={{ borderBottom: i < filtered.length - 1 ? "1px solid rgba(255,255,255,0.03)" : "none" }}
                     onClick={() => onSelect(k.id)}>
                     <td className="px-4 py-3">
                       <div className="text-sm font-medium text-zinc-200 leading-none">{k.label}</div>
