@@ -278,6 +278,57 @@ function MetricCards({ keys }: { keys: AK[] }) {
   );
 }
 
+function ProviderFilterDropdown({ filter, onFilter }: { filter: PF; onFilter: (f: PF) => void }) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    const h = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    };
+    document.addEventListener("mousedown", h);
+    return () => document.removeEventListener("mousedown", h);
+  }, [open]);
+
+  const options: PF[] = ["all", ...(Object.keys(P) as Provider[])];
+  const label = filter === "all" ? "All" : P[filter].name;
+
+  return (
+    <div className="relative" ref={ref}>
+      <button onClick={() => setOpen(o => !o)}
+        className="flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[11px] font-medium transition-all"
+        style={{
+          color: "#ECECF0",
+          background: "rgba(255,255,255,0.06)",
+          border: "1px solid rgba(255,255,255,0.08)",
+        }}>
+        {label}
+        <ChevronDown size={11} color="#71717A"
+          style={{ transform: open ? "rotate(180deg)" : "none", transition: "transform 0.15s ease" }} />
+      </button>
+
+      {open && (
+        <div className="absolute right-0 z-10 mt-1.5 min-w-[140px] rounded-lg shadow-lg animate-in fade-in slide-in-from-top-1 duration-150 overflow-hidden"
+          style={{ background: "#1C1C1E", border: "1px solid rgba(255,255,255,0.1)" }}>
+          {options.map(f => {
+            const active = filter === f;
+            const meta = f === "all" ? null : P[f];
+            return (
+              <button key={f} onClick={() => { onFilter(f); setOpen(false); }}
+                className="w-full flex items-center justify-between gap-2 text-left px-3 py-2 text-xs transition-colors hover:bg-white/5"
+                style={{ background: active ? "rgba(255,255,255,0.04)" : "transparent" }}>
+                <span style={{ color: active ? "#ECECF0" : "#A1A1AA" }}>{f === "all" ? "All" : meta!.name}</span>
+                {active && <CheckCircle2 size={13} color="#ECECF0" className="shrink-0" />}
+              </button>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function KeysTable({ keys, filter, onFilter, onSelect, onEdit, onToggle, onCheck, checkingIds, now }: {
   keys: AK[]; filter: PF; onFilter: (f: PF) => void; now: number;
   onSelect: (id: string) => void; onEdit: (id: string) => void; onToggle: (id: string) => void;
@@ -290,19 +341,7 @@ function KeysTable({ keys, filter, onFilter, onSelect, onEdit, onToggle, onCheck
       <div className="flex items-center justify-between px-4 py-2.5"
         style={{ borderBottom: "1px solid rgba(255,255,255,0.05)", background: "#0F0F11" }}>
         <span className="text-xs font-medium text-zinc-400">API Keys</span>
-        <div className="flex gap-1">
-          {(["all", "gemini", "openrouter"] as PF[]).map(f => (
-            <button key={f} onClick={() => onFilter(f)}
-              className="px-2.5 py-1 rounded-md text-[11px] font-medium capitalize transition-all"
-              style={{
-                color: filter === f ? "#ECECF0" : "#52525B",
-                background: filter === f ? "rgba(255,255,255,0.08)" : "transparent",
-                border: filter === f ? "1px solid rgba(255,255,255,0.1)" : "1px solid transparent",
-              }}>
-              {f}
-            </button>
-          ))}
-        </div>
+        <ProviderFilterDropdown filter={filter} onFilter={onFilter} />
       </div>
 
       {filtered.length === 0 ? (
