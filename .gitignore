@@ -10,3 +10,5 @@ venv/
 llm_gateway.egg-info/
 hammer.py
 chat.py
+test_gateway_keys.py
+test_groq_key.py

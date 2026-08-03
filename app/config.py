@@ -37,9 +37,11 @@ class Settings(BaseSettings):
 
     GEMINI_BASE_URL: str = "https://generativelanguage.googleapis.com"
     OPENROUTER_BASE_URL: str = "https://openrouter.ai/api"
+    GROQ_BASE_URL: str = "https://api.groq.com/openai"
     UPSTREAM_TIMEOUT_SECONDS: float = 60.0
     DEFAULT_GEMINI_MODEL: str = "gemini-2.0-flash"
     DEFAULT_OPENROUTER_MODEL: str = "google/gemini-2.0-flash-001"
+    DEFAULT_GROQ_MODEL: str = "llama-3.1-8b-instant"
 
     HOUSEKEEPING_RESET_CRON_MINUTE: int = 0
 

@@ -52,6 +52,7 @@ async def chat_completions(
     requested_model = request.model
     default_gemini_model = get_settings().DEFAULT_GEMINI_MODEL
     default_openrouter_model = get_settings().DEFAULT_OPENROUTER_MODEL
+    default_groq_model = get_settings().DEFAULT_GROQ_MODEL
 
 
     def build_request(dto: APIKeyDTO) -> UpstreamRequestSpec:
@@ -63,8 +64,9 @@ async def chat_completions(
                 payload=openai_request_to_gemini_payload(request),
                 headers={},
             )
+        default_model = default_groq_model if dto.provider is ProviderType.GROQ else default_openrouter_model
         payload = request.model_dump(exclude={"provider"}, exclude_none=True)
-        payload["model"] = dto.model or requested_model or default_openrouter_model
+        payload["model"] = dto.model or requested_model or default_model
         return UpstreamRequestSpec(
             path="v1/chat/completions",
             method="POST",

@@ -16,7 +16,7 @@ import {
 import { CodeSnippetTabs } from "./components/CodeSnippetTabs";
 
 type Status = "active" | "cooldown" | "exhausted" | "disabled";
-type Provider = "gemini" | "openrouter";
+type Provider = "gemini" | "openrouter" | "groq";
 type View = "dashboard" | "monitor" | "access";
 type PF = "all" | Provider;
 
@@ -74,16 +74,16 @@ const S: Record<Status, { text: string; color: string; bg: string; bd: string }>
 const P: Record<string, { name: string; color: string; bg: string; Icon: typeof Sparkles }> = {
   gemini:     { name: "Gemini",     color: "#4F8EF7", bg: "rgba(79,142,247,0.1)",  Icon: Sparkles },
   openrouter: { name: "OpenRouter", color: "#A78BFA", bg: "rgba(167,139,250,0.1)", Icon: Route    },
+  groq:       { name: "Groq",       color: "#F97316", bg: "rgba(249,115,22,0.1)",  Icon: Zap      },
 };
 function providerMeta(provider: string) {
   return P[provider] ?? { name: provider, color: "#71717A", bg: "rgba(113,113,122,0.1)", Icon: KeyRound };
 }
 
-// Нейтральная (белая/серая) палитра — используется только в Provider-переключателе модалки AddEditModal,
-// чтобы не менять цвета бейджей провайдера по всему остальному интерфейсу.
 const PN: Record<Provider, { name: string; Icon: typeof Sparkles }> = {
   gemini:     { name: "Gemini",     Icon: Sparkles },
   openrouter: { name: "OpenRouter", Icon: Route    },
+  groq:       { name: "Groq",       Icon: Zap      },
 };
 
 function rel(ts: number, now: number) {
@@ -597,7 +597,7 @@ function AddEditModal({ editKey, onSave, onClose, error, saving }: {
               {providerPickerOpen && (
                 <div className="absolute z-10 mt-1.5 w-full rounded-lg shadow-lg animate-in fade-in slide-in-from-top-1 duration-150 overflow-hidden"
                   style={{ background: "#1C1C1E", border: "1px solid rgba(255,255,255,0.1)" }}>
-                  {(["gemini", "openrouter"] as Provider[]).map(p => {
+                  {(Object.keys(PN) as Provider[]).map(p => {
                     const meta = PN[p];
                     const Icon = meta.Icon;
                     const active = form.provider === p;

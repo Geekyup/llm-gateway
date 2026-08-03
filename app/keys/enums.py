@@ -11,3 +11,4 @@ class KeyStatus(str, enum.Enum):
 class ProviderType(str, enum.Enum):
     GEMINI = "gemini"
     OPENROUTER = "openrouter"
+    GROQ = "groq"
