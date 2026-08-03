@@ -313,6 +313,17 @@ export function streamEvents(
           headers: { Authorization: `Bearer ${getAccessToken()}` },
           signal: controller.signal,
         });
+
+        if (res.status === 401) {
+          const refreshed = await tryRefresh();
+          if (!refreshed) {
+            clearTokenPair();
+            onError?.(new Error("session expired"));
+            return;
+          }
+          continue;
+        }
+
         if (!res.ok || !res.body) throw new Error(`stream failed: ${res.status}`);
 
         const reader = res.body.getReader();
