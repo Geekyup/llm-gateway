@@ -1001,8 +1001,8 @@ function LiveMonitor({ reqs, now }: { reqs: LR[]; now: number }) {
       </div>
 
       <div style={{ background: "#111113" }}>
-        <div className="hidden sm:grid px-4 py-2"
-          style={{ gridTemplateColumns: "72px 88px 1fr 52px 64px 56px", borderBottom: "1px solid rgba(255,255,255,0.04)" }}>
+        <div className="hidden sm:grid px-4 py-2 min-w-0"
+          style={{ gridTemplateColumns: "72px 88px minmax(0,1fr) 52px 64px 56px", borderBottom: "1px solid rgba(255,255,255,0.04)" }}>
           {["Time", "Provider", "Key / Chain", "Status", "Tokens", "Latency"].map(h => (
             <span key={h} className="text-[10px] font-semibold text-zinc-600 uppercase tracking-widest">{h}</span>
           ))}
@@ -1026,7 +1026,7 @@ function LiveMonitor({ reqs, now }: { reqs: LR[]; now: number }) {
                   </span>
                 </div>
                 {r.chain && r.chain.length > 0 && (
-                  <div className="flex items-center gap-1.5 flex-wrap mb-1.5">
+                  <div className="flex items-center gap-1.5 flex-nowrap overflow-x-auto mb-1.5">
                     {r.chain.map((c, i) => (
                       <div key={`${c.label}-${c.code}-${i}`} className="flex items-center gap-1.5 shrink-0">
                         <span className="text-[11px] font-mono text-zinc-500 truncate max-w-[100px]">{c.label}</span>
@@ -1050,9 +1050,9 @@ function LiveMonitor({ reqs, now }: { reqs: LR[]; now: number }) {
                 </div>
               </div>
 
-              <div className="hidden sm:grid items-center px-4 py-2.5 transition-colors"
+              <div className="hidden sm:grid items-center px-4 py-2.5 transition-colors min-w-0"
                 style={{
-                  gridTemplateColumns: "72px 88px 1fr 52px 64px 56px",
+                  gridTemplateColumns: "72px 88px minmax(0,1fr) 52px 64px 56px",
                   borderBottom: "1px solid rgba(255,255,255,0.03)",
                 }}
                 onMouseEnter={e => (e.currentTarget.style.background = "rgba(255,255,255,0.015)")}
@@ -1061,7 +1061,7 @@ function LiveMonitor({ reqs, now }: { reqs: LR[]; now: number }) {
                   {new Date(r.ts).toLocaleTimeString("en-US", { hour12: false, hour: "2-digit", minute: "2-digit", second: "2-digit" })}
                 </span>
                 <PBadge provider={r.provider} />
-                <div className="flex items-center gap-1.5 min-w-0">
+                <div className="flex items-center gap-1.5 min-w-0 overflow-x-auto">
                   {r.chain?.map((c, i) => (
                     <div key={`${c.label}-${c.code}-${i}`} className="flex items-center gap-1.5 shrink-0">
                       <span className="text-[11px] font-mono text-zinc-500 truncate max-w-[100px]">{c.label}</span>
@@ -1839,7 +1839,7 @@ function Dashboard({ user, onLogout }: { user: UserRead | null; onLogout: () => 
   }
 
   return (
-    <div className="min-h-screen flex flex-col" style={{ background: "#0A0A0B", fontFamily: "Inter, sans-serif" }}>
+    <div className="min-h-screen flex flex-col overflow-x-hidden" style={{ background: "#0A0A0B", fontFamily: "Inter, sans-serif" }}>
       <TopBar view={view} onView={setView} onAdd={() => setAddOpen(true)} operational={operational} onLogout={onLogout} userEmail={user?.email} />
 
       <main className="flex-1 px-3 sm:px-6 py-4 sm:py-5 w-full max-w-[1400px] mx-auto space-y-4">
