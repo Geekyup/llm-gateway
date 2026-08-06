@@ -38,11 +38,12 @@ packages = ["app"]
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
-testpaths = ["tests"]
+testpaths = ["app/tests"]
 
 [tool.ruff]
 line-length = 100
 target-version = "py312"
+extend-exclude = ["app/db/alembic/versions"]
 
 [tool.ruff.lint]
 ignore = [
@@ -55,4 +56,4 @@ ignore = [
 [tool.ruff.lint.per-file-ignores]
 # Tests intentionally use asserts, and swallow-and-continue is a deliberate
 # pattern in a few fake/fixture helpers, not a security concern.
-"tests/**" = ["S101"]
+"app/tests/**" = ["S101"]

@@ -5,16 +5,12 @@ on:
     branches: [main]
     paths:
       - "app/**"
-      - "tests/**"
-      - "alembic/**"
       - "pyproject.toml"
       - ".github/workflows/backend-ci.yml"
   pull_request:
     branches: [main]
     paths:
       - "app/**"
-      - "tests/**"
-      - "alembic/**"
       - "pyproject.toml"
       - ".github/workflows/backend-ci.yml"
 
@@ -48,8 +44,6 @@ jobs:
           --health-retries 10
 
     env:
-      # Same dummies conftest.py sets — provided here too so anything that
-      # imports settings at collection time (before conftest runs) is safe.
       ENCRYPTION_KEY: "kQ80G5wq1v3o2r7m6b8p3s5t9u1w4y6a8c0e2g4i6k8="
       ADMIN_API_KEY: "test-admin-key"
       DATABASE_URL: "postgresql+asyncpg://test:test@localhost:5432/test"
@@ -71,7 +65,7 @@ jobs:
           pip install --no-cache-dir -e ".[dev]"
 
       - name: Lint with ruff
-        run: ruff check app tests
+        run: ruff check app
 
       - name: Run tests
         run: pytest -v

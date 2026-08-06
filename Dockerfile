@@ -12,7 +12,6 @@ COPY app ./app
 RUN pip install --no-cache-dir -e .
 
 COPY alembic.ini ./
-COPY alembic ./alembic
 
 EXPOSE 8000
 

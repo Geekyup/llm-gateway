@@ -5,12 +5,11 @@ from alembic import context
 from sqlalchemy import pool
 from sqlalchemy.ext.asyncio import async_engine_from_config
 
-from app.config import get_settings
-from app.db.base import Base
-
 # Import all ORM models here so Base.metadata is fully populated for
 # autogenerate. Add new domains' models to this list as they're created.
 from app.auth.models import RefreshToken, User  # noqa: F401
+from app.config import get_settings
+from app.db.base import Base
 from app.keys.models import APIKey  # noqa: F401
 from app.tokens.models import GatewayToken  # noqa: F401
 
