@@ -827,7 +827,7 @@ function KeyDetailDrawer({ keyData, now, onClose, onDisable, onReset, onDelete, 
     <>
       <div className="fixed inset-0 z-40 animate-in fade-in duration-200" onClick={onClose}
         style={{ background: "rgba(0,0,0,0.5)", backdropFilter: "blur(2px)" }} />
-      <aside className="fixed right-0 top-0 bottom-0 z-50 w-full sm:w-96 flex flex-col overflow-y-auto animate-in slide-in-from-right duration-300 ease-out"
+      <aside className="fixed right-0 top-0 bottom-0 z-50 w-full sm:w-96 flex flex-col overflow-y-auto thin-scrollbar animate-in slide-in-from-right duration-300 ease-out"
         style={{ background: "#111113", borderLeft: "1px solid rgba(255,255,255,0.07)", boxShadow: "-24px 0 60px rgba(0,0,0,0.4)" }}>
         <div className="flex items-start justify-between p-5"
           style={{ borderBottom: "1px solid rgba(255,255,255,0.05)" }}>
