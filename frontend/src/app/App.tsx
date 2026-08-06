@@ -1439,8 +1439,8 @@ function ModelPill({
   const ProviderIcon = PN[provider].Icon;
 
   return (
-    <div className="flex items-center gap-1.5" ref={ref}>
-      <div className="relative">
+    <div className="flex items-center gap-1.5 min-w-0" ref={ref}>
+      <div className="relative shrink-0">
         <button onClick={() => setOpen(o => (o === "provider" ? null : "provider"))}
           className="flex items-center gap-1.5 pl-2 pr-1.5 py-1 rounded-full text-xs font-medium transition-colors"
           style={{
@@ -1472,15 +1472,15 @@ function ModelPill({
         )}
       </div>
 
-      <div className="relative">
+      <div className="relative min-w-0">
         <button onClick={() => setOpen(o => (o === "model" ? null : "model"))}
-          className="flex items-center gap-1.5 pl-2.5 pr-1.5 py-1 rounded-full text-xs font-mono transition-colors max-w-[200px]"
+          className="flex items-center gap-1.5 pl-2.5 pr-1.5 py-1 rounded-full text-xs font-mono transition-colors w-full max-w-[160px] min-w-0"
           style={{
             background: open === "model" ? "rgba(255,255,255,0.09)" : "rgba(255,255,255,0.05)",
             border: "1px solid rgba(255,255,255,0.08)", color: model ? "#DCDCE1" : "#71717A",
           }}>
-          <span className="truncate">{model || "pool default"}</span>
-          <ChevronDown size={11} color="#71717A" className="shrink-0"
+          <span className="truncate min-w-0">{model || "pool default"}</span>
+          <ChevronDown size={11} color="#71717A" className="shrink-0 ml-auto"
             style={{ transform: open === "model" ? "rotate(180deg)" : "none", transition: "transform 0.15s ease" }} />
         </button>
         {open === "model" && (
@@ -1651,13 +1651,15 @@ function ChatPlayground({ keys }: { keys: AK[] }) {
 
           <div className="flex items-center justify-between gap-2 px-3 pb-2.5">
             {provider ? (
-              <ModelPill
-                provider={provider as Provider} model={model} providers={providers} modelsForProvider={modelsForProvider}
-                onProvider={p => { setProvider(p); setModel(""); }} onModel={setModel}
-              />
+              <div className="min-w-0 flex-1">
+                <ModelPill
+                  provider={provider as Provider} model={model} providers={providers} modelsForProvider={modelsForProvider}
+                  onProvider={p => { setProvider(p); setModel(""); }} onModel={setModel}
+                />
+              </div>
             ) : <div />}
 
-            <div className="flex items-center gap-1.5">
+            <div className="flex items-center gap-1.5 shrink-0">
               {messages.length > 0 && (
                 <button onClick={() => setMessages([])} title="Clear chat"
                   className="p-1.5 rounded-full transition-colors hover:bg-white/5">
