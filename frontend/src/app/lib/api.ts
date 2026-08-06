@@ -379,6 +379,10 @@ export async function streamPlaygroundChat(
       }
       try {
         const parsed = JSON.parse(data);
+        if (parsed?.error?.message) {
+          handlers.onError(parsed.error.message);
+          return;
+        }
         const delta: string | undefined = parsed?.choices?.[0]?.delta?.content;
         if (delta) handlers.onDelta(delta);
       } catch {
