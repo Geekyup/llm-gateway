@@ -1419,6 +1419,98 @@ function GatewayAccessPanel() {
   );
 }
 
+function ModelPill({
+  provider, model, providers, modelsForProvider, onProvider, onModel,
+}: {
+  provider: Provider; model: string; providers: Provider[]; modelsForProvider: string[];
+  onProvider: (p: Provider) => void; onModel: (m: string) => void;
+}) {
+  const [open, setOpen] = useState<"provider" | "model" | null>(null);
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    function onDocClick(e: MouseEvent) {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(null);
+    }
+    document.addEventListener("mousedown", onDocClick);
+    return () => document.removeEventListener("mousedown", onDocClick);
+  }, []);
+
+  const ProviderIcon = PN[provider].Icon;
+
+  return (
+    <div className="flex items-center gap-1.5" ref={ref}>
+      <div className="relative">
+        <button onClick={() => setOpen(o => (o === "provider" ? null : "provider"))}
+          className="flex items-center gap-1.5 pl-2 pr-1.5 py-1 rounded-full text-xs font-medium transition-colors"
+          style={{
+            background: open === "provider" ? "rgba(255,255,255,0.09)" : "rgba(255,255,255,0.05)",
+            border: "1px solid rgba(255,255,255,0.08)", color: "#DCDCE1",
+          }}>
+          <ProviderIcon size={11} color="#A1A1AA" />
+          {PN[provider].name}
+          <ChevronDown size={11} color="#71717A"
+            style={{ transform: open === "provider" ? "rotate(180deg)" : "none", transition: "transform 0.15s ease" }} />
+        </button>
+        {open === "provider" && (
+          <div className="absolute z-20 bottom-full mb-1.5 w-44 rounded-lg shadow-lg animate-in fade-in slide-in-from-bottom-1 duration-150 overflow-hidden"
+            style={{ background: "#1C1C1E", border: "1px solid rgba(255,255,255,0.1)" }}>
+            {providers.map(p => {
+              const Icon = PN[p].Icon;
+              const active = p === provider;
+              return (
+                <button key={p} onClick={() => { onProvider(p); setOpen(null); }}
+                  className="w-full flex items-center gap-2 text-left px-3 py-2 text-xs transition-colors hover:bg-white/5"
+                  style={{ background: active ? "rgba(255,255,255,0.04)" : "transparent" }}>
+                  <Icon size={12} color="#ECECF0" />
+                  <span className="flex-1" style={{ color: active ? "#ECECF0" : "#A1A1AA" }}>{PN[p].name}</span>
+                  {active && <CheckCircle2 size={12} color="#ECECF0" />}
+                </button>
+              );
+            })}
+          </div>
+        )}
+      </div>
+
+      <div className="relative">
+        <button onClick={() => setOpen(o => (o === "model" ? null : "model"))}
+          className="flex items-center gap-1.5 pl-2.5 pr-1.5 py-1 rounded-full text-xs font-mono transition-colors max-w-[200px]"
+          style={{
+            background: open === "model" ? "rgba(255,255,255,0.09)" : "rgba(255,255,255,0.05)",
+            border: "1px solid rgba(255,255,255,0.08)", color: model ? "#DCDCE1" : "#71717A",
+          }}>
+          <span className="truncate">{model || "pool default"}</span>
+          <ChevronDown size={11} color="#71717A" className="shrink-0"
+            style={{ transform: open === "model" ? "rotate(180deg)" : "none", transition: "transform 0.15s ease" }} />
+        </button>
+        {open === "model" && (
+          <div className="absolute z-20 bottom-full mb-1.5 w-56 rounded-lg shadow-lg animate-in fade-in slide-in-from-bottom-1 duration-150 overflow-hidden"
+            style={{ background: "#1C1C1E", border: "1px solid rgba(255,255,255,0.1)" }}>
+            <div className="max-h-52 overflow-y-auto py-1">
+              <button onClick={() => { onModel(""); setOpen(null); }}
+                className="w-full flex items-center justify-between text-left px-3 py-2 text-xs transition-colors hover:bg-white/5"
+                style={{ background: !model ? "rgba(255,255,255,0.04)" : "transparent" }}>
+                <span style={{ color: !model ? "#ECECF0" : "#A1A1AA" }}>Pool default (any)</span>
+                {!model && <CheckCircle2 size={12} color="#ECECF0" />}
+              </button>
+              {modelsForProvider.map(m => {
+                const active = m === model;
+                return (
+                  <button key={m} onClick={() => { onModel(m); setOpen(null); }}
+                    className="w-full flex items-center justify-between text-left px-3 py-2 text-xs font-mono transition-colors hover:bg-white/5">
+                    <span className="truncate" style={{ color: active ? "#ECECF0" : "#A1A1AA" }}>{m}</span>
+                    {active && <CheckCircle2 size={12} color="#ECECF0" className="shrink-0 ml-2" />}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 function ChatPlayground({ keys }: { keys: AK[] }) {
   const activeKeys = keys.filter(k => k.status !== "disabled");
   const providers = Array.from(new Set(activeKeys.map(k => k.provider))) as Provider[];
@@ -1431,6 +1523,7 @@ function ChatPlayground({ keys }: { keys: AK[] }) {
   const [error, setError]       = useState<string | null>(null);
   const abortRef = useRef<AbortController | null>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   useEffect(() => {
     if (provider && !providers.includes(provider as Provider)) setProvider(providers[0] ?? "");
@@ -1443,6 +1536,13 @@ function ChatPlayground({ keys }: { keys: AK[] }) {
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
+
+  useEffect(() => {
+    const el = textareaRef.current;
+    if (!el) return;
+    el.style.height = "auto";
+    el.style.height = `${Math.min(el.scrollHeight, 200)}px`;
+  }, [input]);
 
   if (providers.length === 0) {
     return (
@@ -1498,76 +1598,88 @@ function ChatPlayground({ keys }: { keys: AK[] }) {
   }
 
   return (
-    <div className="flex flex-col rounded-xl overflow-hidden" style={{ border: "1px solid rgba(255,255,255,0.06)", background: "#111113", height: "calc(100vh - 160px)" }}>
-      <div className="flex items-center gap-2 px-4 py-3 shrink-0" style={{ borderBottom: "1px solid rgba(255,255,255,0.06)" }}>
-        <select value={provider} onChange={e => { setProvider(e.target.value as Provider); setModel(""); }}
-          className="text-xs font-mono px-2 py-1.5 rounded-md outline-none"
-          style={{ background: "#18181B", border: "1px solid rgba(255,255,255,0.08)", color: "#ECECF0" }}>
-          {providers.map(p => <option key={p} value={p}>{p}</option>)}
-        </select>
-        <select value={model} onChange={e => setModel(e.target.value)}
-          className="text-xs font-mono px-2 py-1.5 rounded-md outline-none flex-1 min-w-0"
-          style={{ background: "#18181B", border: "1px solid rgba(255,255,255,0.08)", color: "#ECECF0" }}>
-          <option value="">any model / pool default</option>
-          {modelsForProvider.map(m => <option key={m} value={m}>{m}</option>)}
-        </select>
-        {messages.length > 0 && (
-          <button onClick={() => setMessages([])} title="Clear chat"
-            className="p-1.5 rounded-md transition-colors hover:bg-white/5 shrink-0">
-            <Trash2 size={13} color="#52525B" />
-          </button>
-        )}
-      </div>
-
-      <div className="flex-1 overflow-y-auto px-4 py-4 space-y-4">
-        {messages.length === 0 && (
-          <div className="flex flex-col items-center justify-center h-full gap-2 text-center" style={{ color: "#3F3F46" }}>
-            <MessageSquare size={22} />
-            <div className="text-xs">Send a message to test your key pool end-to-end</div>
+    <div className="flex flex-col mx-auto w-full max-w-3xl" style={{ height: "calc(100vh - 130px)" }}>
+      <div className="flex-1 overflow-y-auto px-1 sm:px-0">
+        {messages.length === 0 ? (
+          <div className="flex flex-col items-center justify-center h-full gap-3 text-center" style={{ color: "#3F3F46" }}>
+            <div className="w-11 h-11 rounded-xl flex items-center justify-center"
+              style={{ background: "rgba(0,214,143,0.1)", border: "1px solid rgba(0,214,143,0.2)" }}>
+              <MessageSquare size={18} color="#00D68F" />
+            </div>
+            <div className="text-sm font-medium" style={{ color: "#A1A1AA" }}>Test your key pool</div>
+            <div className="text-xs max-w-xs">Send a message below — it goes through the same failover and retry logic as any client of the gateway.</div>
+          </div>
+        ) : (
+          <div className="py-6 space-y-6">
+            {messages.map((m, i) => (
+              <div key={i} className="flex gap-3" style={{ opacity: streaming && i === messages.length - 1 && !m.content ? 0.6 : 1 }}>
+                <div className="w-7 h-7 rounded-full flex items-center justify-center shrink-0"
+                  style={{
+                    background: m.role === "user" ? "rgba(255,255,255,0.06)" : "rgba(0,214,143,0.12)",
+                    border: m.role === "user" ? "1px solid rgba(255,255,255,0.08)" : "1px solid rgba(0,214,143,0.2)",
+                  }}>
+                  {m.role === "user" ? <User size={13} color="#A1A1AA" /> : <Bot size={13} color="#00D68F" />}
+                </div>
+                <div className="min-w-0 flex-1 pt-1">
+                  <div className="text-[11px] font-medium mb-1" style={{ color: "#52525B" }}>
+                    {m.role === "user" ? "You" : "Assistant"}
+                  </div>
+                  <div className="text-sm leading-relaxed whitespace-pre-wrap" style={{ color: "#DCDCE1" }}>
+                    {m.content || (streaming && i === messages.length - 1 ? "···" : "")}
+                  </div>
+                </div>
+              </div>
+            ))}
+            <div ref={bottomRef} />
           </div>
         )}
-        {messages.map((m, i) => (
-          <div key={i} className="flex gap-2.5" style={{ opacity: streaming && i === messages.length - 1 && !m.content ? 0.6 : 1 }}>
-            <div className="w-6 h-6 rounded-md flex items-center justify-center shrink-0 mt-0.5"
-              style={{
-                background: m.role === "user" ? "rgba(255,255,255,0.06)" : "rgba(0,214,143,0.12)",
-                border: m.role === "user" ? "1px solid rgba(255,255,255,0.08)" : "1px solid rgba(0,214,143,0.2)",
-              }}>
-              {m.role === "user" ? <User size={12} color="#A1A1AA" /> : <Bot size={12} color="#00D68F" />}
-            </div>
-            <div className="text-sm leading-relaxed whitespace-pre-wrap min-w-0 flex-1 pt-0.5" style={{ color: "#DCDCE1" }}>
-              {m.content || (streaming && i === messages.length - 1 ? "···" : "")}
-            </div>
-          </div>
-        ))}
-        <div ref={bottomRef} />
       </div>
 
       {error && (
-        <div className="flex items-center gap-2 px-4 py-2 text-xs shrink-0" style={{ color: "#EF4444", background: "rgba(239,68,68,0.08)" }}>
+        <div className="flex items-center gap-2 px-3.5 py-2 mb-2 rounded-lg text-xs shrink-0" style={{ color: "#EF4444", background: "rgba(239,68,68,0.08)", border: "1px solid rgba(239,68,68,0.15)" }}>
           <AlertTriangle size={12} className="shrink-0" /> {error}
         </div>
       )}
 
-      <div className="flex items-center gap-2 px-3 py-3 shrink-0" style={{ borderTop: "1px solid rgba(255,255,255,0.06)" }}>
-        <input value={input} onChange={e => setInput(e.target.value)}
-          onKeyDown={e => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); send(); } }}
-          placeholder="Message the gateway…" disabled={streaming}
-          className="flex-1 min-w-0 text-sm px-3 py-2 rounded-lg outline-none"
-          style={{ background: "#18181B", border: "1px solid rgba(255,255,255,0.08)", color: "#ECECF0" }} />
-        {streaming ? (
-          <button onClick={stop}
-            className="flex items-center justify-center w-9 h-9 rounded-lg shrink-0 transition-all active:scale-95"
-            style={{ background: "rgba(239,68,68,0.12)", border: "1px solid rgba(239,68,68,0.3)" }}>
-            <Square size={13} color="#EF4444" />
-          </button>
-        ) : (
-          <button onClick={send} disabled={!input.trim()}
-            className="flex items-center justify-center w-9 h-9 rounded-lg shrink-0 transition-all active:scale-95 disabled:opacity-40"
-            style={{ background: "#00D68F" }}>
-            <Send size={13} color="#0A0A0B" />
-          </button>
-        )}
+      <div className="shrink-0 pb-4 sm:pb-6">
+        <div className="rounded-2xl overflow-hidden" style={{ background: "#18181B", border: "1px solid rgba(255,255,255,0.09)" }}>
+          <textarea ref={textareaRef} value={input} onChange={e => setInput(e.target.value)}
+            onKeyDown={e => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); send(); } }}
+            placeholder="Message the gateway…" disabled={streaming} rows={1}
+            className="w-full resize-none px-4 pt-3.5 pb-2 text-sm outline-none bg-transparent"
+            style={{ color: "#ECECF0", maxHeight: 200 }} />
+
+          <div className="flex items-center justify-between gap-2 px-3 pb-2.5">
+            {provider ? (
+              <ModelPill
+                provider={provider as Provider} model={model} providers={providers} modelsForProvider={modelsForProvider}
+                onProvider={p => { setProvider(p); setModel(""); }} onModel={setModel}
+              />
+            ) : <div />}
+
+            <div className="flex items-center gap-1.5">
+              {messages.length > 0 && (
+                <button onClick={() => setMessages([])} title="Clear chat"
+                  className="p-1.5 rounded-full transition-colors hover:bg-white/5">
+                  <Trash2 size={13} color="#52525B" />
+                </button>
+              )}
+              {streaming ? (
+                <button onClick={stop}
+                  className="flex items-center justify-center w-8 h-8 rounded-full shrink-0 transition-all active:scale-95"
+                  style={{ background: "rgba(239,68,68,0.12)", border: "1px solid rgba(239,68,68,0.3)" }}>
+                  <Square size={12} color="#EF4444" />
+                </button>
+              ) : (
+                <button onClick={send} disabled={!input.trim()}
+                  className="flex items-center justify-center w-8 h-8 rounded-full shrink-0 transition-all active:scale-95 disabled:opacity-30"
+                  style={{ background: "#00D68F" }}>
+                  <Send size={12} color="#0A0A0B" />
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
       </div>
     </div>
   );
