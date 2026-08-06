@@ -782,6 +782,12 @@ function KeyDetailDrawer({ keyData, now, onClose, onDisable, onReset, onDelete, 
   }, [onClose]);
 
   useEffect(() => {
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => { document.body.style.overflow = prev; };
+  }, []);
+
+  useEffect(() => {
     let cancelled = false;
     setChartData(null);
     setChartError(false);
