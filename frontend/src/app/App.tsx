@@ -1839,7 +1839,7 @@ function Dashboard({ user, onLogout }: { user: UserRead | null; onLogout: () => 
   }
 
   return (
-    <div className="min-h-screen flex flex-col overflow-x-hidden" style={{ background: "#0A0A0B", fontFamily: "Inter, sans-serif" }}>
+    <div className="min-h-screen flex flex-col" style={{ background: "#0A0A0B", fontFamily: "Inter, sans-serif" }}>
       <TopBar view={view} onView={setView} onAdd={() => setAddOpen(true)} operational={operational} onLogout={onLogout} userEmail={user?.email} />
 
       <main className="flex-1 px-3 sm:px-6 py-4 sm:py-5 w-full max-w-[1400px] mx-auto space-y-4">
