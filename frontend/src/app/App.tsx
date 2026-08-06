@@ -1866,30 +1866,37 @@ function Dashboard({ user, onLogout }: { user: UserRead | null; onLogout: () => 
           <div className="flex items-center justify-center py-24">
             <Loader2 size={20} className="animate-spin" color="#52525B" />
           </div>
-        ) : view === "dashboard" ? (
-          <div key="dashboard" className="space-y-4 animate-in fade-in slide-in-from-bottom-1 duration-300 ease-out">
-            <MetricCards keys={keys} />
-            <KeysTable
-              keys={keys} filter={filter} onFilter={setFilter} now={now}
-              onSelect={setSelectedId}
-              onEdit={id => { setEditId(id); setSelectedId(null); }}
-              onToggle={toggleKey}
-              onCheck={checkKey}
-              checkingIds={checkingIds}
-            />
-          </div>
-        ) : view === "monitor" ? (
-          <div key="monitor" className="animate-in fade-in slide-in-from-bottom-1 duration-300 ease-out">
-            <LiveMonitor reqs={reqs} now={now} />
-          </div>
-        ) : view === "playground" ? (
-          <div key="playground" className="animate-in fade-in slide-in-from-bottom-1 duration-300 ease-out">
-            <ChatPlayground keys={keys} />
-          </div>
         ) : (
-          <div key="access" className="animate-in fade-in slide-in-from-bottom-1 duration-300 ease-out">
-            <GatewayAccessPanel />
-          </div>
+          <>
+            {view === "dashboard" && (
+              <div key="dashboard" className="space-y-4 animate-in fade-in slide-in-from-bottom-1 duration-300 ease-out">
+                <MetricCards keys={keys} />
+                <KeysTable
+                  keys={keys} filter={filter} onFilter={setFilter} now={now}
+                  onSelect={setSelectedId}
+                  onEdit={id => { setEditId(id); setSelectedId(null); }}
+                  onToggle={toggleKey}
+                  onCheck={checkKey}
+                  checkingIds={checkingIds}
+                />
+              </div>
+            )}
+            {view === "monitor" && (
+              <div key="monitor" className="animate-in fade-in slide-in-from-bottom-1 duration-300 ease-out">
+                <LiveMonitor reqs={reqs} now={now} />
+              </div>
+            )}
+            {/* ChatPlayground stays mounted across tab switches so the conversation isn't lost;
+                it's just hidden with CSS instead of being removed from the tree. */}
+            <div key="playground" className={view === "playground" ? "animate-in fade-in slide-in-from-bottom-1 duration-300 ease-out" : "hidden"}>
+              <ChatPlayground keys={keys} />
+            </div>
+            {view === "access" && (
+              <div key="access" className="animate-in fade-in slide-in-from-bottom-1 duration-300 ease-out">
+                <GatewayAccessPanel />
+              </div>
+            )}
+          </>
         )}
       </main>
 
