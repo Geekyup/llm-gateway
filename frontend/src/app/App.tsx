@@ -3,7 +3,7 @@ import {
   Plus, Eye, EyeOff, X, Activity, RefreshCw, Trash2, Edit2,
   Power, Clock, ArrowRight, CheckCircle2, Shield, AlertTriangle,
   LayoutDashboard, KeyRound, Zap, LogOut, Loader2, Stethoscope, ChevronDown, Search,
-  Sparkles, Route, MessageSquare, Send, Square, User, Bot,
+  Sparkles, Route, MessageSquare, Send, Square, User, Bot, Menu,
 } from "lucide-react";
 import { AreaChart, Area, XAxis, Tooltip, ResponsiveContainer } from "recharts";
 import ReactMarkdown from "react-markdown";
@@ -165,60 +165,110 @@ function CircP({ used, limit, color }: { used: number; limit: number; color: str
   );
 }
 
-function TopBar({ view, onView, onAdd, operational, onLogout, userEmail }: {
-  view: View; onView: (v: View) => void; onAdd: () => void; operational: boolean; onLogout: () => void;
-  userEmail?: string | null;
+const NAV_ITEMS: { v: View; label: string; Icon: typeof LayoutDashboard }[] = [
+  { v: "dashboard",  label: "Dashboard",     Icon: LayoutDashboard },
+  { v: "monitor",    label: "Live Monitor",  Icon: Activity },
+  { v: "playground", label: "Playground",    Icon: MessageSquare },
+  { v: "access",     label: "Gateway Access", Icon: Shield },
+];
+
+function SidebarBrand() {
+  return (
+    <div className="flex items-center gap-2.5 px-4 h-14 shrink-0"
+      style={{ borderBottom: "1px solid rgba(255,255,255,0.06)" }}>
+      <div className="w-7 h-7 rounded-lg flex items-center justify-center shrink-0"
+        style={{ background: "rgba(0,214,143,0.12)", border: "1px solid rgba(0,214,143,0.2)" }}>
+        <KeyRound size={14} color="#00D68F" />
+      </div>
+      <span className="font-mono text-sm font-medium tracking-tight text-zinc-100 truncate">keypool</span>
+      <span className="text-[10px] font-mono px-1.5 py-0.5 rounded shrink-0"
+        style={{ color: "#52525B", background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.06)" }}>
+        v0.4.1
+      </span>
+    </div>
+  );
+}
+
+function SidebarNav({ view, onView }: { view: View; onView: (v: View) => void }) {
+  return (
+    <nav className="flex flex-col gap-0.5 px-3 py-4">
+      {NAV_ITEMS.map(({ v, label, Icon }) => (
+        <button key={v} onClick={() => onView(v)}
+          className="flex items-center gap-2.5 px-3 py-2 rounded-lg text-[13px] font-medium transition-all"
+          style={{
+            color: view === v ? "#ECECF0" : "#71717A",
+            background: view === v ? "rgba(0,214,143,0.10)" : "transparent",
+          }}
+          onMouseEnter={e => { if (view !== v) e.currentTarget.style.background = "rgba(255,255,255,0.04)"; }}
+          onMouseLeave={e => { if (view !== v) e.currentTarget.style.background = "transparent"; }}>
+          <Icon size={15} color={view === v ? "#00D68F" : "#52525B"} />
+          {label}
+        </button>
+      ))}
+    </nav>
+  );
+}
+
+function Sidebar({ view, onView }: { view: View; onView: (v: View) => void }) {
+  return (
+    <aside className="hidden md:flex md:flex-col w-56 shrink-0 h-screen sticky top-0"
+      style={{ background: "#0D0D0F", borderRight: "1px solid rgba(255,255,255,0.06)" }}>
+      <SidebarBrand />
+      <SidebarNav view={view} onView={onView} />
+    </aside>
+  );
+}
+
+function MobileSidebarDrawer({ view, onView, onClose }: {
+  view: View; onView: (v: View) => void; onClose: () => void;
 }) {
   return (
-    <header className="flex flex-col md:grid md:grid-cols-[1fr_auto_1fr] md:items-center md:h-14 shrink-0 px-3 sm:px-6 gap-2 md:gap-5 py-2.5 md:py-0"
-      style={{ borderBottom: "1px solid rgba(255,255,255,0.06)", background: "#0A0A0B" }}>
-      <div className="flex items-center justify-between md:justify-self-start gap-2.5 md:gap-5">
-        <div className="flex items-center gap-2.5 min-w-0">
-          <div className="w-7 h-7 rounded-lg flex items-center justify-center shrink-0"
-            style={{ background: "rgba(0,214,143,0.12)", border: "1px solid rgba(0,214,143,0.2)" }}>
-            <KeyRound size={14} color="#00D68F" />
+    <>
+      <div className="fixed inset-0 z-40 animate-in fade-in duration-200" onClick={onClose}
+        style={{ background: "rgba(0,0,0,0.5)", backdropFilter: "blur(2px)" }} />
+      <aside className="fixed left-0 top-0 bottom-0 z-50 w-64 flex flex-col animate-in slide-in-from-left duration-250 ease-out"
+        style={{ background: "#0D0D0F", borderRight: "1px solid rgba(255,255,255,0.06)" }}>
+        <div className="flex items-center justify-between px-4 h-14 shrink-0"
+          style={{ borderBottom: "1px solid rgba(255,255,255,0.06)" }}>
+          <div className="flex items-center gap-2.5 min-w-0">
+            <div className="w-7 h-7 rounded-lg flex items-center justify-center shrink-0"
+              style={{ background: "rgba(0,214,143,0.12)", border: "1px solid rgba(0,214,143,0.2)" }}>
+              <KeyRound size={14} color="#00D68F" />
+            </div>
+            <span className="font-mono text-sm font-medium tracking-tight text-zinc-100 truncate">keypool</span>
           </div>
-          <span className="font-mono text-sm font-medium tracking-tight text-zinc-100 truncate">keypool</span>
-          <span className="hidden sm:inline text-[10px] font-mono px-1.5 py-0.5 rounded shrink-0"
-            style={{ color: "#52525B", background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.06)" }}>
-            v0.4.1
-          </span>
+          <button onClick={onClose} className="p-1.5 rounded-lg transition-colors hover:bg-white/5 shrink-0">
+            <X size={16} color="#52525B" />
+          </button>
         </div>
-        <div className="flex md:hidden items-center gap-2">
-          <span className="w-2 h-2 rounded-full"
-            style={{
-              background: operational ? "#00D68F" : "#EF4444",
-              boxShadow: operational ? "0 0 7px rgba(0,214,143,0.8)" : "0 0 7px rgba(239,68,68,0.8)",
-            }} />
-        </div>
+        <SidebarNav view={view} onView={v => { onView(v); onClose(); }} />
+      </aside>
+    </>
+  );
+}
+
+function TopBar({ onAdd, operational, onLogout, userEmail, onMenu }: {
+  onAdd: () => void; operational: boolean; onLogout: () => void;
+  userEmail?: string | null; onMenu: () => void;
+}) {
+  return (
+    <header className="flex items-center justify-between h-14 shrink-0 px-3 sm:px-6 gap-3"
+      style={{ borderBottom: "1px solid rgba(255,255,255,0.06)", background: "#0A0A0B" }}>
+      <div className="flex items-center gap-2">
+        <button onClick={onMenu} className="md:hidden p-1.5 -ml-1.5 rounded-lg transition-colors hover:bg-white/5 shrink-0">
+          <Menu size={18} color="#A1A1AA" />
+        </button>
+        <span className="w-2 h-2 rounded-full shrink-0"
+          style={{
+            background: operational ? "#00D68F" : "#EF4444",
+            boxShadow: operational ? "0 0 7px rgba(0,214,143,0.8)" : "0 0 7px rgba(239,68,68,0.8)",
+          }} />
+        <span className="hidden sm:inline text-xs font-mono" style={{ color: operational ? "#00D68F" : "#EF4444" }}>
+          {operational ? "Operational" : "Degraded"}
+        </span>
       </div>
 
-      <nav className="flex gap-0.5 overflow-x-auto -mx-3 px-3 sm:mx-0 sm:px-0 md:justify-self-center">
-        {(["dashboard", "monitor", "playground", "access"] as View[]).map(v => (
-          <button key={v} onClick={() => onView(v)}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-all shrink-0 whitespace-nowrap"
-            style={{
-              color: view === v ? "#ECECF0" : "#52525B",
-              background: view === v ? "rgba(255,255,255,0.07)" : "transparent",
-              border: view === v ? "1px solid rgba(255,255,255,0.08)" : "1px solid transparent",
-            }}>
-            {v === "dashboard" ? <LayoutDashboard size={12} /> : v === "monitor" ? <Activity size={12} /> : v === "playground" ? <MessageSquare size={12} /> : <Shield size={12} />}
-            {v === "dashboard" ? "Dashboard" : v === "monitor" ? "Live Monitor" : v === "playground" ? "Playground" : "Gateway Access"}
-          </button>
-        ))}
-      </nav>
-
-      <div className="flex items-center justify-between md:justify-self-end gap-4">
-        <div className="hidden md:flex items-center gap-2">
-          <span className="w-2 h-2 rounded-full"
-            style={{
-              background: operational ? "#00D68F" : "#EF4444",
-              boxShadow: operational ? "0 0 7px rgba(0,214,143,0.8)" : "0 0 7px rgba(239,68,68,0.8)",
-            }} />
-          <span className="text-xs font-mono" style={{ color: operational ? "#00D68F" : "#EF4444" }}>
-            {operational ? "Operational" : "Degraded"}
-          </span>
-        </div>
+      <div className="flex items-center gap-3 sm:gap-4">
         <button onClick={onAdd}
           className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all active:scale-95"
           style={{ background: "#00D68F", color: "#0A0A0B", boxShadow: "0 0 16px rgba(0,214,143,0.3)" }}
@@ -1719,6 +1769,7 @@ function Dashboard({ user, onLogout }: { user: UserRead | null; onLogout: () => 
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [editId, setEditId]       = useState<string | null>(null);
   const [addOpen, setAddOpen]     = useState(false);
+  const [menuOpen, setMenuOpen]   = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
   const [saving, setSaving]       = useState(false);
   const [reqs, setReqs]           = useState<LR[]>([]);
@@ -1862,55 +1913,62 @@ function Dashboard({ user, onLogout }: { user: UserRead | null; onLogout: () => 
   }
 
   return (
-    <div className="min-h-screen flex flex-col" style={{ background: "#0A0A0B", fontFamily: "Inter, sans-serif" }}>
-      <TopBar view={view} onView={setView} onAdd={() => setAddOpen(true)} operational={operational} onLogout={onLogout} userEmail={user?.email} />
+    <div className="min-h-screen flex" style={{ background: "#0A0A0B", fontFamily: "Inter, sans-serif" }}>
+      <Sidebar view={view} onView={setView} />
+      {menuOpen && (
+        <MobileSidebarDrawer view={view} onView={setView} onClose={() => setMenuOpen(false)} />
+      )}
 
-      <main className="flex-1 px-3 sm:px-6 py-4 sm:py-5 w-full max-w-[1400px] mx-auto space-y-4">
-        {loadError && (
-          <div className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs"
-            style={{ background: "rgba(239,68,68,0.08)", color: "#EF4444", border: "1px solid rgba(239,68,68,0.2)" }}>
-            <AlertTriangle size={13} className="shrink-0" />
-            Could not reach the API: {loadError}
-          </div>
-        )}
+      <div className="flex-1 flex flex-col min-w-0">
+        <TopBar onAdd={() => setAddOpen(true)} operational={operational} onLogout={onLogout} userEmail={user?.email} onMenu={() => setMenuOpen(true)} />
 
-        {loading ? (
-          <div className="flex items-center justify-center py-24">
-            <Loader2 size={20} className="animate-spin" color="#52525B" />
-          </div>
-        ) : (
-          <>
-            {view === "dashboard" && (
-              <div key="dashboard" className="space-y-4 animate-in fade-in slide-in-from-bottom-1 duration-300 ease-out">
-                <MetricCards keys={keys} />
-                <KeysTable
-                  keys={keys} filter={filter} onFilter={setFilter} now={now}
-                  onSelect={setSelectedId}
-                  onEdit={id => { setEditId(id); setSelectedId(null); }}
-                  onToggle={toggleKey}
-                  onCheck={checkKey}
-                  checkingIds={checkingIds}
-                />
-              </div>
-            )}
-            {view === "monitor" && (
-              <div key="monitor" className="animate-in fade-in slide-in-from-bottom-1 duration-300 ease-out">
-                <LiveMonitor reqs={reqs} now={now} />
-              </div>
-            )}
-            {/* ChatPlayground stays mounted across tab switches so the conversation isn't lost;
-                it's just hidden with CSS instead of being removed from the tree. */}
-            <div key="playground" className={view === "playground" ? "animate-in fade-in slide-in-from-bottom-1 duration-300 ease-out" : "hidden"}>
-              <ChatPlayground keys={keys} active={view === "playground"} />
+        <main className="flex-1 px-3 sm:px-6 py-4 sm:py-5 w-full max-w-[1400px] mx-auto space-y-4">
+          {loadError && (
+            <div className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs"
+              style={{ background: "rgba(239,68,68,0.08)", color: "#EF4444", border: "1px solid rgba(239,68,68,0.2)" }}>
+              <AlertTriangle size={13} className="shrink-0" />
+              Could not reach the API: {loadError}
             </div>
-            {view === "access" && (
-              <div key="access" className="animate-in fade-in slide-in-from-bottom-1 duration-300 ease-out">
-                <GatewayAccessPanel />
+          )}
+
+          {loading ? (
+            <div className="flex items-center justify-center py-24">
+              <Loader2 size={20} className="animate-spin" color="#52525B" />
+            </div>
+          ) : (
+            <>
+              {view === "dashboard" && (
+                <div key="dashboard" className="space-y-4 animate-in fade-in slide-in-from-bottom-1 duration-300 ease-out">
+                  <MetricCards keys={keys} />
+                  <KeysTable
+                    keys={keys} filter={filter} onFilter={setFilter} now={now}
+                    onSelect={setSelectedId}
+                    onEdit={id => { setEditId(id); setSelectedId(null); }}
+                    onToggle={toggleKey}
+                    onCheck={checkKey}
+                    checkingIds={checkingIds}
+                  />
+                </div>
+              )}
+              {view === "monitor" && (
+                <div key="monitor" className="animate-in fade-in slide-in-from-bottom-1 duration-300 ease-out">
+                  <LiveMonitor reqs={reqs} now={now} />
+                </div>
+              )}
+              {/* ChatPlayground stays mounted across tab switches so the conversation isn't lost;
+                  it's just hidden with CSS instead of being removed from the tree. */}
+              <div key="playground" className={view === "playground" ? "animate-in fade-in slide-in-from-bottom-1 duration-300 ease-out" : "hidden"}>
+                <ChatPlayground keys={keys} active={view === "playground"} />
               </div>
-            )}
-          </>
-        )}
-      </main>
+              {view === "access" && (
+                <div key="access" className="animate-in fade-in slide-in-from-bottom-1 duration-300 ease-out">
+                  <GatewayAccessPanel />
+                </div>
+              )}
+            </>
+          )}
+        </main>
+      </div>
 
       {checkResults.length > 0 && (
         <div className="fixed bottom-4 right-4 z-[60] flex flex-col-reverse gap-2 pointer-events-none">
