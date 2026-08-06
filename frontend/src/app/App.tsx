@@ -896,7 +896,7 @@ function KeyDetailDrawer({ keyData, now, onClose, onDisable, onReset, onDelete, 
                           <stop offset="95%" stopColor={s.color} stopOpacity={0}    />
                         </linearGradient>
                       </defs>
-                      <XAxis dataKey="h"
+                      <XAxis dataKey="h" padding={{ left: 0, right: 0 }}
                         tick={{ fontSize: 9, fill: "#52525B", fontFamily: "JetBrains Mono, monospace" }}
                         tickLine={false} axisLine={false} interval={3} />
                       <Tooltip
@@ -924,7 +924,7 @@ function KeyDetailDrawer({ keyData, now, onClose, onDisable, onReset, onDelete, 
                           <stop offset="95%" stopColor="#A78BFA" stopOpacity={0}    />
                         </linearGradient>
                       </defs>
-                      <XAxis dataKey="h"
+                      <XAxis dataKey="h" padding={{ left: 0, right: 0 }}
                         tick={{ fontSize: 9, fill: "#52525B", fontFamily: "JetBrains Mono, monospace" }}
                         tickLine={false} axisLine={false} interval={3} />
                       <Tooltip
