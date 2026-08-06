@@ -85,6 +85,7 @@ async def run_chat_completion(
         default_model = default_groq_model if dto.provider is ProviderType.GROQ else default_openrouter_model
         payload = request.model_dump(exclude={"provider"}, exclude_none=True)
         payload["model"] = dto.model or requested_model or default_model
+        payload["stream"] = False
         return UpstreamRequestSpec(
             path="v1/chat/completions",
             method="POST",
@@ -125,8 +126,10 @@ async def run_chat_completion(
     else:
         response_model = upstream_body.get("model", requested_model or default_gemini_model)
         choices = upstream_body.get("choices") or []
-        content = choices[0]["message"]["content"] if choices else ""
+        content = (choices[0].get("message") or {}).get("content") if choices else ""
         json_body = upstream_body
+
+    content = content or ""
 
     if not request.stream:
         return JSONResponse(status_code=200, content=json_body)
@@ -149,13 +152,21 @@ async def _emulated_stream(content: str, *, model: str):
         )
         return f"data: {json.dumps(payload.model_dump())}\n\n"
 
-    yield chunk(ChatCompletionChunkDelta(role="assistant", content=""))
+    try:
+        yield chunk(ChatCompletionChunkDelta(role="assistant", content=""))
 
-    words = content.split(" ")
-    for i, word in enumerate(words):
-        piece = word if i == len(words) - 1 else word + " "
-        yield chunk(ChatCompletionChunkDelta(content=piece))
-        await asyncio.sleep(0.02)
+        words = (content or "").split(" ")
+        for i, word in enumerate(words):
+            piece = word if i == len(words) - 1 else word + " "
+            yield chunk(ChatCompletionChunkDelta(content=piece))
+            await asyncio.sleep(0.02)
 
-    yield chunk(ChatCompletionChunkDelta(), finish_reason="stop")
-    yield "data: [DONE]\n\n"
+        yield chunk(ChatCompletionChunkDelta(), finish_reason="stop")
+        yield "data: [DONE]\n\n"
+    except Exception:
+        logger.exception("emulated stream failed after headers were sent")
+        error_payload = {
+            "error": {"message": "Streaming failed while generating the response.", "type": "internal_error"}
+        }
+        yield f"data: {json.dumps(error_payload)}\n\n"
+        yield "data: [DONE]\n\n"
