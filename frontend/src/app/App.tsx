@@ -6,6 +6,9 @@ import {
   Sparkles, Route, MessageSquare, Send, Square, User, Bot,
 } from "lucide-react";
 import { AreaChart, Area, XAxis, Tooltip, ResponsiveContainer } from "recharts";
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
+import rehypeHighlight from "rehype-highlight";
 import {
   api, streamEvents, streamPlaygroundChat, getAccessToken, getRefreshToken, setTokenPair, clearTokenPair,
   startGoogleLogin,
@@ -1599,7 +1602,7 @@ function ChatPlayground({ keys }: { keys: AK[] }) {
 
   return (
     <div className="flex flex-col mx-auto w-full max-w-3xl" style={{ height: "calc(100vh - 130px)" }}>
-      <div className="flex-1 overflow-y-auto px-1 sm:px-0">
+      <div className="flex-1 overflow-y-auto thin-scrollbar pr-2">
         {messages.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-full gap-3 text-center" style={{ color: "#3F3F46" }}>
             <div className="w-11 h-11 rounded-xl flex items-center justify-center"
@@ -1624,9 +1627,17 @@ function ChatPlayground({ keys }: { keys: AK[] }) {
                   <div className="text-[11px] font-medium mb-1" style={{ color: "#52525B" }}>
                     {m.role === "user" ? "You" : "Assistant"}
                   </div>
-                  <div className="text-sm leading-relaxed whitespace-pre-wrap" style={{ color: "#DCDCE1" }}>
-                    {m.content || (streaming && i === messages.length - 1 ? "···" : "")}
-                  </div>
+                  {m.content ? (
+                    <div className="markdown-body">
+                      <ReactMarkdown remarkPlugins={[remarkGfm]} rehypePlugins={[rehypeHighlight]}>
+                        {m.content}
+                      </ReactMarkdown>
+                    </div>
+                  ) : (
+                    <div className="text-sm leading-relaxed" style={{ color: "#DCDCE1" }}>
+                      {streaming && i === messages.length - 1 ? "···" : ""}
+                    </div>
+                  )}
                 </div>
               </div>
             ))}
