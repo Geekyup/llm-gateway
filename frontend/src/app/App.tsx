@@ -1514,7 +1514,7 @@ function ModelPill({
   );
 }
 
-function ChatPlayground({ keys }: { keys: AK[] }) {
+function ChatPlayground({ keys, active }: { keys: AK[]; active: boolean }) {
   const activeKeys = keys.filter(k => k.status !== "disabled");
   const providers = Array.from(new Set(activeKeys.map(k => k.provider))) as Provider[];
 
@@ -1543,9 +1543,15 @@ function ChatPlayground({ keys }: { keys: AK[] }) {
   useEffect(() => {
     const el = textareaRef.current;
     if (!el) return;
-    el.style.height = "auto";
-    el.style.height = `${Math.min(el.scrollHeight, 200)}px`;
-  }, [input]);
+    const resize = () => {
+      el.style.height = "auto";
+      el.style.height = `${Math.min(el.scrollHeight, 200)}px`;
+    };
+    // When the tab was hidden (display: none), scrollHeight reads as 0 until
+    // the browser has actually laid the element out again — defer a frame.
+    const raf = requestAnimationFrame(resize);
+    return () => cancelAnimationFrame(raf);
+  }, [input, active]);
 
   if (providers.length === 0) {
     return (
@@ -1889,7 +1895,7 @@ function Dashboard({ user, onLogout }: { user: UserRead | null; onLogout: () => 
             {/* ChatPlayground stays mounted across tab switches so the conversation isn't lost;
                 it's just hidden with CSS instead of being removed from the tree. */}
             <div key="playground" className={view === "playground" ? "animate-in fade-in slide-in-from-bottom-1 duration-300 ease-out" : "hidden"}>
-              <ChatPlayground keys={keys} />
+              <ChatPlayground keys={keys} active={view === "playground"} />
             </div>
             {view === "access" && (
               <div key="access" className="animate-in fade-in slide-in-from-bottom-1 duration-300 ease-out">
