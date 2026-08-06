@@ -1453,7 +1453,7 @@ function ModelPill({
             style={{ transform: open === "provider" ? "rotate(180deg)" : "none", transition: "transform 0.15s ease" }} />
         </button>
         {open === "provider" && (
-          <div className="absolute z-20 bottom-full mb-1.5 w-44 rounded-lg shadow-lg animate-in fade-in slide-in-from-bottom-1 duration-150 overflow-hidden"
+          <div className="absolute z-20 bottom-full mb-1.5 left-0 w-44 max-w-[calc(100vw-2rem)] rounded-lg shadow-lg animate-in fade-in slide-in-from-bottom-1 duration-150 overflow-hidden"
             style={{ background: "#1C1C1E", border: "1px solid rgba(255,255,255,0.1)" }}>
             {providers.map(p => {
               const Icon = PN[p].Icon;
@@ -1484,7 +1484,7 @@ function ModelPill({
             style={{ transform: open === "model" ? "rotate(180deg)" : "none", transition: "transform 0.15s ease" }} />
         </button>
         {open === "model" && (
-          <div className="absolute z-20 bottom-full mb-1.5 w-56 rounded-lg shadow-lg animate-in fade-in slide-in-from-bottom-1 duration-150 overflow-hidden"
+          <div className="absolute z-20 bottom-full mb-1.5 left-0 w-56 max-w-[calc(100vw-2rem)] rounded-lg shadow-lg animate-in fade-in slide-in-from-bottom-1 duration-150 overflow-hidden"
             style={{ background: "#1C1C1E", border: "1px solid rgba(255,255,255,0.1)" }}>
             <div className="max-h-52 overflow-y-auto py-1">
               <button onClick={() => { onModel(""); setOpen(null); }}
@@ -1642,7 +1642,7 @@ function ChatPlayground({ keys }: { keys: AK[] }) {
       )}
 
       <div className="shrink-0 pb-4 sm:pb-6">
-        <div className="rounded-2xl overflow-hidden" style={{ background: "#18181B", border: "1px solid rgba(255,255,255,0.09)" }}>
+        <div className="rounded-2xl overflow-visible" style={{ background: "#18181B", border: "1px solid rgba(255,255,255,0.09)" }}>
           <textarea ref={textareaRef} value={input} onChange={e => setInput(e.target.value)}
             onKeyDown={e => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); send(); } }}
             placeholder="Message the gateway…" disabled={streaming} rows={1}
