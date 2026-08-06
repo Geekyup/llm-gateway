@@ -298,6 +298,96 @@ export const api = {
   },
 };
 
+export interface PlaygroundChatMessage {
+  role: "user" | "assistant";
+  content: string;
+}
+
+export interface ChatStreamHandlers {
+  onDelta: (text: string) => void;
+  onDone: () => void;
+  onError: (message: string) => void;
+}
+
+/**
+ * Streams a chat completion from the built-in playground endpoint, which is
+ * authenticated with the user's normal session — no gateway token needed.
+ */
+export async function streamPlaygroundChat(
+  params: { messages: PlaygroundChatMessage[]; provider?: string; model?: string },
+  handlers: ChatStreamHandlers,
+  signal?: AbortSignal
+): Promise<void> {
+  let res: Response;
+  try {
+    res = await fetch(`${API_BASE_URL}/me/playground/chat/completions`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${getAccessToken()}`,
+      },
+      body: JSON.stringify({ ...params, stream: true }),
+      signal,
+    });
+  } catch (err) {
+    handlers.onError(err instanceof Error ? err.message : "Network error");
+    return;
+  }
+
+  if (res.status === 401) {
+    const refreshed = await tryRefresh();
+    if (refreshed) {
+      return streamPlaygroundChat(params, handlers, signal);
+    }
+    clearTokenPair();
+    handlers.onError("Session expired — please sign in again");
+    return;
+  }
+
+  if (!res.ok || !res.body) {
+    let detail = res.statusText;
+    try {
+      const body = await res.json();
+      detail = body.detail ?? body.error?.message ?? JSON.stringify(body);
+    } catch {
+    }
+    handlers.onError(detail || `Request failed (${res.status})`);
+    return;
+  }
+
+  const reader = res.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = "";
+
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    buffer += decoder.decode(value, { stream: true });
+    buffer = buffer.replace(/\r\n/g, "\n");
+
+    const parts = buffer.split("\n\n");
+    buffer = parts.pop() ?? "";
+
+    for (const part of parts) {
+      const line = part.split("\n").find(l => l.startsWith("data:"));
+      if (!line) continue;
+      const data = line.slice(5).trim();
+      if (!data) continue;
+      if (data === "[DONE]") {
+        handlers.onDone();
+        return;
+      }
+      try {
+        const parsed = JSON.parse(data);
+        const delta: string | undefined = parsed?.choices?.[0]?.delta?.content;
+        if (delta) handlers.onDelta(delta);
+      } catch {
+      }
+    }
+  }
+  handlers.onDone();
+}
+
 export function streamEvents(
   onEvent: (evt: RequestEvent) => void,
   onError?: (err: unknown) => void

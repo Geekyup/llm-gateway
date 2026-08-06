@@ -1,8 +1,10 @@
+import asyncio
 import json
 import logging
+import uuid
 
 from fastapi import APIRouter, Depends
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, StreamingResponse
 
 from app.api.deps import get_gateway_service
 from app.config import get_settings
@@ -15,7 +17,14 @@ from app.gateway.dependencies import require_gateway_token
 from app.gateway.proxy_service import GatewayService, UpstreamRequestSpec
 from app.keys.enums import ProviderType
 from app.keys.schemas import APIKeyDTO
-from app.openai_compat.schemas import ChatCompletionRequest, OpenAIErrorDetail, OpenAIErrorResponse
+from app.openai_compat.schemas import (
+    ChatCompletionChunk,
+    ChatCompletionChunkChoice,
+    ChatCompletionChunkDelta,
+    ChatCompletionRequest,
+    OpenAIErrorDetail,
+    OpenAIErrorResponse,
+)
 from app.openai_compat.translation import (
     gemini_path_for_model,
     gemini_response_to_openai,
@@ -37,6 +46,15 @@ async def chat_completions(
     request: ChatCompletionRequest,
     gateway: GatewayService = Depends(get_gateway_service),
     user_id: int = Depends(require_gateway_token),
+):
+    return await run_chat_completion(request, gateway=gateway, user_id=user_id)
+
+
+async def run_chat_completion(
+    request: ChatCompletionRequest,
+    *,
+    gateway: GatewayService,
+    user_id: int,
 ):
     provider_type: ProviderType | None = None
     if request.provider:
@@ -96,9 +114,48 @@ async def chat_completions(
         return _openai_error(upstream_response.status_code, str(detail), "upstream_error")
 
     upstream_body = upstream_response.json()
-    if "candidates" in upstream_body or "usageMetadata" in upstream_body:
+    is_gemini_shape = "candidates" in upstream_body or "usageMetadata" in upstream_body
+    if is_gemini_shape:
         openai_response = gemini_response_to_openai(
             upstream_body, model=requested_model or default_gemini_model
         )
-        return JSONResponse(status_code=200, content=openai_response.model_dump())
-    return JSONResponse(status_code=200, content=upstream_body)
+        response_model = openai_response.model
+        content = openai_response.choices[0].message.content if openai_response.choices else ""
+        json_body = openai_response.model_dump()
+    else:
+        response_model = upstream_body.get("model", requested_model or default_gemini_model)
+        choices = upstream_body.get("choices") or []
+        content = choices[0]["message"]["content"] if choices else ""
+        json_body = upstream_body
+
+    if not request.stream:
+        return JSONResponse(status_code=200, content=json_body)
+
+    return StreamingResponse(
+        _emulated_stream(content, model=response_model),
+        media_type="text/event-stream",
+        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+    )
+
+
+async def _emulated_stream(content: str, *, model: str):
+    completion_id = f"chatcmpl-{uuid.uuid4().hex}"
+
+    def chunk(delta: ChatCompletionChunkDelta, finish_reason: str | None = None) -> str:
+        payload = ChatCompletionChunk(
+            id=completion_id,
+            model=model,
+            choices=[ChatCompletionChunkChoice(delta=delta, finish_reason=finish_reason)],
+        )
+        return f"data: {json.dumps(payload.model_dump())}\n\n"
+
+    yield chunk(ChatCompletionChunkDelta(role="assistant", content=""))
+
+    words = content.split(" ")
+    for i, word in enumerate(words):
+        piece = word if i == len(words) - 1 else word + " "
+        yield chunk(ChatCompletionChunkDelta(content=piece))
+        await asyncio.sleep(0.02)
+
+    yield chunk(ChatCompletionChunkDelta(), finish_reason="stop")
+    yield "data: [DONE]\n\n"

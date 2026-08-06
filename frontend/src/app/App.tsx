@@ -3,21 +3,22 @@ import {
   Plus, Eye, EyeOff, X, Activity, RefreshCw, Trash2, Edit2,
   Power, Clock, ArrowRight, CheckCircle2, Shield, AlertTriangle,
   LayoutDashboard, KeyRound, Zap, LogOut, Loader2, Stethoscope, ChevronDown, Search,
-  Sparkles, Route,
+  Sparkles, Route, MessageSquare, Send, Square, User, Bot,
 } from "lucide-react";
 import { AreaChart, Area, XAxis, Tooltip, ResponsiveContainer } from "recharts";
 import {
-  api, streamEvents, getAccessToken, getRefreshToken, setTokenPair, clearTokenPair,
+  api, streamEvents, streamPlaygroundChat, getAccessToken, getRefreshToken, setTokenPair, clearTokenPair,
   startGoogleLogin,
   ApiError, type ApiKeyRead, type RequestEvent as ApiRequestEvent,
   type GatewayTokenRead, type GatewayTokenCreated, type UserRead, type ModelOption,
+  type PlaygroundChatMessage,
   API_BASE_URL,
 } from "./lib/api";
 import { CodeSnippetTabs } from "./components/CodeSnippetTabs";
 
 type Status = "active" | "cooldown" | "exhausted" | "disabled";
 type Provider = "gemini" | "openrouter" | "groq";
-type View = "dashboard" | "monitor" | "access";
+type View = "dashboard" | "monitor" | "playground" | "access";
 type PF = "all" | Provider;
 
 interface AK {
@@ -190,7 +191,7 @@ function TopBar({ view, onView, onAdd, operational, onLogout, userEmail }: {
       </div>
 
       <nav className="flex gap-0.5 overflow-x-auto -mx-3 px-3 sm:mx-0 sm:px-0 md:justify-self-center">
-        {(["dashboard", "monitor", "access"] as View[]).map(v => (
+        {(["dashboard", "monitor", "playground", "access"] as View[]).map(v => (
           <button key={v} onClick={() => onView(v)}
             className="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-all shrink-0 whitespace-nowrap"
             style={{
@@ -198,8 +199,8 @@ function TopBar({ view, onView, onAdd, operational, onLogout, userEmail }: {
               background: view === v ? "rgba(255,255,255,0.07)" : "transparent",
               border: view === v ? "1px solid rgba(255,255,255,0.08)" : "1px solid transparent",
             }}>
-            {v === "dashboard" ? <LayoutDashboard size={12} /> : v === "monitor" ? <Activity size={12} /> : <Shield size={12} />}
-            {v === "dashboard" ? "Dashboard" : v === "monitor" ? "Live Monitor" : "Gateway Access"}
+            {v === "dashboard" ? <LayoutDashboard size={12} /> : v === "monitor" ? <Activity size={12} /> : v === "playground" ? <MessageSquare size={12} /> : <Shield size={12} />}
+            {v === "dashboard" ? "Dashboard" : v === "monitor" ? "Live Monitor" : v === "playground" ? "Playground" : "Gateway Access"}
           </button>
         ))}
       </nav>
@@ -1418,6 +1419,160 @@ function GatewayAccessPanel() {
   );
 }
 
+function ChatPlayground({ keys }: { keys: AK[] }) {
+  const activeKeys = keys.filter(k => k.status !== "disabled");
+  const providers = Array.from(new Set(activeKeys.map(k => k.provider))) as Provider[];
+
+  const [provider, setProvider] = useState<Provider | "">(providers[0] ?? "");
+  const [model, setModel]       = useState<string>("");
+  const [input, setInput]       = useState("");
+  const [messages, setMessages] = useState<PlaygroundChatMessage[]>([]);
+  const [streaming, setStreaming] = useState(false);
+  const [error, setError]       = useState<string | null>(null);
+  const abortRef = useRef<AbortController | null>(null);
+  const bottomRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (provider && !providers.includes(provider as Provider)) setProvider(providers[0] ?? "");
+  }, [providers, provider]);
+
+  const modelsForProvider = Array.from(
+    new Set(activeKeys.filter(k => k.provider === provider && k.model).map(k => k.model as string))
+  );
+
+  useEffect(() => {
+    bottomRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [messages]);
+
+  if (providers.length === 0) {
+    return (
+      <div className="flex flex-col items-center justify-center py-24 gap-3 text-center">
+        <div className="w-11 h-11 rounded-xl flex items-center justify-center"
+          style={{ background: "rgba(0,214,143,0.1)", border: "1px solid rgba(0,214,143,0.2)" }}>
+          <MessageSquare size={18} color="#00D68F" />
+        </div>
+        <div className="text-sm font-medium text-zinc-200">No active keys yet</div>
+        <div className="text-xs max-w-xs" style={{ color: "#52525B" }}>
+          Add at least one active API key to test it here in the playground.
+        </div>
+      </div>
+    );
+  }
+
+  async function send() {
+    const text = input.trim();
+    if (!text || streaming) return;
+    setError(null);
+    setInput("");
+    const nextMessages: PlaygroundChatMessage[] = [...messages, { role: "user", content: text }];
+    setMessages([...nextMessages, { role: "assistant", content: "" }]);
+    setStreaming(true);
+
+    const controller = new AbortController();
+    abortRef.current = controller;
+
+    await streamPlaygroundChat(
+      { messages: nextMessages, provider: provider || undefined, model: model || undefined },
+      {
+        onDelta: (delta) => {
+          setMessages(prev => {
+            const copy = [...prev];
+            copy[copy.length - 1] = { role: "assistant", content: copy[copy.length - 1].content + delta };
+            return copy;
+          });
+        },
+        onDone: () => setStreaming(false),
+        onError: (message) => {
+          setError(message);
+          setStreaming(false);
+          setMessages(prev => prev.slice(0, -1));
+        },
+      },
+      controller.signal
+    );
+  }
+
+  function stop() {
+    abortRef.current?.abort();
+    setStreaming(false);
+  }
+
+  return (
+    <div className="flex flex-col rounded-xl overflow-hidden" style={{ border: "1px solid rgba(255,255,255,0.06)", background: "#111113", height: "calc(100vh - 160px)" }}>
+      <div className="flex items-center gap-2 px-4 py-3 shrink-0" style={{ borderBottom: "1px solid rgba(255,255,255,0.06)" }}>
+        <select value={provider} onChange={e => { setProvider(e.target.value as Provider); setModel(""); }}
+          className="text-xs font-mono px-2 py-1.5 rounded-md outline-none"
+          style={{ background: "#18181B", border: "1px solid rgba(255,255,255,0.08)", color: "#ECECF0" }}>
+          {providers.map(p => <option key={p} value={p}>{p}</option>)}
+        </select>
+        <select value={model} onChange={e => setModel(e.target.value)}
+          className="text-xs font-mono px-2 py-1.5 rounded-md outline-none flex-1 min-w-0"
+          style={{ background: "#18181B", border: "1px solid rgba(255,255,255,0.08)", color: "#ECECF0" }}>
+          <option value="">any model / pool default</option>
+          {modelsForProvider.map(m => <option key={m} value={m}>{m}</option>)}
+        </select>
+        {messages.length > 0 && (
+          <button onClick={() => setMessages([])} title="Clear chat"
+            className="p-1.5 rounded-md transition-colors hover:bg-white/5 shrink-0">
+            <Trash2 size={13} color="#52525B" />
+          </button>
+        )}
+      </div>
+
+      <div className="flex-1 overflow-y-auto px-4 py-4 space-y-4">
+        {messages.length === 0 && (
+          <div className="flex flex-col items-center justify-center h-full gap-2 text-center" style={{ color: "#3F3F46" }}>
+            <MessageSquare size={22} />
+            <div className="text-xs">Send a message to test your key pool end-to-end</div>
+          </div>
+        )}
+        {messages.map((m, i) => (
+          <div key={i} className="flex gap-2.5" style={{ opacity: streaming && i === messages.length - 1 && !m.content ? 0.6 : 1 }}>
+            <div className="w-6 h-6 rounded-md flex items-center justify-center shrink-0 mt-0.5"
+              style={{
+                background: m.role === "user" ? "rgba(255,255,255,0.06)" : "rgba(0,214,143,0.12)",
+                border: m.role === "user" ? "1px solid rgba(255,255,255,0.08)" : "1px solid rgba(0,214,143,0.2)",
+              }}>
+              {m.role === "user" ? <User size={12} color="#A1A1AA" /> : <Bot size={12} color="#00D68F" />}
+            </div>
+            <div className="text-sm leading-relaxed whitespace-pre-wrap min-w-0 flex-1 pt-0.5" style={{ color: "#DCDCE1" }}>
+              {m.content || (streaming && i === messages.length - 1 ? "···" : "")}
+            </div>
+          </div>
+        ))}
+        <div ref={bottomRef} />
+      </div>
+
+      {error && (
+        <div className="flex items-center gap-2 px-4 py-2 text-xs shrink-0" style={{ color: "#EF4444", background: "rgba(239,68,68,0.08)" }}>
+          <AlertTriangle size={12} className="shrink-0" /> {error}
+        </div>
+      )}
+
+      <div className="flex items-center gap-2 px-3 py-3 shrink-0" style={{ borderTop: "1px solid rgba(255,255,255,0.06)" }}>
+        <input value={input} onChange={e => setInput(e.target.value)}
+          onKeyDown={e => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); send(); } }}
+          placeholder="Message the gateway…" disabled={streaming}
+          className="flex-1 min-w-0 text-sm px-3 py-2 rounded-lg outline-none"
+          style={{ background: "#18181B", border: "1px solid rgba(255,255,255,0.08)", color: "#ECECF0" }} />
+        {streaming ? (
+          <button onClick={stop}
+            className="flex items-center justify-center w-9 h-9 rounded-lg shrink-0 transition-all active:scale-95"
+            style={{ background: "rgba(239,68,68,0.12)", border: "1px solid rgba(239,68,68,0.3)" }}>
+            <Square size={13} color="#EF4444" />
+          </button>
+        ) : (
+          <button onClick={send} disabled={!input.trim()}
+            className="flex items-center justify-center w-9 h-9 rounded-lg shrink-0 transition-all active:scale-95 disabled:opacity-40"
+            style={{ background: "#00D68F" }}>
+            <Send size={13} color="#0A0A0B" />
+          </button>
+        )}
+      </div>
+    </div>
+  );
+}
+
 function Dashboard({ user, onLogout }: { user: UserRead | null; onLogout: () => void }) {
   const [keys, setKeys]           = useState<AK[]>([]);
   const [loading, setLoading]     = useState(true);
@@ -1601,6 +1756,10 @@ function Dashboard({ user, onLogout }: { user: UserRead | null; onLogout: () => 
         ) : view === "monitor" ? (
           <div key="monitor" className="animate-in fade-in slide-in-from-bottom-1 duration-300 ease-out">
             <LiveMonitor reqs={reqs} now={now} />
+          </div>
+        ) : view === "playground" ? (
+          <div key="playground" className="animate-in fade-in slide-in-from-bottom-1 duration-300 ease-out">
+            <ChatPlayground keys={keys} />
           </div>
         ) : (
           <div key="access" className="animate-in fade-in slide-in-from-bottom-1 duration-300 ease-out">

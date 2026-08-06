@@ -128,8 +128,8 @@ uvicorn app.main:app --reload
 ### Тесты
 
 ```bash
-pytest -v
-ruff check app tests
+py -m pytest -v
+py -m ruff check app tests
 ```
 
 ### Только фронтенд

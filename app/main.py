@@ -5,6 +5,7 @@ from starlette.middleware.sessions import SessionMiddleware
 
 from app.account.gateway_tokens_router import router as gateway_tokens_router
 from app.account.keys_router import router as keys_router
+from app.account.playground_router import router as playground_router
 from app.auth.router import router as auth_router
 from app.config import get_settings
 from app.core.exceptions import (
@@ -60,6 +61,7 @@ def create_app() -> FastAPI:
     app.include_router(gateway_router)
     app.include_router(keys_router)
     app.include_router(gateway_tokens_router)
+    app.include_router(playground_router)
     app.include_router(monitoring_router)
     app.include_router(auth_router)
 
