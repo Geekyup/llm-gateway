@@ -46,7 +46,7 @@ async def health_check_exhausted_keys(ctx: dict) -> None:
     async with session_factory() as session:
         service = build_key_pool_service(session, redis, settings)
 
-        all_keys = await service._repo.list_all_system_wide()
+        all_keys = await service.list_all_keys_system_wide()
         exhausted = [k for k in all_keys if k.status == KeyStatus.EXHAUSTED]
         revived = 0
         for key in exhausted:

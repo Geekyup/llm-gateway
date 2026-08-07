@@ -1,7 +1,8 @@
 import logging
 import time
 import uuid
-from collections.abc import Callable
+from collections.abc import AsyncIterator, Callable
+from contextlib import asynccontextmanager
 from dataclasses import dataclass
 from datetime import UTC, datetime
 
@@ -212,6 +213,129 @@ class GatewayService:
 
         provider_label = last_provider_type.value if last_provider_type is not None else "any"
         if last_response is not None:
+            raise UpstreamExhaustedError(provider=provider_label, attempts=len(tried_key_ids))
+
+        raise NoAvailableKeysError(provider=provider_label)
+
+    @asynccontextmanager
+    async def proxy_stream_request(
+        self,
+        *,
+        user_id: int,
+        build_request: RequestSpecBuilder,
+        provider_type: ProviderType | None = None,
+        model: str | None = None,
+    ) -> AsyncIterator[httpx.Response]:
+        request_id = uuid.uuid4().hex
+        tried_key_ids: set[int] = set()
+        last_status: int | None = None
+        last_provider_type: ProviderType | None = provider_type
+
+        for attempt in range(1, self._max_attempts + 1):
+            dto = await self._key_pool.select_key(user_id, provider_type, model=model)
+            if dto is None:
+                outcome = "upstream_exhausted" if tried_key_ids else "no_keys"
+                await self._emit(
+                    user_id=user_id,
+                    request_id=request_id,
+                    attempt=attempt,
+                    provider_type=last_provider_type,
+                    path=None,
+                    method="POST",
+                    key_id=None,
+                    key_label=None,
+                    upstream_status=None,
+                    outcome=outcome,
+                    latency_ms=None,
+                )
+                provider_label = provider_type.value if provider_type is not None else "any"
+                if tried_key_ids:
+                    raise UpstreamExhaustedError(provider=provider_label, attempts=len(tried_key_ids))
+                if model:
+                    provider_label = f"{provider_label}' for model '{model}"
+                raise NoAvailableKeysError(provider=provider_label)
+
+            if dto.id in tried_key_ids:
+                break
+            tried_key_ids.add(dto.id)
+
+            key_provider_type = dto.provider
+            last_provider_type = key_provider_type
+            provider: Provider = get_provider(key_provider_type.value)
+            spec = build_request(dto)
+
+            started = time.monotonic()
+            async with provider.forward_stream(
+                key=dto.decrypted_key,
+                path=spec.path,
+                method=spec.method,
+                payload=spec.payload,
+                headers=spec.headers,
+            ) as response:
+                latency_ms = int((time.monotonic() - started) * 1000)
+                last_status = response.status_code
+
+                if provider.is_key_exhausted(response):
+                    await self._key_pool.record_exhausted(dto.id, user_id, key_provider_type)
+                    await self._emit(
+                        user_id=user_id,
+                        request_id=request_id,
+                        attempt=attempt,
+                        provider_type=key_provider_type,
+                        path=spec.path,
+                        method=spec.method,
+                        key_id=dto.id,
+                        key_label=dto.label,
+                        upstream_status=response.status_code,
+                        outcome="exhausted",
+                        latency_ms=latency_ms,
+                    )
+                    logger.info(
+                        "attempt=%d key_id=%s provider=%s exhausted (stream), retrying",
+                        attempt, dto.id, key_provider_type.value,
+                    )
+                    continue
+
+                if provider.is_rate_limited(response):
+                    await self._key_pool.record_rate_limited(dto.id, user_id, key_provider_type)
+                    await self._emit(
+                        user_id=user_id,
+                        request_id=request_id,
+                        attempt=attempt,
+                        provider_type=key_provider_type,
+                        path=spec.path,
+                        method=spec.method,
+                        key_id=dto.id,
+                        key_label=dto.label,
+                        upstream_status=response.status_code,
+                        outcome="rate_limited",
+                        latency_ms=latency_ms,
+                    )
+                    logger.info(
+                        "attempt=%d key_id=%s provider=%s rate-limited (stream), retrying",
+                        attempt, dto.id, key_provider_type.value,
+                    )
+                    continue
+
+                await self._key_pool.record_success(dto.id, user_id, key_provider_type)
+                await self._emit(
+                    user_id=user_id,
+                    request_id=request_id,
+                    attempt=attempt,
+                    provider_type=key_provider_type,
+                    path=spec.path,
+                    method=spec.method,
+                    key_id=dto.id,
+                    key_label=dto.label,
+                    upstream_status=response.status_code,
+                    outcome="success",
+                    latency_ms=latency_ms,
+                )
+                yield response
+                return
+
+        provider_label = last_provider_type.value if last_provider_type is not None else "any"
+        if last_status is not None:
             raise UpstreamExhaustedError(provider=provider_label, attempts=len(tried_key_ids))
 
         raise NoAvailableKeysError(provider=provider_label)

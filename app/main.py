@@ -33,7 +33,10 @@ def create_app() -> FastAPI:
 
     app = FastAPI(
         title=settings.APP_NAME,
-        description="Gateway API with a rotating pool of Gemini API keys and automatic 429 failover.",
+        description=(
+            "Gateway API with a rotating pool of API keys across multiple providers "
+            "(Gemini, Groq, OpenRouter) and automatic failover on rate limits/exhaustion."
+        ),
         version="0.1.0",
     )
 

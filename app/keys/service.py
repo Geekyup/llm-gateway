@@ -35,18 +35,21 @@ class KeyPoolService:
             model=payload.model,
         )
         await self._cache.invalidate(user_id, payload.provider.value)
-        return key  
+        return key
 
     async def list_keys(self, user_id: int, provider: ProviderType | None = None):
-        return await self._repo.list_all(user_id=user_id, provider=provider)  
+        return await self._repo.list_all(user_id=user_id, provider=provider)
+
+    async def list_all_keys_system_wide(self, provider: ProviderType | None = None):
+        return await self._repo.list_all_system_wide(provider=provider)
 
     async def get_key(self, key_id: int, user_id: int):
-        return await self._repo.get(key_id, user_id=user_id)  
+        return await self._repo.get(key_id, user_id=user_id)
 
     async def set_status(self, key_id: int, user_id: int, status: KeyStatus):
         key = await self._repo.mark_status(key_id, status, user_id=user_id)
         await self._cache.invalidate(user_id, key.provider.value)
-        return key  
+        return key
 
     async def update_key(self, key_id: int, user_id: int, payload: APIKeyUpdate):
         fields = payload.model_dump(exclude_unset=True)
@@ -58,12 +61,12 @@ class KeyPoolService:
 
         key = await self._repo.update_fields(key_id, user_id=user_id, **fields)
         await self._cache.invalidate(user_id, key.provider.value)
-        return key  
+        return key
 
     async def reset_cooldown(self, key_id: int, user_id: int):
         key = await self._repo.mark_status(key_id, KeyStatus.ACTIVE, user_id=user_id, cooldown_until=None)
         await self._cache.invalidate(user_id, key.provider.value)
-        return key  
+        return key
 
     async def delete_key(self, key_id: int, user_id: int) -> None:
         key = await self._repo.get(key_id, user_id=user_id)
@@ -71,6 +74,11 @@ class KeyPoolService:
         await self._repo.delete(key_id, user_id=user_id)
 
     _ALL_PROVIDERS_CACHE_KEY = "__all__"
+    _NO_MODEL_NAMESPACE_SUFFIX = "__nomodel__"
+
+    @staticmethod
+    def _is_under_daily_limit(key: APIKeyDTO) -> bool:
+        return key.requests_today < key.daily_limit
 
     async def get_candidate_keys(
         self, user_id: int, provider: ProviderType | None = None, model: str | None = None
@@ -84,18 +92,23 @@ class KeyPoolService:
             all_active = [APIKeyDTO.model_validate(k) for k in keys]
             await self._cache.set_active(user_id, cache_namespace, all_active)
 
-        # Клиент не указал модель -> любой активный ключ пула подходит.
+        under_limit = [k for k in all_active if self._is_under_daily_limit(k)]
+
         if model is None:
-            return all_active
-        # Ключ без привязки к конкретной модели считается универсальным
-        # и участвует в подборе наравне с ключами, у которых модель совпала.
-        return [k for k in all_active if k.model is None or k.model == model]
+            return under_limit
+
+        return [k for k in under_limit if k.model is None or k.model == model]
+
+    def _selector_namespace(self, provider: ProviderType | None, model: str | None) -> str:
+        base = provider.value if provider is not None else self._ALL_PROVIDERS_CACHE_KEY
+        model_part = model if model is not None else self._NO_MODEL_NAMESPACE_SUFFIX
+        return f"{base}:{model_part}"
 
     async def select_key(
         self, user_id: int, provider: ProviderType | None = None, model: str | None = None
     ) -> APIKeyDTO | None:
         candidates = await self.get_candidate_keys(user_id, provider, model=model)
-        selector_namespace = provider.value if provider is not None else self._ALL_PROVIDERS_CACHE_KEY
+        selector_namespace = self._selector_namespace(provider, model)
         chosen = await self._selector.select(user_id, selector_namespace, candidates)
         if chosen is None:
             return None

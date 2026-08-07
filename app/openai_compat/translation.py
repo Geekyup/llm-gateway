@@ -13,6 +13,27 @@ def gemini_path_for_model(model: str) -> str:
     return f"v1beta/models/{model}:generateContent"
 
 
+def gemini_stream_path_for_model(model: str) -> str:
+    return f"v1beta/models/{model}:streamGenerateContent?alt=sse"
+
+
+def gemini_stream_chunk_to_openai_delta(gemini_chunk: dict) -> tuple[str, str | None]:
+    candidates = gemini_chunk.get("candidates") or []
+    if not candidates:
+        return "", None
+
+    first = candidates[0]
+    parts = (first.get("content") or {}).get("parts") or []
+    text = "".join(part.get("text", "") for part in parts)
+
+    raw_reason = first.get("finishReason")
+    if not raw_reason:
+        return text, None
+    raw_reason = raw_reason.lower()
+    finish_reason = "length" if raw_reason == "max_tokens" else "stop" if raw_reason == "stop" else raw_reason
+    return text, finish_reason
+
+
 def openai_request_to_gemini_payload(request: ChatCompletionRequest) -> dict:
     system_parts: list[str] = []
     contents: list[dict] = []
