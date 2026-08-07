@@ -1,7 +1,7 @@
 import logging
 import time
 import uuid
-from collections.abc import AsyncIterator, Callable
+from collections.abc import AsyncIterator, Awaitable, Callable
 from contextlib import asynccontextmanager
 from dataclasses import dataclass
 from datetime import UTC, datetime
@@ -28,6 +28,8 @@ class UpstreamRequestSpec:
     headers: dict
 
 RequestSpecBuilder = Callable[[APIKeyDTO], UpstreamRequestSpec]
+
+TokenRecorder = Callable[[int | None, int | None, int | None], Awaitable[None]]
 
 
 class GatewayService:
@@ -225,7 +227,7 @@ class GatewayService:
         build_request: RequestSpecBuilder,
         provider_type: ProviderType | None = None,
         model: str | None = None,
-    ) -> AsyncIterator[httpx.Response]:
+    ) -> AsyncIterator[tuple[httpx.Response, TokenRecorder]]:
         request_id = uuid.uuid4().hex
         tried_key_ids: set[int] = set()
         last_status: int | None = None
@@ -318,20 +320,37 @@ class GatewayService:
                     continue
 
                 await self._key_pool.record_success(dto.id, user_id, key_provider_type)
-                await self._emit(
-                    user_id=user_id,
-                    request_id=request_id,
-                    attempt=attempt,
-                    provider_type=key_provider_type,
-                    path=spec.path,
-                    method=spec.method,
-                    key_id=dto.id,
-                    key_label=dto.label,
-                    upstream_status=response.status_code,
-                    outcome="success",
-                    latency_ms=latency_ms,
-                )
-                yield response
+
+                async def record_tokens(
+                    prompt_tokens: int | None,
+                    completion_tokens: int | None,
+                    total_tokens: int | None,
+                    *,
+                    _attempt: int = attempt,
+                    _key_provider_type: ProviderType = key_provider_type,
+                    _spec: UpstreamRequestSpec = spec,
+                    _dto: APIKeyDTO = dto,
+                    _status_code: int = response.status_code,
+                    _latency_ms: int = latency_ms,
+                ) -> None:
+                    await self._emit(
+                        user_id=user_id,
+                        request_id=request_id,
+                        attempt=_attempt,
+                        provider_type=_key_provider_type,
+                        path=_spec.path,
+                        method=_spec.method,
+                        key_id=_dto.id,
+                        key_label=_dto.label,
+                        upstream_status=_status_code,
+                        outcome="success",
+                        latency_ms=_latency_ms,
+                        prompt_tokens=prompt_tokens,
+                        completion_tokens=completion_tokens,
+                        total_tokens=total_tokens,
+                    )
+
+                yield response, record_tokens
                 return
 
         provider_label = last_provider_type.value if last_provider_type is not None else "any"

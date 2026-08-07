@@ -88,6 +88,8 @@ async def run_chat_completion(
         payload = request.model_dump(exclude={"provider"}, exclude_none=True)
         payload["model"] = dto.model or requested_model or default_model
         payload["stream"] = stream
+        if stream:
+            payload["stream_options"] = {"include_usage": True}
         return UpstreamRequestSpec(
             path="v1/chat/completions",
             method="POST",
@@ -225,7 +227,7 @@ async def _open_and_relay_stream(
         build_request=build_request,
         provider_type=provider_type,
         model=requested_model,
-    ) as upstream_response:
+    ) as (upstream_response, record_tokens):
         if upstream_response.status_code >= 400:
             body = await upstream_response.aread()
             try:
@@ -235,23 +237,41 @@ async def _open_and_relay_stream(
             raise _UpstreamErrorSignal(upstream_response.status_code, str(detail))
 
         is_gemini = "streamGenerateContent" in str(upstream_response.request.url)
+        usage: dict[str, int | None] = {"prompt_tokens": None, "completion_tokens": None, "total_tokens": None}
         if is_gemini:
-            relay = _relay_gemini_stream(upstream_response, model=requested_model or default_gemini_model)
+            relay = _relay_gemini_stream(
+                upstream_response, model=requested_model or default_gemini_model, usage=usage
+            )
         else:
-            relay = _relay_openai_stream(upstream_response)
+            relay = _relay_openai_stream(upstream_response, usage=usage)
 
         async for chunk in relay:
             yield chunk
 
+        await record_tokens(usage["prompt_tokens"], usage["completion_tokens"], usage["total_tokens"])
 
-async def _relay_openai_stream(upstream_response):
+
+async def _relay_openai_stream(upstream_response, *, usage: dict[str, int | None]):
     async for line in upstream_response.aiter_lines():
         if not line:
             continue
+        if line.startswith("data:"):
+            raw = line.removeprefix("data:").strip()
+            if raw and raw != "[DONE]":
+                try:
+                    payload = json.loads(raw)
+                except json.JSONDecodeError:
+                    payload = None
+                if payload:
+                    chunk_usage = payload.get("usage")
+                    if chunk_usage:
+                        usage["prompt_tokens"] = chunk_usage.get("prompt_tokens")
+                        usage["completion_tokens"] = chunk_usage.get("completion_tokens")
+                        usage["total_tokens"] = chunk_usage.get("total_tokens")
         yield f"{line}\n\n"
 
 
-async def _relay_gemini_stream(upstream_response, *, model: str):
+async def _relay_gemini_stream(upstream_response, *, model: str, usage: dict[str, int | None]):
     completion_id = f"chatcmpl-{uuid.uuid4().hex}"
 
     def chunk(delta: ChatCompletionChunkDelta, finish_reason: str | None = None) -> str:
@@ -275,6 +295,12 @@ async def _relay_gemini_stream(upstream_response, *, model: str):
         except json.JSONDecodeError:
             logger.warning("failed to parse gemini SSE chunk", exc_info=True)
             continue
+
+        chunk_usage = gemini_chunk.get("usageMetadata")
+        if chunk_usage:
+            usage["prompt_tokens"] = chunk_usage.get("promptTokenCount")
+            usage["completion_tokens"] = chunk_usage.get("candidatesTokenCount")
+            usage["total_tokens"] = chunk_usage.get("totalTokenCount")
 
         text, finish_reason = gemini_stream_chunk_to_openai_delta(gemini_chunk)
         if text:

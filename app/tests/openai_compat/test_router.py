@@ -30,6 +30,50 @@ class RecordingGateway:
         return self.response
 
 
+class RecordingStreamGateway:
+
+    def __init__(
+        self,
+        status_code: int = 200,
+        body_lines: list[str] | None = None,
+        upstream_url: str = "http://upstream/v1/chat/completions",
+        raise_: Exception | None = None,
+    ) -> None:
+        self.status_code = status_code
+        self.body_lines = body_lines or []
+        self.upstream_url = upstream_url
+        self.raise_ = raise_
+        self.calls: list[dict] = []
+        self.recorded_tokens: list[tuple] = []
+
+    def proxy_stream_request(self, **kwargs):
+        self.calls.append(kwargs)
+        if self.raise_:
+            raise self.raise_
+        return _FakeStreamCtx(self)
+
+
+class _FakeStreamCtx:
+    def __init__(self, gateway: RecordingStreamGateway) -> None:
+        self._gateway = gateway
+
+    async def __aenter__(self):
+        body = "\n\n".join(self._gateway.body_lines).encode()
+        response = httpx.Response(
+            status_code=self._gateway.status_code,
+            content=body,
+            request=httpx.Request("POST", self._gateway.upstream_url),
+        )
+
+        async def record_tokens(prompt_tokens, completion_tokens, total_tokens):
+            self._gateway.recorded_tokens.append((prompt_tokens, completion_tokens, total_tokens))
+
+        return response, record_tokens
+
+    async def __aexit__(self, *exc_info) -> None:
+        return None
+
+
 @pytest.mark.asyncio
 async def test_no_explicit_provider_searches_across_all_providers():
     gateway = RecordingGateway(httpx.Response(200, json={"candidates": []}))
@@ -145,3 +189,95 @@ async def test_no_available_keys_surfaces_as_503():
     response = await chat_completions(request, gateway=gateway, user_id=1)
 
     assert response.status_code == 503
+
+
+@pytest.mark.asyncio
+async def test_stream_openrouter_records_tokens_from_final_usage_chunk():
+
+    body_lines = [
+        'data: {"choices": [{"delta": {"content": "Hi"}}]}',
+        'data: {"choices": [], "usage": {"prompt_tokens": 10, "completion_tokens": 3, "total_tokens": 13}}',
+        "data: [DONE]",
+    ]
+    gateway = RecordingStreamGateway(
+        status_code=200,
+        body_lines=body_lines,
+        upstream_url="http://upstream/v1/chat/completions",
+    )
+    request = ChatCompletionRequest(
+        model="openai/gpt-4o-mini",
+        messages=[ChatMessage(role="user", content="hi")],
+        provider="openrouter",
+        stream=True,
+    )
+
+    response = await chat_completions(request, gateway=gateway, user_id=1)
+
+    chunks = [chunk async for chunk in response.body_iterator]
+    assert b"".join(
+        c if isinstance(c, bytes) else c.encode() for c in chunks
+    )  
+
+    assert gateway.recorded_tokens == [(10, 3, 13)]
+
+
+@pytest.mark.asyncio
+async def test_stream_openrouter_requests_usage_via_stream_options():
+    gateway = RecordingStreamGateway(
+        status_code=200,
+        body_lines=['data: {"choices": [], "usage": {"prompt_tokens": 1, "completion_tokens": 1, "total_tokens": 2}}', "data: [DONE]"],
+    )
+    request = ChatCompletionRequest(
+        model="openai/gpt-4o-mini",
+        messages=[ChatMessage(role="user", content="hi")],
+        provider="openrouter",
+        stream=True,
+    )
+
+    response = await chat_completions(request, gateway=gateway, user_id=1)
+    _ = [chunk async for chunk in response.body_iterator]
+
+    call = gateway.calls[0]
+    spec = call["build_request"](_fake_dto(ProviderType.OPENROUTER))
+    assert spec.payload["stream"] is True
+    assert spec.payload["stream_options"] == {"include_usage": True}
+
+
+@pytest.mark.asyncio
+async def test_stream_gemini_records_tokens_from_usage_metadata():
+    body_lines = [
+        'data: {"candidates": [{"content": {"parts": [{"text": "Hi"}]}}], "usageMetadata": {"promptTokenCount": 5, "candidatesTokenCount": 1, "totalTokenCount": 6}}',
+        'data: {"candidates": [{"content": {"parts": [{"text": "!"}]}, "finishReason": "STOP"}], "usageMetadata": {"promptTokenCount": 5, "candidatesTokenCount": 2, "totalTokenCount": 7}}',
+    ]
+    gateway = RecordingStreamGateway(
+        status_code=200,
+        body_lines=body_lines,
+        upstream_url="http://upstream/v1beta/models/gemini-1.5-flash:streamGenerateContent?alt=sse",
+    )
+    request = ChatCompletionRequest(
+        model="gemini-1.5-flash",
+        messages=[ChatMessage(role="user", content="hi")],
+        provider="gemini",
+        stream=True,
+    )
+
+    response = await chat_completions(request, gateway=gateway, user_id=1)
+    _ = [chunk async for chunk in response.body_iterator]
+
+    assert gateway.recorded_tokens == [(5, 2, 7)]
+
+
+@pytest.mark.asyncio
+async def test_stream_upstream_error_does_not_record_tokens():
+    gateway = RecordingStreamGateway(status_code=429, body_lines=['{"error": {"message": "rate limited"}}'])
+    request = ChatCompletionRequest(
+        model="openai/gpt-4o-mini",
+        messages=[ChatMessage(role="user", content="hi")],
+        provider="openrouter",
+        stream=True,
+    )
+
+    response = await chat_completions(request, gateway=gateway, user_id=1)
+
+    assert response.status_code == 429
+    assert gateway.recorded_tokens == []

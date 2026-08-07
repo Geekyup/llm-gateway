@@ -44,6 +44,41 @@ class UsageMetadataProvider:
         return response.status_code == 403
 
 
+class ScriptedStreamProvider:
+    
+    def __init__(self, status_codes: list[int], bodies: list[bytes] | None = None) -> None:
+        self._status_codes = iter(status_codes)
+        self._bodies = iter(bodies or [])
+        self.calls: list[str] = []
+
+    def forward_stream(self, *, key, path, method, payload, headers):
+        self.calls.append(key)
+        status = next(self._status_codes)
+        try:
+            body = next(self._bodies)
+        except StopIteration:
+            body = b'{"ok": true}'
+        response = httpx.Response(status_code=status, content=body, request=httpx.Request(method, f"http://upstream/{path}"))
+        return _FakeStreamContext(response)
+
+    def is_rate_limited(self, response: httpx.Response) -> bool:
+        return response.status_code == 429
+
+    def is_key_exhausted(self, response: httpx.Response) -> bool:
+        return response.status_code == 403
+
+
+class _FakeStreamContext:
+    def __init__(self, response: httpx.Response) -> None:
+        self._response = response
+
+    async def __aenter__(self) -> httpx.Response:
+        return self._response
+
+    async def __aexit__(self, *exc_info) -> None:
+        return None
+
+
 @pytest.fixture
 def key_pool(key_repo, fake_redis):
     cache = KeyStatusCache(fake_redis, ttl_seconds=30)
@@ -394,3 +429,85 @@ async def test_cross_provider_failover_rebuilds_request_per_attempt(key_pool, te
 
 async def _async_return(value):
     return value
+
+
+@pytest.mark.asyncio
+async def test_stream_success_emits_no_event_before_tokens_recorded(key_pool, fake_redis, test_user, _patch_registry):
+    await _create_active_key(key_pool, test_user.id, "k1")
+    provider = ScriptedStreamProvider([200])
+    _patch_registry(provider)
+    publisher = RequestEventPublisher(fake_redis)
+    gateway = GatewayService(key_pool, max_attempts=3, event_publisher=publisher)
+
+    async with gateway.proxy_stream_request(
+        user_id=test_user.id,
+        build_request=_build_request(),
+        provider_type=ProviderType.GEMINI,
+    ) as (response, record_tokens):
+        assert response.status_code == 200
+        events = await publisher.recent(test_user.id, limit=10)
+        assert events == []
+
+        await record_tokens(120, 45, 165)
+
+    events = await publisher.recent(test_user.id, limit=10)
+    assert len(events) == 1
+    assert events[0].outcome == "success"
+    assert events[0].prompt_tokens == 120
+    assert events[0].completion_tokens == 45
+    assert events[0].total_tokens == 165
+
+
+@pytest.mark.asyncio
+async def test_stream_never_records_tokens_if_caller_does_not_call_it(
+    key_pool, fake_redis, test_user, _patch_registry
+):
+    await _create_active_key(key_pool, test_user.id, "k1")
+    provider = ScriptedStreamProvider([200])
+    _patch_registry(provider)
+    publisher = RequestEventPublisher(fake_redis)
+    gateway = GatewayService(key_pool, max_attempts=3, event_publisher=publisher)
+
+    async with gateway.proxy_stream_request(
+        user_id=test_user.id,
+        build_request=_build_request(),
+        provider_type=ProviderType.GEMINI,
+    ) as (response, _record_tokens):
+        assert response.status_code == 200
+
+    events = await publisher.recent(test_user.id, limit=10)
+    assert events == []
+
+
+@pytest.mark.asyncio
+async def test_stream_429_triggers_failover_to_second_key(key_pool, test_user, _patch_registry):
+    await _create_active_key(key_pool, test_user.id, "k1")
+    await _create_active_key(key_pool, test_user.id, "k2")
+    provider = ScriptedStreamProvider([429, 200])
+    _patch_registry(provider)
+    gateway = GatewayService(key_pool, max_attempts=3)
+
+    async with gateway.proxy_stream_request(
+        user_id=test_user.id,
+        build_request=_build_request(),
+        provider_type=ProviderType.GEMINI,
+    ) as (response, record_tokens):
+        assert response.status_code == 200
+        await record_tokens(None, None, None)
+
+    assert len(provider.calls) == 2
+
+
+@pytest.mark.asyncio
+async def test_stream_no_keys_available_raises(key_pool, test_user, _patch_registry):
+    provider = ScriptedStreamProvider([])
+    _patch_registry(provider)
+    gateway = GatewayService(key_pool, max_attempts=3)
+
+    with pytest.raises(NoAvailableKeysError):
+        async with gateway.proxy_stream_request(
+            user_id=test_user.id,
+            build_request=_build_request(),
+            provider_type=ProviderType.GEMINI,
+        ):
+            pass

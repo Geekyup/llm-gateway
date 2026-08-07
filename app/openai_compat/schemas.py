@@ -9,6 +9,10 @@ class ChatMessage(BaseModel):
     content: str
 
 
+class ChatCompletionStreamOptions(BaseModel):
+    include_usage: bool = False
+
+
 class ChatCompletionRequest(BaseModel):
     model: str | None = None
     messages: list[ChatMessage]
@@ -16,6 +20,7 @@ class ChatCompletionRequest(BaseModel):
     max_tokens: int | None = None
     provider: str | None = None
     stream: bool = False
+    stream_options: ChatCompletionStreamOptions | None = None
 
 
 class ChatCompletionChoiceMessage(BaseModel):
