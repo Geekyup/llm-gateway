@@ -341,3 +341,10 @@
 .markdown-body .hljs-name { color: #A78BFA; }
 .markdown-body .hljs-variable,
 .markdown-body .hljs-template-variable { color: #F0ABFC; }
+
+.grid-bg {
+  background-image:
+    linear-gradient(to right, rgba(255, 255, 255, 0.05) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(255, 255, 255, 0.05) 1px, transparent 1px);
+  background-size: 48px 48px;
+}

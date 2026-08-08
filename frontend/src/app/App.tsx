@@ -18,6 +18,7 @@ import {
   API_BASE_URL,
 } from "./lib/api";
 import { CodeSnippetTabs } from "./components/CodeSnippetTabs";
+import LandingPage from "./LandingPage";
 
 type Status = "active" | "cooldown" | "exhausted" | "disabled";
 type Provider = "gemini" | "openrouter" | "groq";
@@ -1236,7 +1237,16 @@ export default function App() {
   }
 
   if (!authed) {
-    return <LoginGate error={authError} />;
+    if (authError) {
+      return <LoginGate error={authError} />;
+    }
+    return (
+      <LandingPage
+        onSignIn={() => {
+          startGoogleLogin();
+        }}
+      />
+    );
   }
 
   return (
