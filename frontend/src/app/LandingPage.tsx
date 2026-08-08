@@ -226,15 +226,14 @@ function SignInButton({
   return (
     <button
       onClick={onClick}
-      className={`group relative font-medium rounded-md flex items-center gap-2 transition-transform duration-200 hover:scale-[1.03] active:scale-[0.98] ${padding}`}
+      className={`group font-medium rounded-md flex items-center gap-2 transition-all active:scale-[0.97] ${padding}`}
       style={{ background: "var(--primary)", color: "var(--primary-foreground)" }}
     >
-      <span className="absolute inset-0 rounded-md animate-cta-glow" />
-      <span className="relative">Sign in with Google</span>
+      Sign in with Google
       {showArrow && (
         <ArrowRight
           size={15}
-          className="relative transition-transform duration-200 group-hover:translate-x-0.5"
+          className="transition-transform duration-200 group-hover:translate-x-0.5"
         />
       )}
     </button>
@@ -243,47 +242,51 @@ function SignInButton({
 
 export default function LandingPage({ onSignIn }: { onSignIn: () => void }) {
   return (
-    <div className="min-h-screen w-full grid-bg bg-background text-foreground">
-      <header className="sticky top-0 z-10 backdrop-blur-sm border-b border-border" style={{ background: "rgba(10,10,11,0.8)" }}>
-        <div className="max-w-5xl mx-auto px-6 h-14 flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <div className="w-6 h-6 rounded-md flex items-center justify-center" style={{ background: "rgba(0,214,143,0.1)" }}>
-              <KeyRound size={13} className="text-primary" />
-            </div>
-            <span className="text-[13px] font-medium tracking-tight">keypool</span>
-          </div>
-          <SignInButton onClick={onSignIn} size="sm" />
-        </div>
-      </header>
+    <div className="min-h-screen w-full bg-background text-foreground">
+      <div className="relative">
+        <div className="absolute inset-0 hero-grid pointer-events-none" />
 
-      {/* Hero */}
-      <section className="max-w-5xl mx-auto px-6 pt-20 pb-16">
-        <div className="grid md:grid-cols-2 gap-12 items-center">
-          <div>
-            <p className="text-[11px] font-mono uppercase tracking-wider mb-4 text-muted-foreground">
-              self-hosted / v0.4
-            </p>
-            <h1 className="text-[34px] md:text-[42px] leading-[1.1] font-semibold tracking-tight mb-5">
-              One endpoint. Many keys.
-              <br />
-              Zero 429s reaching your app.
-            </h1>
-            <p className="text-[15px] leading-relaxed mb-8 max-w-md text-muted-foreground">
-              Keypool sits between your app and Gemini, Groq, or OpenRouter.
-              It holds your keys, rotates them per request, and retries on a
-              different key the moment one gets rate limited — same request
-              and response shape as the OpenAI API.
-            </p>
-            <div className="flex items-center gap-3">
-              <SignInButton onClick={onSignIn} showArrow />
-              <span className="text-[12px] font-mono text-muted-foreground">
-                self-serve, no sales call
-              </span>
+        <header className="sticky top-0 z-10 backdrop-blur-sm border-b border-border" style={{ background: "rgba(10,10,11,0.8)" }}>
+          <div className="max-w-5xl mx-auto px-6 h-14 flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <div className="w-6 h-6 rounded-md flex items-center justify-center" style={{ background: "rgba(0,214,143,0.1)" }}>
+                <KeyRound size={13} className="text-primary" />
+              </div>
+              <span className="text-[13px] font-medium tracking-tight">keypool</span>
             </div>
+            <SignInButton onClick={onSignIn} size="sm" />
           </div>
-          <FailoverChain />
-        </div>
-      </section>
+        </header>
+
+        {/* Hero */}
+        <section className="relative max-w-5xl mx-auto px-6 pt-20 pb-16">
+          <div className="grid md:grid-cols-2 gap-12 items-center">
+            <div>
+              <p className="text-[11px] font-mono uppercase tracking-wider mb-4 text-muted-foreground">
+                self-hosted / v0.4
+              </p>
+              <h1 className="text-[34px] md:text-[42px] leading-[1.1] font-semibold tracking-tight mb-5">
+                One endpoint. Many keys.
+                <br />
+                Zero 429s reaching your app.
+              </h1>
+              <p className="text-[15px] leading-relaxed mb-8 max-w-md text-muted-foreground">
+                Keypool sits between your app and Gemini, Groq, or OpenRouter.
+                It holds your keys, rotates them per request, and retries on a
+                different key the moment one gets rate limited — same request
+                and response shape as the OpenAI API.
+              </p>
+              <div className="flex items-center gap-3">
+                <SignInButton onClick={onSignIn} showArrow />
+                <span className="text-[12px] font-mono text-muted-foreground">
+                  self-serve, no sales call
+                </span>
+              </div>
+            </div>
+            <FailoverChain />
+          </div>
+        </section>
+      </div>
 
       {/* Providers */}
       <section className="max-w-5xl mx-auto px-6 py-10 border-t border-border">

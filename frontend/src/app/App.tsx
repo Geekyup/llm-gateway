@@ -1175,17 +1175,16 @@ function LoginGate({ error }: { error?: string | null }) {
         )}
 
         <button onClick={() => { setGoogleLoginPending(true); startGoogleLogin(); }} disabled={googleLoginPending}
-          className="relative w-full py-2 rounded-lg text-sm font-semibold transition-all active:scale-[0.97] disabled:active:scale-100 disabled:opacity-70 flex items-center justify-center gap-2"
+          className="w-full py-2 rounded-lg text-sm font-semibold transition-all active:scale-[0.97] disabled:active:scale-100 disabled:opacity-70 flex items-center justify-center gap-2"
           style={{ background: "#00D68F", color: "#0A0A0B" }}>
-          {!googleLoginPending && <span className="absolute inset-0 rounded-lg animate-cta-glow" />}
           {googleLoginPending ? (
-            <Loader2 size={16} className="animate-spin relative" />
+            <Loader2 size={16} className="animate-spin" />
           ) : (
-            <svg width="16" height="16" viewBox="0 0 24 24" aria-hidden="true" className="relative">
+            <svg width="16" height="16" viewBox="0 0 24 24" aria-hidden="true">
               <path fill="#0A0A0B" d="M12 11v2.8h6.5c-.3 1.6-2.1 4.7-6.5 4.7-3.9 0-7.1-3.2-7.1-7.2s3.2-7.2 7.1-7.2c2.2 0 3.7.9 4.6 1.7l3.1-3C17.6 1 15.1 0 12 0 5.4 0 0 5.4 0 12s5.4 12 12 12c6.9 0 11.5-4.8 11.5-11.6 0-.8-.1-1.4-.2-2H12z"/>
             </svg>
           )}
-          <span className="relative">{googleLoginPending ? "Redirecting..." : "Sign in with Google"}</span>
+          {googleLoginPending ? "Redirecting..." : "Sign in with Google"}
         </button>
 
         <p className="mt-4 text-[11px] text-zinc-600 leading-relaxed">
