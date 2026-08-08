@@ -1,10 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { KeyRound, ArrowRight, ShieldCheck } from "lucide-react";
 
-// -----------------------------------------------------------------------
-// Colors here are pulled 1:1 from src/styles/theme.css (--primary,
-// --destructive, --chart-2..5, etc). Nothing is a new hex value.
-// -----------------------------------------------------------------------
 const AMBER = "#F59E0B";
 const PROVIDERS = [
   { key: "gemini", name: "Gemini", color: "#4F8EF7" },
@@ -14,12 +10,6 @@ const PROVIDERS = [
 
 type KeyState = "active" | "exhausting" | "idle" | "cooldown";
 
-// -----------------------------------------------------------------------
-// Signature element: a live failover chain. One key is active at a time;
-// every few seconds it "exhausts" (flashes red) and the baton visibly
-// passes to the next key. This is the one concrete thing the product
-// does, shown instead of described.
-// -----------------------------------------------------------------------
 function FailoverChain() {
   const KEYS = 5;
   const [active, setActive] = useState(0);
@@ -223,9 +213,37 @@ const LIVE_FEED_SAMPLE = [
   { provider: "openrouter", color: "#A78BFA", model: "claude-3-5-haiku", ms: 731, status: "ok" },
 ];
 
+function SignInButton({
+  onClick,
+  size = "md",
+  showArrow = false,
+}: {
+  onClick: () => void;
+  size?: "sm" | "md";
+  showArrow?: boolean;
+}) {
+  const padding = size === "sm" ? "px-3.5 py-1.5 text-[13px]" : "px-5 py-2.5 text-[14px]";
+  return (
+    <button
+      onClick={onClick}
+      className={`group relative font-medium rounded-md flex items-center gap-2 transition-transform duration-200 hover:scale-[1.03] active:scale-[0.98] ${padding}`}
+      style={{ background: "var(--primary)", color: "var(--primary-foreground)" }}
+    >
+      <span className="absolute inset-0 rounded-md animate-cta-glow" />
+      <span className="relative">Sign in with Google</span>
+      {showArrow && (
+        <ArrowRight
+          size={15}
+          className="relative transition-transform duration-200 group-hover:translate-x-0.5"
+        />
+      )}
+    </button>
+  );
+}
+
 export default function LandingPage({ onSignIn }: { onSignIn: () => void }) {
   return (
-    <div className="min-h-screen w-full grid-bg text-foreground" style={{ background: "var(--background)" }}>
+    <div className="min-h-screen w-full grid-bg bg-background text-foreground">
       <header className="sticky top-0 z-10 backdrop-blur-sm border-b border-border" style={{ background: "rgba(10,10,11,0.8)" }}>
         <div className="max-w-5xl mx-auto px-6 h-14 flex items-center justify-between">
           <div className="flex items-center gap-2">
@@ -234,13 +252,7 @@ export default function LandingPage({ onSignIn }: { onSignIn: () => void }) {
             </div>
             <span className="text-[13px] font-medium tracking-tight">keypool</span>
           </div>
-          <button
-            onClick={onSignIn}
-            className="text-[13px] font-medium px-3.5 py-1.5 rounded-md transition-transform hover:scale-[1.02]"
-            style={{ background: "var(--primary)", color: "var(--primary-foreground)" }}
-          >
-            Sign in with Google
-          </button>
+          <SignInButton onClick={onSignIn} size="sm" />
         </div>
       </header>
 
@@ -263,14 +275,7 @@ export default function LandingPage({ onSignIn }: { onSignIn: () => void }) {
               and response shape as the OpenAI API.
             </p>
             <div className="flex items-center gap-3">
-              <button
-                onClick={onSignIn}
-                className="text-[14px] font-medium px-5 py-2.5 rounded-md flex items-center gap-2 transition-transform hover:scale-[1.02]"
-                style={{ background: "var(--primary)", color: "var(--primary-foreground)" }}
-              >
-                Sign in with Google
-                <ArrowRight size={15} />
-              </button>
+              <SignInButton onClick={onSignIn} showArrow />
               <span className="text-[12px] font-mono text-muted-foreground">
                 self-serve, no sales call
               </span>
