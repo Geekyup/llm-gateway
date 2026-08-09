@@ -27,7 +27,7 @@ export function startGoogleLogin(): void {
 }
 
 export type ApiKeyStatus = "active" | "cooldown" | "exhausted" | "disabled";
-export type ApiProvider = "gemini";
+export type ApiProvider = "gemini" | "openrouter" | "groq";
 
 export interface ApiKeyRead {
   id: number;

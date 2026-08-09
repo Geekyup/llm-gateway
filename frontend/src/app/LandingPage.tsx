@@ -1,6 +1,10 @@
 import { useEffect, useRef, useState } from "react";
 import { KeyRound, ArrowRight, ShieldCheck } from "lucide-react";
 
+// -----------------------------------------------------------------------
+// Colors here are pulled 1:1 from src/styles/theme.css (--primary,
+// --destructive, --chart-2..5, etc). Nothing is a new hex value.
+// -----------------------------------------------------------------------
 const AMBER = "#F59E0B";
 const PROVIDERS = [
   { key: "gemini", name: "Gemini", color: "#4F8EF7" },
@@ -10,6 +14,12 @@ const PROVIDERS = [
 
 type KeyState = "active" | "exhausting" | "idle" | "cooldown";
 
+// -----------------------------------------------------------------------
+// Signature element: a live failover chain. One key is active at a time;
+// every few seconds it "exhausts" (flashes red) and the baton visibly
+// passes to the next key. This is the one concrete thing the product
+// does, shown instead of described.
+// -----------------------------------------------------------------------
 function FailoverChain() {
   const KEYS = 5;
   const [active, setActive] = useState(0);

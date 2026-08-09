@@ -1,0 +1,151 @@
+import { KeyRound, Loader2, Stethoscope, Edit2, Power } from "lucide-react";
+import { rel, cd } from "../../lib/domain";
+import type { AK, PF } from "../../types";
+import { StatusBadge } from "../shared/StatusBadge";
+import { ProviderBadge } from "../shared/ProviderBadge";
+import { UsageBar } from "../shared/UsageBar";
+import { ProviderFilterDropdown } from "./ProviderFilterDropdown";
+
+export function KeysTable({
+  keys,
+  filter,
+  onFilter,
+  onSelect,
+  onEdit,
+  onToggle,
+  onCheck,
+  checkingIds,
+  now,
+}: {
+  keys: AK[];
+  filter: PF;
+  onFilter: (f: PF) => void;
+  now: number;
+  onSelect: (id: string) => void;
+  onEdit: (id: string) => void;
+  onToggle: (id: string) => void;
+  onCheck: (id: string) => void;
+  checkingIds: Set<string>;
+}) {
+  const filtered = filter === "all" ? keys : keys.filter((k) => k.provider === filter);
+
+  return (
+    <div className="rounded-xl overflow-hidden" style={{ border: "1px solid rgba(255,255,255,0.06)" }}>
+      <div className="flex items-center justify-between px-4 py-2.5" style={{ borderBottom: "1px solid rgba(255,255,255,0.05)", background: "#0F0F11" }}>
+        <span className="text-xs font-medium text-zinc-400">API Keys</span>
+        <ProviderFilterDropdown filter={filter} onFilter={onFilter} />
+      </div>
+
+      {filtered.length === 0 ? (
+        <div className="px-4 py-16 text-center" style={{ background: "#111113" }}>
+          <div className="flex flex-col items-center gap-3">
+            <div className="w-10 h-10 rounded-xl flex items-center justify-center" style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.06)" }}>
+              <KeyRound size={18} color="#3F3F46" />
+            </div>
+            <p className="text-sm text-zinc-500">No keys found</p>
+            <p className="text-xs text-zinc-600">Add your first API key to get started</p>
+          </div>
+        </div>
+      ) : (
+        <>
+          <div className="sm:hidden divide-y divide-white/[0.03]" style={{ background: "#111113" }}>
+            {filtered.map((k) => (
+              <div key={k.id} className="px-4 py-3.5 transition-colors active:bg-white/[0.03] cursor-pointer" onClick={() => onSelect(k.id)}>
+                <div className="flex items-start justify-between gap-2 mb-2">
+                  <div className="min-w-0">
+                    <div className="text-sm font-medium text-zinc-200 leading-none truncate">{k.label}</div>
+                    <div className="text-[11px] font-mono text-zinc-600 mt-1 truncate">
+                      {k.masked}
+                      {k.model && <span className="text-zinc-700"> · {k.model}</span>}
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-1 shrink-0" onClick={(e) => e.stopPropagation()}>
+                    <button onClick={() => onCheck(k.id)} disabled={checkingIds.has(k.id)} className="p-1.5 rounded-md transition-colors hover:bg-white/5 disabled:opacity-50" title="Test key">
+                      {checkingIds.has(k.id) ? <Loader2 size={13} color="#71717A" className="animate-spin" /> : <Stethoscope size={13} color="#71717A" />}
+                    </button>
+                    <button onClick={() => onEdit(k.id)} className="p-1.5 rounded-md transition-colors hover:bg-white/5" title="Edit">
+                      <Edit2 size={13} color="#71717A" />
+                    </button>
+                    <button onClick={() => onToggle(k.id)} className="p-1.5 rounded-md transition-colors hover:bg-white/5" title={k.status === "disabled" ? "Enable" : "Disable"}>
+                      <Power size={13} color={k.status === "disabled" ? "#ECECF0" : "#71717A"} />
+                    </button>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2 mb-2.5">
+                  <ProviderBadge provider={k.provider} />
+                  <StatusBadge status={k.status} />
+                </div>
+                <UsageBar used={k.used} limit={k.limit} status={k.status} />
+                <div className="flex items-center justify-between mt-2.5">
+                  <span className="text-[11px] text-zinc-600">
+                    Last used: <span className="font-mono text-zinc-500">{k.lastUsed ? rel(k.lastUsed, now) : "—"}</span>
+                  </span>
+                  {k.cooldownUntil ? (
+                    <span className="text-[11px] font-mono" style={{ color: "#F59E0B" }}>
+                      {cd(k.cooldownUntil, now)}
+                    </span>
+                  ) : null}
+                </div>
+              </div>
+            ))}
+          </div>
+
+          <div className="hidden sm:block overflow-x-auto" style={{ background: "#111113" }}>
+            <table className="w-full min-w-[760px]">
+              <thead>
+                <tr style={{ borderBottom: "1px solid rgba(255,255,255,0.04)" }}>
+                  {["Label", "Provider", "Status", "Usage", "Cooldown", "Last Used", ""].map((h, i) => (
+                    <th key={i} className="px-4 py-2.5 text-left text-[10px] font-semibold text-zinc-600 uppercase tracking-widest">
+                      {h}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-white/[0.03]">
+                {filtered.map((k) => (
+                  <tr key={k.id} className="group cursor-pointer transition-colors hover:bg-white/[0.02]" onClick={() => onSelect(k.id)}>
+                    <td className="px-4 py-3">
+                      <div className="text-sm font-medium text-zinc-200 leading-none">{k.label}</div>
+                      <div className="text-[11px] font-mono text-zinc-600 mt-1">
+                        {k.masked}
+                        {k.model && <span className="text-zinc-700"> · {k.model}</span>}
+                      </div>
+                    </td>
+                    <td className="px-4 py-3"><ProviderBadge provider={k.provider} /></td>
+                    <td className="px-4 py-3"><StatusBadge status={k.status} /></td>
+                    <td className="px-4 py-3"><UsageBar used={k.used} limit={k.limit} status={k.status} /></td>
+                    <td className="px-4 py-3">
+                      {k.cooldownUntil ? (
+                        <span className="text-xs font-mono" style={{ color: "#F59E0B" }}>
+                          {cd(k.cooldownUntil, now)}
+                        </span>
+                      ) : (
+                        <span className="text-xs text-zinc-700">—</span>
+                      )}
+                    </td>
+                    <td className="px-4 py-3">
+                      <span className="text-xs font-mono text-zinc-500">{k.lastUsed ? rel(k.lastUsed, now) : "—"}</span>
+                    </td>
+                    <td className="px-4 py-3">
+                      <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity" onClick={(e) => e.stopPropagation()}>
+                        <button onClick={() => onCheck(k.id)} disabled={checkingIds.has(k.id)} className="p-1.5 rounded-md transition-colors hover:bg-white/5 disabled:opacity-50" title="Test key">
+                          {checkingIds.has(k.id) ? <Loader2 size={13} color="#71717A" className="animate-spin" /> : <Stethoscope size={13} color="#71717A" />}
+                        </button>
+                        <button onClick={() => onEdit(k.id)} className="p-1.5 rounded-md transition-colors hover:bg-white/5" title="Edit">
+                          <Edit2 size={13} color="#71717A" />
+                        </button>
+                        <button onClick={() => onToggle(k.id)} className="p-1.5 rounded-md transition-colors hover:bg-white/5" title={k.status === "disabled" ? "Enable" : "Disable"}>
+                          <Power size={13} color={k.status === "disabled" ? "#ECECF0" : "#71717A"} />
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
