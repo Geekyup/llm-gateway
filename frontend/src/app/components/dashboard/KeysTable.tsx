@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { KeyRound, Loader2, Stethoscope, Edit2, Power, Search, Layers } from "lucide-react";
+import { KeyRound, Loader2, Stethoscope, Edit2, Power, Search, LayoutGrid } from "lucide-react";
 import { rel, cd } from "../../lib/domain";
 import type { AK, PF, SF } from "../../types";
 import { StatusBadge } from "../shared/StatusBadge";
@@ -9,7 +9,6 @@ import { ProviderFilterDropdown } from "./ProviderFilterDropdown";
 import { StatusFilterDropdown } from "./StatusFilterDropdown";
 import { ProviderGroupHeader } from "./ProviderGroupHeader";
 import { useFlipAnimation } from "../../lib/useFlipAnimation";
-
 
 const PROVIDER_ORDER = ["gemini", "openrouter", "groq"];
 
@@ -63,7 +62,6 @@ export function KeysTable({
     return true;
   });
 
-
   const groups = useMemo(() => groupByProvider(filtered), [filtered]);
   const orderedRows = useMemo(
     () => (grouped ? groups.flatMap((g) => g.items) : filtered),
@@ -92,16 +90,15 @@ export function KeysTable({
           <StatusFilterDropdown filter={statusFilter} onFilter={onStatusFilter} />
           <button
             onClick={() => setGrouped((g) => !g)}
-            className="flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[11px] font-medium transition-all mb-[1px]"
+            className="flex items-center justify-center w-[26px] h-[26px] rounded-md transition-all mb-[1px]"
             style={{
-              color: grouped ? "#00D68F" : "#ECECF0",
-              background: grouped ? "rgba(0,214,143,0.10)" : "rgba(255,255,255,0.06)",
+              background: grouped ? "rgba(0,214,143,0.12)" : "rgba(255,255,255,0.06)",
               border: `1px solid ${grouped ? "rgba(0,214,143,0.28)" : "rgba(255,255,255,0.08)"}`,
             }}
             title={grouped ? "Show flat list" : "Group by provider"}
+            aria-label={grouped ? "Show flat list" : "Group by provider"}
           >
-            <Layers size={12} color={grouped ? "#00D68F" : "#71717A"} />
-            Group
+            <LayoutGrid size={13} color={grouped ? "#00D68F" : "#71717A"} />
           </button>
         </div>
       </div>
@@ -122,16 +119,20 @@ export function KeysTable({
         <>
           <div ref={mobileFlipRef} className="sm:hidden" style={{ background: "#111113" }}>
             {grouped
-              ? groups.map((g) => (
-                  <div key={g.provider}>
-                    <ProviderGroupHeader provider={g.provider} keys={g.items} />
-                    <div className="divide-y divide-white/[0.03]">
-                      {g.items.map((k) => (
-                        <MobileKeyRow key={k.id} k={k} now={now} checkingIds={checkingIds} onSelect={onSelect} onEdit={onEdit} onToggle={onToggle} onCheck={onCheck} />
-                      ))}
+              ? (
+                <div className="flex flex-col gap-2 p-2.5">
+                  {groups.map((g) => (
+                    <div key={g.provider} className="rounded-lg overflow-hidden" style={{ border: "1px solid rgba(255,255,255,0.07)", background: "#0F0F11" }}>
+                      <ProviderGroupHeader provider={g.provider} keys={g.items} />
+                      <div className="divide-y divide-white/[0.03]" style={{ borderTop: "1px solid rgba(255,255,255,0.05)" }}>
+                        {g.items.map((k) => (
+                          <MobileKeyRow key={k.id} k={k} now={now} checkingIds={checkingIds} onSelect={onSelect} onEdit={onEdit} onToggle={onToggle} onCheck={onCheck} />
+                        ))}
+                      </div>
                     </div>
-                  </div>
-                ))
+                  ))}
+                </div>
+              )
               : (
                 <div className="divide-y divide-white/[0.03]">
                   {orderedRows.map((k) => (
@@ -154,10 +155,10 @@ export function KeysTable({
               </thead>
               <tbody ref={desktopFlipRef} className="divide-y divide-white/[0.03]">
                 {grouped
-                  ? groups.map((g) => (
+                  ? groups.map((g, i) => (
                       <RowFragment key={g.provider}>
                         <tr>
-                          <td colSpan={6} className="p-0">
+                          <td colSpan={6} className="p-0" style={{ paddingTop: i === 0 ? 0 : 10 }}>
                             <ProviderGroupHeader provider={g.provider} keys={g.items} />
                           </td>
                         </tr>
@@ -177,7 +178,6 @@ export function KeysTable({
     </div>
   );
 }
-
 
 function RowFragment({ children }: { children: React.ReactNode }) {
   return <>{children}</>;
