@@ -1,15 +1,19 @@
-import { KeyRound, Loader2, Stethoscope, Edit2, Power } from "lucide-react";
+import { useState } from "react";
+import { KeyRound, Loader2, Stethoscope, Edit2, Power, Search } from "lucide-react";
 import { rel, cd } from "../../lib/domain";
-import type { AK, PF } from "../../types";
+import type { AK, PF, SF } from "../../types";
 import { StatusBadge } from "../shared/StatusBadge";
 import { ProviderBadge } from "../shared/ProviderBadge";
 import { UsageBar } from "../shared/UsageBar";
 import { ProviderFilterDropdown } from "./ProviderFilterDropdown";
+import { StatusFilterDropdown } from "./StatusFilterDropdown";
 
 export function KeysTable({
   keys,
   filter,
   onFilter,
+  statusFilter,
+  onStatusFilter,
   onSelect,
   onEdit,
   onToggle,
@@ -20,6 +24,8 @@ export function KeysTable({
   keys: AK[];
   filter: PF;
   onFilter: (f: PF) => void;
+  statusFilter: SF;
+  onStatusFilter: (f: SF) => void;
   now: number;
   onSelect: (id: string) => void;
   onEdit: (id: string) => void;
@@ -27,13 +33,34 @@ export function KeysTable({
   onCheck: (id: string) => void;
   checkingIds: Set<string>;
 }) {
-  const filtered = filter === "all" ? keys : keys.filter((k) => k.provider === filter);
+  const [query, setQuery] = useState("");
+  const q = query.trim().toLowerCase();
+
+  const filtered = keys.filter((k) => {
+    if (filter !== "all" && k.provider !== filter) return false;
+    if (statusFilter !== "all" && k.status !== statusFilter) return false;
+    if (q && !k.label.toLowerCase().includes(q)) return false;
+    return true;
+  });
 
   return (
     <div className="rounded-xl overflow-hidden" style={{ border: "1px solid rgba(255,255,255,0.06)" }}>
-      <div className="flex items-center justify-between px-4 py-2.5" style={{ borderBottom: "1px solid rgba(255,255,255,0.05)", background: "#0F0F11" }}>
-        <span className="text-xs font-medium text-zinc-400">API Keys</span>
-        <ProviderFilterDropdown filter={filter} onFilter={onFilter} />
+      <div className="flex items-center justify-between gap-2 px-4 py-2.5" style={{ borderBottom: "1px solid rgba(255,255,255,0.05)", background: "#0F0F11" }}>
+        <span className="text-xs font-medium text-zinc-400 shrink-0">API Keys</span>
+        <div className="flex items-center gap-2 min-w-0">
+          <div className="relative hidden sm:block">
+            <Search size={12} color="#52525B" className="absolute left-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+            <input
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder="Search keys..."
+              className="text-[11px] rounded-md pl-7 pr-2.5 py-1 outline-none w-[150px] focus:w-[190px] transition-all"
+              style={{ color: "#ECECF0", background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.08)" }}
+            />
+          </div>
+          <ProviderFilterDropdown filter={filter} onFilter={onFilter} />
+          <StatusFilterDropdown filter={statusFilter} onFilter={onStatusFilter} />
+        </div>
       </div>
 
       {filtered.length === 0 ? (
@@ -43,7 +70,9 @@ export function KeysTable({
               <KeyRound size={18} color="#3F3F46" />
             </div>
             <p className="text-sm text-zinc-500">No keys found</p>
-            <p className="text-xs text-zinc-600">Add your first API key to get started</p>
+            <p className="text-xs text-zinc-600">
+              {keys.length === 0 ? "Add your first API key to get started" : "Try a different search or filter"}
+            </p>
           </div>
         </div>
       ) : (

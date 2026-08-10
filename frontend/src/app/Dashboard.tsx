@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import { Loader2, AlertTriangle, CheckCircle2 } from "lucide-react";
 import { api, ApiError, streamEvents, type UserRead } from "./lib/api";
 import { toAK, toLR } from "./lib/domain";
-import type { AK, FormState, LR, PF, View } from "./types";
+import type { AK, FormState, LR, PF, SF, View } from "./types";
 import { Sidebar } from "./components/layout/Sidebar";
 import { MobileSidebarDrawer } from "./components/layout/MobileSidebarDrawer";
 import { TopBar } from "./components/layout/TopBar";
@@ -20,6 +20,7 @@ export function Dashboard({ user, onLogout }: { user: UserRead | null; onLogout:
   const [loadError, setLoadError] = useState<string | null>(null);
   const [view, setView] = useState<View>("dashboard");
   const [filter, setFilter] = useState<PF>("all");
+  const [statusFilter, setStatusFilter] = useState<SF>("all");
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [editId, setEditId] = useState<string | null>(null);
   const [addOpen, setAddOpen] = useState(false);
@@ -192,6 +193,8 @@ export function Dashboard({ user, onLogout }: { user: UserRead | null; onLogout:
                     keys={keys}
                     filter={filter}
                     onFilter={setFilter}
+                    statusFilter={statusFilter}
+                    onStatusFilter={setStatusFilter}
                     now={now}
                     onSelect={setSelectedId}
                     onEdit={(id) => { setEditId(id); setSelectedId(null); }}
