@@ -1,7 +1,7 @@
 import { STATUS_META } from "../../lib/domain";
 import type { Status } from "../../types";
 
-export function StatusBadge({ status }: { status: Status }) {
+export function StatusBadge({ status, cooldownText }: { status: Status; cooldownText?: string }) {
   const s = STATUS_META[status];
   return (
     <span
@@ -13,6 +13,7 @@ export function StatusBadge({ status }: { status: Status }) {
         style={{ background: s.color }}
       />
       {s.text}
+      {status === "cooldown" && cooldownText && <span style={{ opacity: 0.75 }}>· {cooldownText}</span>}
     </span>
   );
 }

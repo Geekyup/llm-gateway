@@ -3,7 +3,14 @@ import type { Status } from "../../types";
 
 export function UsageBar({ used, limit, status }: { used: number; limit: number; status: Status }) {
   const pct = limit > 0 ? Math.min(100, Math.max(0, (used / limit) * 100)) : 0;
-  const color = STATUS_META[status].color;
+  const color =
+    status === "active"
+      ? pct >= 90
+        ? "#EF4444"
+        : pct >= 70
+          ? "#F59E0B"
+          : STATUS_META.active.color
+      : STATUS_META[status].color;
   return (
     <div className="min-w-[140px]">
       <div className="flex justify-between mb-1.5">

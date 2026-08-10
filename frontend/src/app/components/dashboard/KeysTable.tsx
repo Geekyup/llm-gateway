@@ -94,7 +94,7 @@ export function KeysTable({
             <table className="w-full min-w-[760px]">
               <thead>
                 <tr style={{ borderBottom: "1px solid rgba(255,255,255,0.04)" }}>
-                  {["Label", "Provider", "Status", "Usage", "Cooldown", "Last Used", ""].map((h, i) => (
+                  {["Label", "Provider", "Status", "Usage", "Last Used", ""].map((h, i) => (
                     <th key={i} className="px-4 py-2.5 text-left text-[10px] font-semibold text-zinc-600 uppercase tracking-widest">
                       {h}
                     </th>
@@ -112,17 +112,10 @@ export function KeysTable({
                       </div>
                     </td>
                     <td className="px-4 py-3"><ProviderBadge provider={k.provider} /></td>
-                    <td className="px-4 py-3"><StatusBadge status={k.status} /></td>
-                    <td className="px-4 py-3"><UsageBar used={k.used} limit={k.limit} status={k.status} /></td>
                     <td className="px-4 py-3">
-                      {k.cooldownUntil ? (
-                        <span className="text-xs font-mono" style={{ color: "#F59E0B" }}>
-                          {cd(k.cooldownUntil, now)}
-                        </span>
-                      ) : (
-                        <span className="text-xs text-zinc-700">—</span>
-                      )}
+                      <StatusBadge status={k.status} cooldownText={k.cooldownUntil ? cd(k.cooldownUntil, now) : undefined} />
                     </td>
+                    <td className="px-4 py-3"><UsageBar used={k.used} limit={k.limit} status={k.status} /></td>
                     <td className="px-4 py-3">
                       <span className="text-xs font-mono text-zinc-500">{k.lastUsed ? rel(k.lastUsed, now) : "—"}</span>
                     </td>
