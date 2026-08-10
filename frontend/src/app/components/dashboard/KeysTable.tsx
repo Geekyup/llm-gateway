@@ -10,6 +10,7 @@ import { StatusFilterDropdown } from "./StatusFilterDropdown";
 import { ProviderGroupHeader } from "./ProviderGroupHeader";
 import { useFlipAnimation } from "../../lib/useFlipAnimation";
 
+
 const PROVIDER_ORDER = ["gemini", "openrouter", "groq"];
 
 function groupByProvider(list: AK[]): { provider: string; items: AK[] }[] {
@@ -62,6 +63,7 @@ export function KeysTable({
     return true;
   });
 
+
   const groups = useMemo(() => groupByProvider(filtered), [filtered]);
   const orderedRows = useMemo(
     () => (grouped ? groups.flatMap((g) => g.items) : filtered),
@@ -69,7 +71,7 @@ export function KeysTable({
   );
 
   const mobileFlipRef = useFlipAnimation<HTMLDivElement>(grouped);
-  const desktopFlipRef = useFlipAnimation<HTMLTableSectionElement>(grouped);
+  const desktopFlipRef = useFlipAnimation<HTMLDivElement>(grouped);
 
   return (
     <div className="rounded-xl overflow-hidden" style={{ border: "1px solid rgba(255,255,255,0.06)" }}>
@@ -142,45 +144,49 @@ export function KeysTable({
               )}
           </div>
 
-          <div className="hidden sm:block overflow-x-auto" style={{ background: "#111113" }}>
-            <table className="w-full min-w-[760px]">
-              <thead>
-                <tr style={{ borderBottom: "1px solid rgba(255,255,255,0.04)" }}>
-                  {["Label", "Provider", "Status", "Usage", "Last Used", ""].map((h, i) => (
-                    <th key={i} className="px-4 py-2.5 text-left text-[10px] font-semibold text-zinc-600 uppercase tracking-widest">
-                      {h}
-                    </th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody ref={desktopFlipRef} className="divide-y divide-white/[0.03]">
-                {grouped
-                  ? groups.map((g, i) => (
-                      <RowFragment key={g.provider}>
-                        <tr>
-                          <td colSpan={6} className="p-0" style={{ paddingTop: i === 0 ? 0 : 10 }}>
-                            <ProviderGroupHeader provider={g.provider} keys={g.items} />
-                          </td>
-                        </tr>
-                        {g.items.map((k) => (
-                          <DesktopKeyRow key={k.id} k={k} now={now} checkingIds={checkingIds} onSelect={onSelect} onEdit={onEdit} onToggle={onToggle} onCheck={onCheck} />
-                        ))}
-                      </RowFragment>
-                    ))
-                  : orderedRows.map((k) => (
+          <div ref={desktopFlipRef} className="hidden sm:block" style={{ background: grouped ? "transparent" : "#111113" }}>
+            {grouped ? (
+              <div className="flex flex-col gap-2.5 p-2.5">
+                {groups.map((g) => (
+                  <div key={g.provider} className="rounded-lg overflow-hidden" style={{ border: "1px solid rgba(255,255,255,0.07)", background: "#0F0F11" }}>
+                    <ProviderGroupHeader provider={g.provider} keys={g.items} />
+                    <div className="overflow-x-auto" style={{ borderTop: "1px solid rgba(255,255,255,0.05)" }}>
+                      <table className="w-full min-w-[760px]">
+                        <tbody className="divide-y divide-white/[0.03]">
+                          {g.items.map((k) => (
+                            <DesktopKeyRow key={k.id} k={k} now={now} checkingIds={checkingIds} onSelect={onSelect} onEdit={onEdit} onToggle={onToggle} onCheck={onCheck} />
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full min-w-[760px]">
+                  <thead>
+                    <tr style={{ borderBottom: "1px solid rgba(255,255,255,0.04)" }}>
+                      {["Label", "Provider", "Status", "Usage", "Last Used", ""].map((h, i) => (
+                        <th key={i} className="px-4 py-2.5 text-left text-[10px] font-semibold text-zinc-600 uppercase tracking-widest">
+                          {h}
+                        </th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-white/[0.03]">
+                    {orderedRows.map((k) => (
                       <DesktopKeyRow key={k.id} k={k} now={now} checkingIds={checkingIds} onSelect={onSelect} onEdit={onEdit} onToggle={onToggle} onCheck={onCheck} />
                     ))}
-              </tbody>
-            </table>
+                  </tbody>
+                </table>
+              </div>
+            )}
           </div>
         </>
       )}
     </div>
   );
-}
-
-function RowFragment({ children }: { children: React.ReactNode }) {
-  return <>{children}</>;
 }
 
 function MobileKeyRow({
