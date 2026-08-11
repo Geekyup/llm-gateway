@@ -1,15 +1,17 @@
 import { useLayoutEffect, useRef } from "react";
 
+
 const ANIMATION_MS = 320;
 
 function findScrollParent(el: HTMLElement): HTMLElement | null {
   let node: HTMLElement | null = el.parentElement;
-  while (node) {
+  while (node && node !== document.body) {
     const style = getComputedStyle(node);
     if (/(auto|scroll)/.test(style.overflowX + style.overflowY)) return node;
     node = node.parentElement;
   }
-  return null;
+
+  return (document.scrollingElement as HTMLElement) ?? document.documentElement;
 }
 
 export function useFlipAnimation<T extends HTMLElement = HTMLDivElement>(dep: unknown) {
@@ -24,8 +26,12 @@ export function useFlipAnimation<T extends HTMLElement = HTMLDivElement>(dep: un
     const prev = prevRects.current;
     let animated = false;
 
+
     const scrollParent = findScrollParent(container);
-    const prevOverflow = scrollParent?.style.overflow;
+    const targets = new Set<HTMLElement>([document.documentElement, document.body]);
+    if (scrollParent) targets.add(scrollParent);
+    const prevOverflow = new Map<HTMLElement, string>();
+    for (const t of targets) prevOverflow.set(t, t.style.overflow);
 
     if (prev.size > 0) {
       for (const node of nodes) {
@@ -47,10 +53,10 @@ export function useFlipAnimation<T extends HTMLElement = HTMLDivElement>(dep: un
         }
       }
 
-      if (animated && scrollParent) {
-        scrollParent.style.overflow = "hidden";
+      if (animated) {
+        for (const t of targets) t.style.overflow = "hidden";
         window.setTimeout(() => {
-          scrollParent.style.overflow = prevOverflow ?? "";
+          for (const t of targets) t.style.overflow = prevOverflow.get(t) ?? "";
         }, ANIMATION_MS + 30);
       }
     }

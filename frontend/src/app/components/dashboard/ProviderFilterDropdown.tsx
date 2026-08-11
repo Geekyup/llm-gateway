@@ -18,7 +18,8 @@ export function ProviderFilterDropdown({ filter, onFilter }: { filter: PF; onFil
 
   const options: PF[] = ["all", ...(Object.keys(PROVIDER_META) as Provider[])];
   const active = filter !== "all";
-  const label = active ? PROVIDER_META[filter].name : "All providers";
+  const fullLabel = active ? PROVIDER_META[filter].name : "All providers";
+  const shortLabel = active ? PROVIDER_META[filter].name : "All";
   const ActiveIcon = active ? PROVIDER_META[filter].Icon : Plug;
   const iconColor = active ? PROVIDER_META[filter].color : "#71717A";
 
@@ -27,16 +28,17 @@ export function ProviderFilterDropdown({ filter, onFilter }: { filter: PF; onFil
       <div className="text-[10px] text-zinc-600 mb-1">Provider</div>
       <button
         onClick={() => setOpen((o) => !o)}
-        className="flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[11px] font-medium transition-all"
+        className="flex items-center gap-1 sm:gap-1.5 px-2 sm:px-2.5 py-1 rounded-md text-[11px] font-medium transition-all whitespace-nowrap"
         style={{
           color: "#ECECF0",
           background: active ? PROVIDER_META[filter].bg : "rgba(255,255,255,0.06)",
           border: `1px solid ${active ? PROVIDER_META[filter].color + "38" : "rgba(255,255,255,0.08)"}`,
         }}
       >
-        <ActiveIcon size={12} color={iconColor} />
-        {label}
-        <ChevronDown size={11} color="#71717A" style={{ transform: open ? "rotate(180deg)" : "none", transition: "transform 0.15s ease" }} />
+        <ActiveIcon size={12} color={iconColor} className="shrink-0" />
+        <span className="sm:hidden">{shortLabel}</span>
+        <span className="hidden sm:inline">{fullLabel}</span>
+        <ChevronDown size={11} color="#71717A" className="shrink-0" style={{ transform: open ? "rotate(180deg)" : "none", transition: "transform 0.15s ease" }} />
       </button>
 
       {open && (

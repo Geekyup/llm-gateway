@@ -18,7 +18,8 @@ export function StatusFilterDropdown({ filter, onFilter }: { filter: SF; onFilte
 
   const options: SF[] = ["all", ...(Object.keys(STATUS_META) as Status[])];
   const active = filter !== "all";
-  const label = active ? STATUS_META[filter].text : "All statuses";
+  const fullLabel = active ? STATUS_META[filter].text : "All statuses";
+  const shortLabel = active ? STATUS_META[filter].text : "All";
   const dotColor = active ? STATUS_META[filter].color : "#71717A";
 
   return (
@@ -26,7 +27,7 @@ export function StatusFilterDropdown({ filter, onFilter }: { filter: SF; onFilte
       <div className="text-[10px] text-zinc-600 mb-1">Status</div>
       <button
         onClick={() => setOpen((o) => !o)}
-        className="flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[11px] font-medium transition-all"
+        className="flex items-center gap-1 sm:gap-1.5 px-2 sm:px-2.5 py-1 rounded-md text-[11px] font-medium transition-all whitespace-nowrap"
         style={{
           color: "#ECECF0",
           background: active ? STATUS_META[filter].bg : "rgba(255,255,255,0.06)",
@@ -36,10 +37,11 @@ export function StatusFilterDropdown({ filter, onFilter }: { filter: SF; onFilte
         {active ? (
           <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ background: dotColor }} />
         ) : (
-          <ListFilter size={12} color={dotColor} />
+          <ListFilter size={12} color={dotColor} className="shrink-0" />
         )}
-        {label}
-        <ChevronDown size={11} color="#71717A" style={{ transform: open ? "rotate(180deg)" : "none", transition: "transform 0.15s ease" }} />
+        <span className="sm:hidden">{shortLabel}</span>
+        <span className="hidden sm:inline">{fullLabel}</span>
+        <ChevronDown size={11} color="#71717A" className="shrink-0" style={{ transform: open ? "rotate(180deg)" : "none", transition: "transform 0.15s ease" }} />
       </button>
 
       {open && (

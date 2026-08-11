@@ -10,7 +10,6 @@ import { StatusFilterDropdown } from "./StatusFilterDropdown";
 import { ProviderGroupHeader } from "./ProviderGroupHeader";
 import { useFlipAnimation } from "../../lib/useFlipAnimation";
 
-
 const PROVIDER_ORDER = ["gemini", "openrouter", "groq"];
 
 function groupByProvider(list: AK[]): { provider: string; items: AK[] }[] {
@@ -63,7 +62,6 @@ export function KeysTable({
     return true;
   });
 
-
   const groups = useMemo(() => groupByProvider(filtered), [filtered]);
   const orderedRows = useMemo(
     () => (grouped ? groups.flatMap((g) => g.items) : filtered),
@@ -75,9 +73,9 @@ export function KeysTable({
 
   return (
     <div className="rounded-xl overflow-hidden" style={{ border: "1px solid rgba(255,255,255,0.06)" }}>
-      <div className="flex items-center justify-between gap-2 px-4 py-2.5" style={{ borderBottom: "1px solid rgba(255,255,255,0.05)", background: "#0F0F11" }}>
+      <div className="flex flex-wrap items-center justify-between gap-x-2 gap-y-2 px-4 py-2.5" style={{ borderBottom: "1px solid rgba(255,255,255,0.05)", background: "#0F0F11" }}>
         <span className="text-xs font-medium text-zinc-400 shrink-0">API Keys</span>
-        <div className="flex items-end gap-3 min-w-0">
+        <div className="flex items-end gap-2 sm:gap-3 min-w-0 flex-wrap sm:flex-nowrap">
           <div className="relative hidden sm:block mb-[1px]">
             <Search size={12} color="#52525B" className="absolute left-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
             <input
