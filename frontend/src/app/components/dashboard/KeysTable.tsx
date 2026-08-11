@@ -10,6 +10,7 @@ import { StatusFilterDropdown } from "./StatusFilterDropdown";
 import { ProviderGroupHeader } from "./ProviderGroupHeader";
 import { useFlipAnimation } from "../../lib/useFlipAnimation";
 
+
 const PROVIDER_ORDER = ["gemini", "openrouter", "groq"];
 
 function groupByProvider(list: AK[]): { provider: string; items: AK[] }[] {
@@ -149,7 +150,8 @@ export function KeysTable({
                   <div key={g.provider} className="rounded-lg overflow-hidden" style={{ border: "1px solid rgba(255,255,255,0.07)", background: "#0F0F11" }}>
                     <ProviderGroupHeader provider={g.provider} keys={g.items} />
                     <div className="overflow-x-auto" style={{ borderTop: "1px solid rgba(255,255,255,0.05)" }}>
-                      <table className="w-full min-w-[760px]">
+                      <table className="w-full min-w-[760px]" style={{ tableLayout: "fixed" }}>
+                        <ColumnWidths />
                         <tbody className="divide-y divide-white/[0.03]">
                           {g.items.map((k) => (
                             <DesktopKeyRow key={k.id} k={k} now={now} checkingIds={checkingIds} onSelect={onSelect} onEdit={onEdit} onToggle={onToggle} onCheck={onCheck} />
@@ -162,7 +164,8 @@ export function KeysTable({
               </div>
             ) : (
               <div className="overflow-x-auto">
-                <table className="w-full min-w-[760px]">
+                <table className="w-full min-w-[760px]" style={{ tableLayout: "fixed" }}>
+                  <ColumnWidths />
                   <thead>
                     <tr style={{ borderBottom: "1px solid rgba(255,255,255,0.04)" }}>
                       {["Label", "Provider", "Status", "Usage", "Last Used", ""].map((h, i) => (
@@ -184,6 +187,19 @@ export function KeysTable({
         </>
       )}
     </div>
+  );
+}
+
+function ColumnWidths() {
+  return (
+    <colgroup>
+      <col style={{ width: "30%" }} />
+      <col style={{ width: "12%" }} />
+      <col style={{ width: "14%" }} />
+      <col style={{ width: "20%" }} />
+      <col style={{ width: "12%" }} />
+      <col style={{ width: "12%" }} />
+    </colgroup>
   );
 }
 
@@ -242,9 +258,9 @@ function DesktopKeyRow({
 }) {
   return (
     <tr data-flip-id={k.id} className="group cursor-pointer transition-colors hover:bg-white/[0.02]" onClick={() => onSelect(k.id)}>
-      <td className="px-4 py-3">
-        <div className="text-sm font-medium text-zinc-200 leading-none">{k.label}</div>
-        <div className="text-[11px] font-mono text-zinc-600 mt-1">
+      <td className="px-4 py-3 min-w-0">
+        <div className="text-sm font-medium text-zinc-200 leading-none truncate">{k.label}</div>
+        <div className="text-[11px] font-mono text-zinc-600 mt-1 truncate">
           {k.masked}
           {k.model && <span className="text-zinc-700"> · {k.model}</span>}
         </div>
