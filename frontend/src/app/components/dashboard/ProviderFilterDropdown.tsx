@@ -2,15 +2,20 @@ import { useEffect, useRef, useState } from "react";
 import { ChevronDown, CheckCircle2, Plug } from "lucide-react";
 import { PROVIDER_META } from "../../lib/domain";
 import type { PF, Provider } from "../../types";
+import { DropdownPortal } from "../shared/DropdownPortal";
 
 export function ProviderFilterDropdown({ filter, onFilter }: { filter: PF; onFilter: (f: PF) => void }) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (!open) return;
     const h = (e: MouseEvent) => {
-      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+      const t = e.target as Node;
+      if (ref.current?.contains(t)) return;
+      if (menuRef.current?.contains(t)) return;
+      setOpen(false);
     };
     document.addEventListener("mousedown", h);
     return () => document.removeEventListener("mousedown", h);
@@ -41,9 +46,10 @@ export function ProviderFilterDropdown({ filter, onFilter }: { filter: PF; onFil
         <ChevronDown size={11} color="#71717A" className="shrink-0" style={{ transform: open ? "rotate(180deg)" : "none", transition: "transform 0.15s ease" }} />
       </button>
 
-      {open && (
+      <DropdownPortal anchorRef={ref} open={open} align="right">
         <div
-          className="absolute right-0 z-10 mt-1.5 min-w-[140px] rounded-lg shadow-lg animate-in fade-in slide-in-from-top-1 duration-150 overflow-hidden"
+          ref={menuRef}
+          className="min-w-[140px] rounded-lg shadow-lg animate-in fade-in slide-in-from-top-1 duration-150 overflow-hidden"
           style={{ background: "#1C1C1E", border: "1px solid rgba(255,255,255,0.1)" }}
         >
           {options.map((f) => {
@@ -62,7 +68,7 @@ export function ProviderFilterDropdown({ filter, onFilter }: { filter: PF; onFil
             );
           })}
         </div>
-      )}
+      </DropdownPortal>
     </div>
   );
 }
