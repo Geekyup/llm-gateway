@@ -18,7 +18,7 @@ const GRID = "rgba(255,255,255,0.04)";
 const ACCENT = "#00D68F";
 
 const BUCKET_COUNT = 12;
-const BUCKET_MS = 60_000; /
+const BUCKET_MS = 60_000; 
 
 interface Bucket {
   label: string;
