@@ -1,19 +1,23 @@
 import { ArrowRight } from "lucide-react";
 import type { LR } from "../../types";
 import { ProviderBadge } from "../shared/ProviderBadge";
+import { MonitorCharts } from "./MonitorCharts";
 
-export function LiveMonitor({ reqs }: { reqs: LR[]; now: number }) {
+export function LiveMonitor({ reqs, now }: { reqs: LR[]; now: number }) {
   return (
-    <div className="rounded-xl overflow-hidden" style={{ border: "1px solid rgba(255,255,255,0.06)" }}>
-      <div className="flex items-center justify-between px-4 py-2.5" style={{ borderBottom: "1px solid rgba(255,255,255,0.05)", background: "#0F0F11" }}>
-        <div className="flex items-center gap-2">
-          <span className="w-2 h-2 rounded-full animate-pulse" style={{ background: "#00D68F", boxShadow: "0 0 6px rgba(0,214,143,0.7)" }} />
-          <span className="text-xs font-medium text-zinc-400">Live Request Feed</span>
-        </div>
-        <span className="text-[11px] font-mono text-zinc-600">{reqs.length} captured</span>
-      </div>
+    <div>
+      <MonitorCharts reqs={reqs} now={now} />
 
-      <div style={{ background: "#111113" }}>
+      <div className="rounded-xl overflow-hidden" style={{ border: "1px solid rgba(255,255,255,0.06)" }}>
+        <div className="flex items-center justify-between px-4 py-2.5" style={{ borderBottom: "1px solid rgba(255,255,255,0.05)", background: "#0F0F11" }}>
+          <div className="flex items-center gap-2">
+            <span className="w-2 h-2 rounded-full animate-pulse" style={{ background: "#00D68F", boxShadow: "0 0 6px rgba(0,214,143,0.7)" }} />
+            <span className="text-xs font-medium text-zinc-400">Live Request Feed</span>
+          </div>
+          <span className="text-[11px] font-mono text-zinc-600">{reqs.length} captured</span>
+        </div>
+
+        <div style={{ background: "#111113" }}>
         <div
           className="hidden sm:grid px-4 py-2 min-w-0"
           style={{ gridTemplateColumns: "72px 88px minmax(0,1fr) 52px 64px 56px", borderBottom: "1px solid rgba(255,255,255,0.04)" }}
@@ -93,6 +97,7 @@ export function LiveMonitor({ reqs }: { reqs: LR[]; now: number }) {
             </div>
           );
         })}
+        </div>
       </div>
     </div>
   );
