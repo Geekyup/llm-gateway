@@ -16,12 +16,23 @@ import { providerMeta } from "../../lib/domain";
 const MUTED = "#52525B";
 const GRID = "rgba(255,255,255,0.04)";
 const ACCENT = "#00D68F";
+const MSK_TZ = "Europe/Moscow";
 
 const BUCKET_COUNT = 12;
 const BUCKET_MS = 60_000; 
 
+function fmtMsk(ts: number): string {
+  return new Intl.DateTimeFormat("ru-RU", {
+    timeZone: MSK_TZ,
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  }).format(ts);
+}
+
 interface Bucket {
   label: string;
+  fullTime: string;
   ts: number;
   count: number;
   p50: number;
@@ -49,9 +60,8 @@ function bucketRequests(reqs: LR[], now: number): Bucket[] {
 
     const isNow = i === BUCKET_COUNT - 1;
     buckets.push({
-      label: isNow
-        ? "now"
-        : `-${(BUCKET_COUNT - 1 - i)}m`,
+      label: fmtMsk(bucketStart),
+      fullTime: isNow ? `${fmtMsk(bucketStart)} MSK - now` : `${fmtMsk(bucketStart)} MSK`,
       ts: bucketStart,
       count: inBucket.length,
       p50,
@@ -71,6 +81,14 @@ function tooltipStyle() {
     fontSize: 11,
     fontFamily: "inherit",
   } as const;
+}
+
+function EmptyChart({ message }: { message: string }) {
+  return (
+    <div className="h-full flex items-center justify-center">
+      <span className="text-[11px] text-zinc-600">{message}</span>
+    </div>
+  );
 }
 
 function ChartCard({
@@ -113,7 +131,7 @@ export function MonitorCharts({ reqs, now }: { reqs: LR[]; now: number }) {
   const providerChartData = useMemo(
     () =>
       buckets.map((b) => {
-        const row: Record<string, number | string> = { label: b.label };
+        const row: Record<string, number | string> = { label: b.label, fullTime: b.fullTime };
         for (const p of providersPresent) row[p] = b.providers[p] ?? 0;
         return row;
       }),
@@ -123,6 +141,8 @@ export function MonitorCharts({ reqs, now }: { reqs: LR[]; now: number }) {
   const current = buckets[buckets.length - 1];
   const currentReq = current?.count ?? 0;
   const currentP50 = current?.p50 || buckets.slice().reverse().find((b) => b.p50 > 0)?.p50 || 0;
+  const totalReqInWindow = buckets.reduce((acc, b) => acc + b.count, 0);
+  const hasData = totalReqInWindow > 0;
 
   const busiest = providersPresent
     .slice()
@@ -138,69 +158,79 @@ export function MonitorCharts({ reqs, now }: { reqs: LR[]; now: number }) {
     <div className="grid gap-3 mb-3">
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
         <ChartCard title="Requests / min" value={currentReq} unit="now">
-          <ResponsiveContainer width="100%" height="100%">
-            <AreaChart data={buckets} margin={{ top: 4, right: 4, left: 4, bottom: 0 }}>
-              <CartesianGrid stroke={GRID} vertical={false} />
-              <XAxis
-                dataKey="label"
-                tick={{ fill: MUTED, fontSize: 9 }}
-                axisLine={false}
-                tickLine={false}
-                interval="preserveStartEnd"
-              />
-              <YAxis tick={{ fill: MUTED, fontSize: 9 }} axisLine={false} tickLine={false} width={24} />
-              <Tooltip
-                contentStyle={tooltipStyle()}
-                labelStyle={{ color: MUTED, marginBottom: 2 }}
-                itemStyle={{ color: "#ECECF0" }}
-                formatter={(v: number) => [`${v} req/min`, ""]}
-                cursor={{ stroke: "rgba(255,255,255,0.1)" }}
-              />
-              <Area
-                type="monotone"
-                dataKey="count"
-                stroke={ACCENT}
-                strokeWidth={1.5}
-                fill={ACCENT}
-                fillOpacity={0.08}
-                dot={false}
-                activeDot={{ r: 4, fill: ACCENT, stroke: "#0A0A0B", strokeWidth: 2 }}
-              />
-            </AreaChart>
-          </ResponsiveContainer>
+          {hasData ? (
+            <ResponsiveContainer width="100%" height="100%">
+              <AreaChart data={buckets} margin={{ top: 4, right: 4, left: 4, bottom: 0 }}>
+                <CartesianGrid stroke={GRID} vertical={false} />
+                <XAxis
+                  dataKey="label"
+                  tick={{ fill: MUTED, fontSize: 9 }}
+                  axisLine={false}
+                  tickLine={false}
+                  interval="preserveStartEnd"
+                />
+                <YAxis tick={{ fill: MUTED, fontSize: 9 }} axisLine={false} tickLine={false} width={24} allowDecimals={false} />
+                <Tooltip
+                  contentStyle={tooltipStyle()}
+                  labelStyle={{ color: MUTED, marginBottom: 2 }}
+                  itemStyle={{ color: "#ECECF0" }}
+                  formatter={(v: number) => [`${v} req/min`, ""]}
+                  labelFormatter={(_, payload) => payload?.[0]?.payload?.fullTime ?? ""}
+                  cursor={{ stroke: "rgba(255,255,255,0.1)" }}
+                />
+                <Area
+                  type="monotone"
+                  dataKey="count"
+                  stroke={ACCENT}
+                  strokeWidth={1.5}
+                  fill={ACCENT}
+                  fillOpacity={0.08}
+                  dot={false}
+                  activeDot={{ r: 4, fill: ACCENT, stroke: "#0A0A0B", strokeWidth: 2 }}
+                />
+              </AreaChart>
+            </ResponsiveContainer>
+          ) : (
+            <EmptyChart message="No requests in the last 12 min" />
+          )}
         </ChartCard>
 
-        <ChartCard title="Latency p50" value={currentP50 || "—"} unit="ms">
-          <ResponsiveContainer width="100%" height="100%">
-            <AreaChart data={buckets} margin={{ top: 4, right: 4, left: 4, bottom: 0 }}>
-              <CartesianGrid stroke={GRID} vertical={false} />
-              <XAxis
-                dataKey="label"
-                tick={{ fill: MUTED, fontSize: 9 }}
-                axisLine={false}
-                tickLine={false}
-                interval="preserveStartEnd"
-              />
-              <YAxis tick={{ fill: MUTED, fontSize: 9 }} axisLine={false} tickLine={false} width={28} />
-              <Tooltip
-                contentStyle={tooltipStyle()}
-                labelStyle={{ color: MUTED, marginBottom: 2 }}
-                itemStyle={{ color: "#ECECF0" }}
-                formatter={(v: number) => [`${v} ms`, ""]}
-                cursor={{ stroke: "rgba(255,255,255,0.1)" }}
-              />
-              <Area
-                type="monotone"
-                dataKey="p50"
-                stroke={ACCENT}
-                strokeWidth={1.5}
-                fill={ACCENT}
-                fillOpacity={0.08}
-                dot={false}
-                activeDot={{ r: 4, fill: ACCENT, stroke: "#0A0A0B", strokeWidth: 2 }}
-              />
-            </AreaChart>
-          </ResponsiveContainer>
+        <ChartCard title="Latency p50" value={currentP50 || "--"} unit="ms">
+          {hasData ? (
+            <ResponsiveContainer width="100%" height="100%">
+              <AreaChart data={buckets} margin={{ top: 4, right: 4, left: 4, bottom: 0 }}>
+                <CartesianGrid stroke={GRID} vertical={false} />
+                <XAxis
+                  dataKey="label"
+                  tick={{ fill: MUTED, fontSize: 9 }}
+                  axisLine={false}
+                  tickLine={false}
+                  interval="preserveStartEnd"
+                />
+                <YAxis tick={{ fill: MUTED, fontSize: 9 }} axisLine={false} tickLine={false} width={28} allowDecimals={false} />
+                <Tooltip
+                  contentStyle={tooltipStyle()}
+                  labelStyle={{ color: MUTED, marginBottom: 2 }}
+                  itemStyle={{ color: "#ECECF0" }}
+                  formatter={(v: number) => [`${v} ms`, ""]}
+                  labelFormatter={(_, payload) => payload?.[0]?.payload?.fullTime ?? ""}
+                  cursor={{ stroke: "rgba(255,255,255,0.1)" }}
+                />
+                <Area
+                  type="monotone"
+                  dataKey="p50"
+                  stroke={ACCENT}
+                  strokeWidth={1.5}
+                  fill={ACCENT}
+                  fillOpacity={0.08}
+                  dot={false}
+                  activeDot={{ r: 4, fill: ACCENT, stroke: "#0A0A0B", strokeWidth: 2 }}
+                />
+              </AreaChart>
+            </ResponsiveContainer>
+          ) : (
+            <EmptyChart message="No latency data yet" />
+          )}
         </ChartCard>
       </div>
 
@@ -226,36 +256,41 @@ export function MonitorCharts({ reqs, now }: { reqs: LR[]; now: number }) {
           </div>
         </div>
         <div className="h-[90px]">
-          <ResponsiveContainer width="100%" height="100%">
-            <BarChart data={providerChartData} margin={{ top: 4, right: 4, left: 4, bottom: 0 }}>
-              <CartesianGrid stroke={GRID} vertical={false} />
-              <XAxis
-                dataKey="label"
-                tick={{ fill: MUTED, fontSize: 9 }}
-                axisLine={false}
-                tickLine={false}
-                interval="preserveStartEnd"
-              />
-              <YAxis tick={{ fill: MUTED, fontSize: 9 }} axisLine={false} tickLine={false} width={24} />
-              <Tooltip
-                contentStyle={tooltipStyle()}
-                labelStyle={{ color: MUTED, marginBottom: 2 }}
-                itemStyle={{ color: "#ECECF0" }}
-                cursor={{ fill: "rgba(255,255,255,0.03)" }}
-              />
-              {providersPresent.map((p) => (
-                <Bar
-                  key={p}
-                  dataKey={p}
-                  stackId="providers"
-                  fill={providerColor(p)}
-                  name={providerMeta(p).name}
-                  radius={p === providersPresent[providersPresent.length - 1] ? [2, 2, 0, 0] : undefined}
-                  maxBarSize={22}
+          {hasData ? (
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={providerChartData} margin={{ top: 4, right: 4, left: 4, bottom: 0 }}>
+                <CartesianGrid stroke={GRID} vertical={false} />
+                <XAxis
+                  dataKey="label"
+                  tick={{ fill: MUTED, fontSize: 9 }}
+                  axisLine={false}
+                  tickLine={false}
+                  interval="preserveStartEnd"
                 />
-              ))}
-            </BarChart>
-          </ResponsiveContainer>
+                <YAxis tick={{ fill: MUTED, fontSize: 9 }} axisLine={false} tickLine={false} width={24} allowDecimals={false} />
+                <Tooltip
+                  contentStyle={tooltipStyle()}
+                  labelStyle={{ color: MUTED, marginBottom: 2 }}
+                  itemStyle={{ color: "#ECECF0" }}
+                  labelFormatter={(_, payload) => payload?.[0]?.payload?.fullTime ?? ""}
+                  cursor={{ fill: "rgba(255,255,255,0.03)" }}
+                />
+                {providersPresent.map((p) => (
+                  <Bar
+                    key={p}
+                    dataKey={p}
+                    stackId="providers"
+                    fill={providerColor(p)}
+                    name={providerMeta(p).name}
+                    radius={p === providersPresent[providersPresent.length - 1] ? [2, 2, 0, 0] : undefined}
+                    maxBarSize={22}
+                  />
+                ))}
+              </BarChart>
+            </ResponsiveContainer>
+          ) : (
+            <EmptyChart message="No requests in the last 12 min" />
+          )}
         </div>
       </div>
     </div>
