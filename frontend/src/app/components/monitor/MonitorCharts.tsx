@@ -160,7 +160,7 @@ export function MonitorCharts({ reqs, now }: { reqs: LR[]; now: number }) {
 
   return (
     <div className="grid gap-3 mb-3">
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
         <ChartCard title="Requests / min" value={currentReq} unit="now">
           {hasData ? (
             <ResponsiveContainer width="100%" height="100%">
@@ -236,57 +236,56 @@ export function MonitorCharts({ reqs, now }: { reqs: LR[]; now: number }) {
             <EmptyChart message="No latency data yet" />
           )}
         </ChartCard>
-
-        <ChartCard title="Requests by provider" value={totalReqInWindow} unit="total">
-          {hasData ? (
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={providerChartData} margin={{ top: 4, right: 4, left: 4, bottom: 0 }}>
-                <CartesianGrid stroke={GRID} vertical={false} />
-                <XAxis
-                  dataKey="label"
-                  tick={{ fill: MUTED, fontSize: 9 }}
-                  axisLine={false}
-                  tickLine={false}
-                  interval="preserveStartEnd"
-                />
-                <YAxis tick={{ fill: MUTED, fontSize: 9 }} axisLine={false} tickLine={false} width={Y_AXIS_WIDTH} allowDecimals={false} />
-                <Tooltip
-                  contentStyle={tooltipStyle()}
-                  labelStyle={{ color: MUTED, marginBottom: 2 }}
-                  itemStyle={{ color: "#ECECF0" }}
-                  labelFormatter={(_, payload) => payload?.[0]?.payload?.fullTime ?? ""}
-                  cursor={{ fill: "rgba(255,255,255,0.03)" }}
-                />
-                {providersPresent.map((p) => (
-                  <Bar
-                    key={p}
-                    dataKey={p}
-                    stackId="providers"
-                    fill={providerColor(p)}
-                    name={providerMeta(p).name}
-                    radius={p === providersPresent[providersPresent.length - 1] ? [2, 2, 0, 0] : undefined}
-                    maxBarSize={22}
-                  />
-                ))}
-              </BarChart>
-            </ResponsiveContainer>
-          ) : (
-            <EmptyChart message="No requests in the last 30 min" />
-          )}
-        </ChartCard>
       </div>
 
-      <div className="flex items-center justify-end gap-3.5 px-1">
-        {providersPresent.map((p) => {
-          const meta = providerMeta(p);
-          return (
-            <span key={p} className="flex items-center gap-1.5 text-[11px] text-zinc-400">
-              <span className="w-1.5 h-1.5 rounded-[2px]" style={{ background: providerColor(p) }} />
-              {meta.name}
-            </span>
-          );
-        })}
-      </div>
+      <ChartCard title="Requests by provider" value={totalReqInWindow} unit="total">
+        <div className="flex items-center justify-end gap-3.5 mb-1.5 -mt-1">
+          {providersPresent.map((p) => {
+            const meta = providerMeta(p);
+            return (
+              <span key={p} className="flex items-center gap-1.5 text-[11px] text-zinc-400">
+                <span className="w-1.5 h-1.5 rounded-[2px]" style={{ background: providerColor(p) }} />
+                {meta.name}
+              </span>
+            );
+          })}
+        </div>
+        {hasData ? (
+          <ResponsiveContainer width="100%" height="100%">
+            <BarChart data={providerChartData} margin={{ top: 4, right: 4, left: 4, bottom: 0 }}>
+              <CartesianGrid stroke={GRID} vertical={false} />
+              <XAxis
+                dataKey="label"
+                tick={{ fill: MUTED, fontSize: 9 }}
+                axisLine={false}
+                tickLine={false}
+                interval="preserveStartEnd"
+              />
+              <YAxis tick={{ fill: MUTED, fontSize: 9 }} axisLine={false} tickLine={false} width={Y_AXIS_WIDTH} allowDecimals={false} />
+              <Tooltip
+                contentStyle={tooltipStyle()}
+                labelStyle={{ color: MUTED, marginBottom: 2 }}
+                itemStyle={{ color: "#ECECF0" }}
+                labelFormatter={(_, payload) => payload?.[0]?.payload?.fullTime ?? ""}
+                cursor={{ fill: "rgba(255,255,255,0.03)" }}
+              />
+              {providersPresent.map((p) => (
+                <Bar
+                  key={p}
+                  dataKey={p}
+                  stackId="providers"
+                  fill={providerColor(p)}
+                  name={providerMeta(p).name}
+                  radius={p === providersPresent[providersPresent.length - 1] ? [2, 2, 0, 0] : undefined}
+                  maxBarSize={22}
+                />
+              ))}
+            </BarChart>
+          </ResponsiveContainer>
+        ) : (
+          <EmptyChart message="No requests in the last 30 min" />
+        )}
+      </ChartCard>
     </div>
   );
 }
