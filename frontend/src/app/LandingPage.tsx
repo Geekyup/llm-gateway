@@ -1,10 +1,8 @@
 import { useEffect, useRef, useState } from "react";
-import { KeyRound, ArrowRight, ShieldCheck } from "lucide-react";
+import { KeyRound, ArrowRight, ShieldCheck, Github } from "lucide-react";
 
-// -----------------------------------------------------------------------
-// Colors here are pulled 1:1 from src/styles/theme.css (--primary,
-// --destructive, --chart-2..5, etc). Nothing is a new hex value.
-// -----------------------------------------------------------------------
+const REPO_URL = "https://github.com/Geekyup/llm-gateway";
+
 const AMBER = "#F59E0B";
 const PROVIDERS = [
   { key: "gemini", name: "Gemini", color: "#4F8EF7" },
@@ -14,12 +12,7 @@ const PROVIDERS = [
 
 type KeyState = "active" | "exhausting" | "idle" | "cooldown";
 
-// -----------------------------------------------------------------------
-// Signature element: a live failover chain. One key is active at a time;
-// every few seconds it "exhausts" (flashes red) and the baton visibly
-// passes to the next key. This is the one concrete thing the product
-// does, shown instead of described.
-// -----------------------------------------------------------------------
+
 function FailoverChain() {
   const KEYS = 5;
   const [active, setActive] = useState(0);
@@ -73,15 +66,18 @@ function FailoverChain() {
     <div className="rounded-xl p-5 bg-card border border-border">
       <div className="flex items-center justify-between mb-4">
         <span className="text-[11px] font-mono uppercase tracking-wider text-muted-foreground">
-          key pool · gemini
+          key pool · any provider
         </span>
-        <span className="text-[11px] font-mono flex items-center gap-1.5 text-primary">
-          <span className="w-1.5 h-1.5 rounded-full animate-pulse bg-primary" />
+        <span
+          className="text-[11px] font-mono flex items-center gap-1.5 text-primary"
+          role="status"
+        >
+          <span className="w-1.5 h-1.5 rounded-full animate-pulse bg-primary" aria-hidden="true" />
           routing live
         </span>
       </div>
 
-      <div className="flex items-center gap-1.5">
+      <div className="flex items-center gap-1.5" role="img" aria-label={`Key pool status: key_0${active + 1} is currently active`}>
         {Array.from({ length: KEYS }).map((_, i) => {
           const state = stateFor(i);
           const color =
@@ -126,7 +122,7 @@ function FailoverChain() {
       </div>
 
       <div className="mt-4 pt-4 border-t border-border">
-        <p className="text-[12px] font-mono text-muted-foreground">
+        <p className="text-[12px] font-mono text-muted-foreground" role="status" aria-live="polite">
           {exhausting !== null ? (
             <>
               <span style={{ color: "var(--destructive)" }}>key_0{exhausting + 1}</span>{" "}
@@ -150,7 +146,7 @@ function ProviderPill({ name, color }: { name: string; color: string }) {
       className="inline-flex items-center gap-2 px-3 py-1.5 rounded-md text-[13px] font-medium"
       style={{ color, background: `${color}14`, border: `1px solid ${color}33` }}
     >
-      <span className="w-1.5 h-1.5 rounded-full" style={{ background: color }} />
+      <span className="w-1.5 h-1.5 rounded-full" style={{ background: color }} aria-hidden="true" />
       {name}
     </span>
   );
@@ -160,10 +156,12 @@ function CodeToken({
   children,
   tip,
   accent,
+  align = "left",
 }: {
   children: React.ReactNode;
   tip: string;
   accent?: boolean;
+  align?: "left" | "right";
 }) {
   const [show, setShow] = useState(false);
   return (
@@ -176,7 +174,9 @@ function CodeToken({
       {children}
       {show && (
         <span
-          className="absolute left-0 bottom-full mb-2 z-20 whitespace-nowrap px-2.5 py-1.5 rounded-md text-[11px] font-mono normal-case bg-popover border border-border text-foreground"
+          className={`absolute bottom-full mb-2 z-20 max-w-[min(280px,80vw)] whitespace-normal px-2.5 py-1.5 rounded-md text-[11px] font-mono normal-case bg-popover border border-border text-foreground ${
+            align === "right" ? "right-0" : "left-0"
+          }`}
           style={{ boxShadow: "0 4px 16px rgba(0,0,0,0.4)" }}
         >
           {tip}
@@ -207,7 +207,10 @@ function CodeBlock() {
           Authorization: Bearer $GATEWAY_TOKEN
         </CodeToken>
         {'" \\\n  -d \'{\n    "model": "'}
-        <CodeToken tip="Any model any of your pooled providers serves. Omit it and Keypool picks from whatever's active.">
+        <CodeToken
+          tip="Any model any of your pooled providers serves. Omit it and Keypool picks from whatever's active."
+          align="right"
+        >
           gemini-2.0-flash
         </CodeToken>
         {'",\n    "messages": [{ "role": "user", "content": "hi" }]\n  }\''}
@@ -216,12 +219,34 @@ function CodeBlock() {
   );
 }
 
-const LIVE_FEED_SAMPLE = [
+type FeedRow = { provider: string; color: string; model: string; ms: number; status: string };
+
+const FEED_POOL: FeedRow[] = [
   { provider: "gemini", color: "#4F8EF7", model: "gemini-2.0-flash", ms: 412, status: "ok" },
   { provider: "groq", color: "#F97316", model: "llama-3.3-70b", ms: 189, status: "ok" },
   { provider: "gemini", color: "#4F8EF7", model: "gemini-2.0-flash", ms: 3, status: "429 → retry" },
   { provider: "openrouter", color: "#A78BFA", model: "claude-3-5-haiku", ms: 731, status: "ok" },
+  { provider: "groq", color: "#F97316", model: "llama-3.1-8b", ms: 94, status: "ok" },
+  { provider: "openrouter", color: "#A78BFA", model: "gpt-4o-mini", ms: 512, status: "ok" },
+  { provider: "gemini", color: "#4F8EF7", model: "gemini-1.5-pro", ms: 288, status: "ok" },
 ];
+
+
+function useLiveFeed(size = 4, intervalMs = 2600) {
+  const [rows, setRows] = useState<FeedRow[]>(() => FEED_POOL.slice(0, size));
+  const cursor = useRef(size % FEED_POOL.length);
+
+  useEffect(() => {
+    const id = setInterval(() => {
+      const next = FEED_POOL[cursor.current % FEED_POOL.length];
+      cursor.current += 1;
+      setRows((prev) => [next, ...prev.slice(0, size - 1)]);
+    }, intervalMs);
+    return () => clearInterval(id);
+  }, [size, intervalMs]);
+
+  return rows;
+}
 
 function SignInButton({
   onClick,
@@ -232,15 +257,25 @@ function SignInButton({
   size?: "sm" | "md";
   showArrow?: boolean;
 }) {
+  const [pending, setPending] = useState(false);
   const padding = size === "sm" ? "px-3.5 py-1.5 text-[13px]" : "px-5 py-2.5 text-[14px]";
+
+  function handleClick() {
+    if (pending) return;
+    setPending(true);
+    onClick();
+  }
+
   return (
     <button
-      onClick={onClick}
-      className={`group font-medium rounded-md flex items-center gap-2 transition-all active:scale-[0.97] ${padding}`}
+      onClick={handleClick}
+      disabled={pending}
+      aria-busy={pending}
+      className={`group font-medium rounded-md flex items-center gap-2 transition-all active:scale-[0.97] disabled:opacity-70 disabled:cursor-not-allowed ${padding}`}
       style={{ background: "var(--primary)", color: "var(--primary-foreground)" }}
     >
-      Sign in with Google
-      {showArrow && (
+      {pending ? "Redirecting…" : "Sign in with Google"}
+      {showArrow && !pending && (
         <ArrowRight
           size={15}
           className="transition-transform duration-200 group-hover:translate-x-0.5"
@@ -251,6 +286,8 @@ function SignInButton({
 }
 
 export default function LandingPage({ onSignIn }: { onSignIn: () => void }) {
+  const feedRows = useLiveFeed();
+
   return (
     <div className="min-h-screen w-full bg-background text-foreground">
       <div className="relative">
@@ -264,11 +301,22 @@ export default function LandingPage({ onSignIn }: { onSignIn: () => void }) {
               </div>
               <span className="text-[13px] font-medium tracking-tight">keypool</span>
             </div>
-            <SignInButton onClick={onSignIn} size="sm" />
+            <div className="flex items-center gap-3">
+              <a
+                href={REPO_URL}
+                target="_blank"
+                rel="noreferrer noopener"
+                aria-label="View source on GitHub"
+                className="flex items-center gap-1.5 text-[13px] text-muted-foreground hover:text-foreground transition-colors"
+              >
+                <Github size={15} />
+                <span className="hidden sm:inline">Source</span>
+              </a>
+              <SignInButton onClick={onSignIn} size="sm" />
+            </div>
           </div>
         </header>
 
-        {/* Hero */}
         <section className="relative max-w-5xl mx-auto px-6 pt-20 pb-16">
           <div className="grid md:grid-cols-2 gap-12 items-center">
             <div>
@@ -276,9 +324,8 @@ export default function LandingPage({ onSignIn }: { onSignIn: () => void }) {
                 self-hosted / v0.4
               </p>
               <h1 className="text-[34px] md:text-[42px] leading-[1.1] font-semibold tracking-tight mb-5">
-                One endpoint. Many keys.
-                <br />
-                Zero 429s reaching your app.
+                One endpoint. Many keys.{" "}
+                <span className="sm:block">Zero 429s reaching your app.</span>
               </h1>
               <p className="text-[15px] leading-relaxed mb-8 max-w-md text-muted-foreground">
                 Keypool sits between your app and Gemini, Groq, or OpenRouter.
@@ -298,7 +345,6 @@ export default function LandingPage({ onSignIn }: { onSignIn: () => void }) {
         </section>
       </div>
 
-      {/* Providers */}
       <section className="max-w-5xl mx-auto px-6 py-10 border-t border-border">
         <p className="text-[11px] font-mono uppercase tracking-wider mb-4 text-muted-foreground">
           Supported providers
@@ -310,19 +356,22 @@ export default function LandingPage({ onSignIn }: { onSignIn: () => void }) {
         </div>
       </section>
 
-      {/* Live feed + what it does */}
       <section className="max-w-5xl mx-auto px-6 pb-16">
         <div className="grid md:grid-cols-[1.1fr_0.9fr] gap-8 items-start">
           <div className="rounded-xl overflow-hidden bg-card border border-border">
             <div className="flex items-center justify-between px-4 py-2.5 border-b border-border">
               <span className="text-[11px] font-mono text-muted-foreground">live request feed</span>
-              <span className="text-[10px] font-mono flex items-center gap-1.5 text-primary">
+              <span
+                className="text-[10px] font-mono flex items-center gap-1.5 text-primary"
+                role="status"
+                aria-live="polite"
+              >
                 <span className="w-1 h-1 rounded-full animate-pulse bg-primary" />
                 sse
               </span>
             </div>
             <div className="divide-y divide-border">
-              {LIVE_FEED_SAMPLE.map((r, i) => (
+              {feedRows.map((r, i) => (
                 <div key={i} className="px-4 py-2.5 flex items-center gap-3 text-[12px] font-mono">
                   <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ background: r.color }} />
                   <span className="w-20 shrink-0" style={{ color: r.color }}>
@@ -368,7 +417,6 @@ export default function LandingPage({ onSignIn }: { onSignIn: () => void }) {
         </div>
       </section>
 
-      {/* Code example */}
       <section className="max-w-5xl mx-auto px-6 pb-20">
         <div className="grid md:grid-cols-2 gap-10 items-center">
           <div>
@@ -388,11 +436,20 @@ export default function LandingPage({ onSignIn }: { onSignIn: () => void }) {
         </div>
       </section>
 
-      <footer className="max-w-5xl mx-auto px-6 py-6 text-[12px] font-mono flex items-center justify-between text-muted-foreground border-t border-border">
-        <span>keypool</span>
-        <span className="hidden sm:inline">
-          each account manages its own keys, tokens, and request history
-        </span>
+      <footer className="max-w-5xl mx-auto px-6 py-6 text-[12px] font-mono flex flex-col sm:flex-row gap-2 sm:items-center sm:justify-between text-muted-foreground border-t border-border">
+        <div className="flex items-center gap-4">
+          <span>keypool</span>
+          <a
+            href={REPO_URL}
+            target="_blank"
+            rel="noreferrer noopener"
+            className="flex items-center gap-1.5 hover:text-foreground transition-colors"
+          >
+            <Github size={13} />
+            source
+          </a>
+        </div>
+        <span>each account manages its own keys, tokens, and request history</span>
       </footer>
     </div>
   );
