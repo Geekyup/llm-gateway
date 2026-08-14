@@ -1,4 +1,5 @@
 import { useMemo } from "react";
+import { BarChart3 } from "lucide-react";
 import {
   ResponsiveContainer,
   AreaChart,
@@ -17,6 +18,8 @@ const MUTED = "#52525B";
 const GRID = "rgba(255,255,255,0.04)";
 const ACCENT = "#00D68F";
 const MSK_TZ = "Europe/Moscow";
+
+const Y_AXIS_WIDTH = 30;
 
 const BUCKET_COUNT = 15;
 const BUCKET_MS = 120_000; 
@@ -85,7 +88,8 @@ function tooltipStyle() {
 
 function EmptyChart({ message }: { message: string }) {
   return (
-    <div className="h-full flex items-center justify-center">
+    <div className="h-full flex flex-col items-center justify-center gap-2">
+      <BarChart3 size={20} className="text-zinc-700" strokeWidth={1.5} />
       <span className="text-[11px] text-zinc-600">{message}</span>
     </div>
   );
@@ -114,7 +118,7 @@ function ChartCard({
           {unit && <span className="text-[10px] text-zinc-600 font-normal"> {unit}</span>}
         </span>
       </div>
-      <div className="h-[100px]">{children}</div>
+      <div className="h-[220px] sm:h-[240px]">{children}</div>
     </div>
   );
 }
@@ -150,13 +154,13 @@ export function MonitorCharts({ reqs, now }: { reqs: LR[]; now: number }) {
       const sum = (p: string) => buckets.reduce((acc, bkt) => acc + (bkt.providers[p] ?? 0), 0);
       return sum(b) - sum(a);
     })[0];
-  const grays = ["#3F3F46", "#27272A", "#52525B"];
+  const grays = ["#71717A", "#3F3F46", "#A1A1AA", "#27272A"];
   let grayIdx = 0;
   const providerColor = (p: string) => (p === busiest ? ACCENT : grays[grayIdx++ % grays.length]);
 
   return (
     <div className="grid gap-3 mb-3">
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
         <ChartCard title="Requests / min" value={currentReq} unit="now">
           {hasData ? (
             <ResponsiveContainer width="100%" height="100%">
@@ -169,7 +173,7 @@ export function MonitorCharts({ reqs, now }: { reqs: LR[]; now: number }) {
                   tickLine={false}
                   interval="preserveStartEnd"
                 />
-                <YAxis tick={{ fill: MUTED, fontSize: 9 }} axisLine={false} tickLine={false} width={24} allowDecimals={false} />
+                <YAxis tick={{ fill: MUTED, fontSize: 9 }} axisLine={false} tickLine={false} width={Y_AXIS_WIDTH} allowDecimals={false} />
                 <Tooltip
                   contentStyle={tooltipStyle()}
                   labelStyle={{ color: MUTED, marginBottom: 2 }}
@@ -207,7 +211,7 @@ export function MonitorCharts({ reqs, now }: { reqs: LR[]; now: number }) {
                   tickLine={false}
                   interval="preserveStartEnd"
                 />
-                <YAxis tick={{ fill: MUTED, fontSize: 9 }} axisLine={false} tickLine={false} width={28} allowDecimals={false} />
+                <YAxis tick={{ fill: MUTED, fontSize: 9 }} axisLine={false} tickLine={false} width={Y_AXIS_WIDTH} allowDecimals={false} />
                 <Tooltip
                   contentStyle={tooltipStyle()}
                   labelStyle={{ color: MUTED, marginBottom: 2 }}
@@ -232,30 +236,8 @@ export function MonitorCharts({ reqs, now }: { reqs: LR[]; now: number }) {
             <EmptyChart message="No latency data yet" />
           )}
         </ChartCard>
-      </div>
 
-      <div
-        className="rounded-[10px] p-3.5"
-        style={{ background: "#111113", border: "1px solid rgba(255,255,255,0.06)" }}
-      >
-        <div className="flex items-center justify-between mb-2.5">
-          <span className="text-[10px] text-zinc-500 uppercase tracking-wider">Requests by provider</span>
-          <div className="flex items-center gap-3.5">
-            {providersPresent.map((p) => {
-              const meta = providerMeta(p);
-              return (
-                <span key={p} className="flex items-center gap-1.5 text-[11px] text-zinc-400">
-                  <span
-                    className="w-1.5 h-1.5 rounded-[2px]"
-                    style={{ background: providerColor(p) }}
-                  />
-                  {meta.name}
-                </span>
-              );
-            })}
-          </div>
-        </div>
-        <div className="h-[90px]">
+        <ChartCard title="Requests by provider" value={totalReqInWindow} unit="total">
           {hasData ? (
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={providerChartData} margin={{ top: 4, right: 4, left: 4, bottom: 0 }}>
@@ -267,7 +249,7 @@ export function MonitorCharts({ reqs, now }: { reqs: LR[]; now: number }) {
                   tickLine={false}
                   interval="preserveStartEnd"
                 />
-                <YAxis tick={{ fill: MUTED, fontSize: 9 }} axisLine={false} tickLine={false} width={24} allowDecimals={false} />
+                <YAxis tick={{ fill: MUTED, fontSize: 9 }} axisLine={false} tickLine={false} width={Y_AXIS_WIDTH} allowDecimals={false} />
                 <Tooltip
                   contentStyle={tooltipStyle()}
                   labelStyle={{ color: MUTED, marginBottom: 2 }}
@@ -291,7 +273,19 @@ export function MonitorCharts({ reqs, now }: { reqs: LR[]; now: number }) {
           ) : (
             <EmptyChart message="No requests in the last 30 min" />
           )}
-        </div>
+        </ChartCard>
+      </div>
+
+      <div className="flex items-center justify-end gap-3.5 px-1">
+        {providersPresent.map((p) => {
+          const meta = providerMeta(p);
+          return (
+            <span key={p} className="flex items-center gap-1.5 text-[11px] text-zinc-400">
+              <span className="w-1.5 h-1.5 rounded-[2px]" style={{ background: providerColor(p) }} />
+              {meta.name}
+            </span>
+          );
+        })}
       </div>
     </div>
   );
