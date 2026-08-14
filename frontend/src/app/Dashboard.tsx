@@ -58,9 +58,19 @@ export function Dashboard({ user, onLogout }: { user: UserRead | null; onLogout:
   }, [refreshKeys]);
 
   useEffect(() => {
-    api.recentEvents(50).then((events) => setReqs(events.map(toLR))).catch(() => {});
+    api
+      .recentEvents(50)
+      .then((events) => {
+        const fetched = events.map(toLR);
+        setReqs((prev) => {
+          const seen = new Set(prev.map((r) => r.id));
+          const merged = [...prev, ...fetched.filter((r) => !seen.has(r.id))];
+          return merged.sort((a, b) => b.ts - a.ts).slice(0, 50);
+        });
+      })
+      .catch(() => {});
     const stop = streamEvents(
-      (evt) => setReqs((prev) => [toLR(evt), ...prev.slice(0, 49)]),
+      (evt) => setReqs((prev) => [toLR(evt), ...prev.filter((r) => r.id !== `${evt.request_id}-${evt.attempt}`)].slice(0, 50)),
       (err) => console.warn("live event stream disconnected:", err)
     );
     return stop;
@@ -122,7 +132,6 @@ export function Dashboard({ user, onLogout }: { user: UserRead | null; onLogout:
       await api.resetCooldown(Number(id));
       await refreshKeys();
     } catch {
-      // no-op: refreshKeys below runs regardless via finally
     } finally {
       setResettingIds((prev) => {
         const next = new Set(prev);
@@ -165,7 +174,7 @@ export function Dashboard({ user, onLogout }: { user: UserRead | null; onLogout:
   }
 
   return (
-    <div className="min-h-screen flex" style={{ background: "#0A0A0B", fontFamily: "Inter, sans-serif" }}>
+    <div className="min-h-screen flex" style={{ background: "var(--background)" }}>
       <Sidebar view={view} onView={setView} />
       {menuOpen && <MobileSidebarDrawer view={view} onView={setView} onClose={() => setMenuOpen(false)} />}
 
@@ -174,7 +183,7 @@ export function Dashboard({ user, onLogout }: { user: UserRead | null; onLogout:
 
         <main className="flex-1 px-3 sm:px-6 py-4 sm:py-5 w-full max-w-[1400px] mx-auto space-y-4">
           {loadError && (
-            <div className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs" style={{ background: "rgba(239,68,68,0.08)", color: "#EF4444", border: "1px solid rgba(239,68,68,0.2)" }}>
+            <div className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs" style={{ background: "rgba(239,68,68,0.08)", color: "var(--destructive)", border: "1px solid rgba(239,68,68,0.2)" }}>
               <AlertTriangle size={13} className="shrink-0" />
               Could not reach the API: {loadError}
             </div>
@@ -182,7 +191,7 @@ export function Dashboard({ user, onLogout }: { user: UserRead | null; onLogout:
 
           {loading ? (
             <div className="flex items-center justify-center py-24">
-              <Loader2 size={20} className="animate-spin" color="#52525B" />
+              <Loader2 size={20} className="animate-spin" color="var(--muted-foreground)" />
             </div>
           ) : (
             <>
@@ -209,8 +218,6 @@ export function Dashboard({ user, onLogout }: { user: UserRead | null; onLogout:
                   <LiveMonitor reqs={reqs} now={now} />
                 </div>
               )}
-              {/* ChatPlayground stays mounted across tab switches so the conversation isn't lost;
-                  it's just hidden with CSS instead of being removed from the tree. */}
               <div key="playground" className={view === "playground" ? "animate-in fade-in slide-in-from-bottom-1 duration-300 ease-out" : "hidden"}>
                 <ChatPlayground keys={keys} active={view === "playground"} />
               </div>
@@ -230,9 +237,9 @@ export function Dashboard({ user, onLogout }: { user: UserRead | null; onLogout:
             <div
               key={r.toastId}
               className="flex items-center gap-2 px-4 py-3 rounded-lg shadow-lg animate-in fade-in slide-in-from-bottom-2 duration-250 ease-out pointer-events-auto"
-              style={{ background: "#18181B", border: `1px solid ${r.ok ? "rgba(0,214,143,0.3)" : "rgba(239,68,68,0.3)"}`, maxWidth: 360 }}
+              style={{ background: "var(--muted)", border: `1px solid ${r.ok ? "rgba(0,214,143,0.3)" : "rgba(239,68,68,0.3)"}`, maxWidth: 360 }}
             >
-              {r.ok ? <CheckCircle2 size={16} color="#00D68F" className="shrink-0" /> : <AlertTriangle size={16} color="#EF4444" className="shrink-0" />}
+              {r.ok ? <CheckCircle2 size={16} color="var(--primary)" className="shrink-0" /> : <AlertTriangle size={16} color="var(--destructive)" className="shrink-0" />}
               <div className="min-w-0">
                 <div className="text-xs font-medium text-zinc-200">{r.ok ? "Key is working" : "Key check failed"}</div>
                 {r.detail && <div className="text-[11px] text-zinc-500 truncate">{r.detail}</div>}

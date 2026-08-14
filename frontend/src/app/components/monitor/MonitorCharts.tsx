@@ -18,8 +18,8 @@ const GRID = "rgba(255,255,255,0.04)";
 const ACCENT = "#00D68F";
 const MSK_TZ = "Europe/Moscow";
 
-const BUCKET_COUNT = 12;
-const BUCKET_MS = 60_000; 
+const BUCKET_COUNT = 15;
+const BUCKET_MS = 120_000; 
 
 function fmtMsk(ts: number): string {
   return new Intl.DateTimeFormat("ru-RU", {
@@ -191,7 +191,7 @@ export function MonitorCharts({ reqs, now }: { reqs: LR[]; now: number }) {
               </AreaChart>
             </ResponsiveContainer>
           ) : (
-            <EmptyChart message="No requests in the last 12 min" />
+            <EmptyChart message="No requests in the last 30 min" />
           )}
         </ChartCard>
 
@@ -289,7 +289,7 @@ export function MonitorCharts({ reqs, now }: { reqs: LR[]; now: number }) {
               </BarChart>
             </ResponsiveContainer>
           ) : (
-            <EmptyChart message="No requests in the last 12 min" />
+            <EmptyChart message="No requests in the last 30 min" />
           )}
         </div>
       </div>
