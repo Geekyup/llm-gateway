@@ -32,7 +32,7 @@ function CodeToken({
   return (
     <span
       className="relative inline-block underline decoration-dotted cursor-help"
-      style={{ color: "#00D68F", textDecorationColor: "rgba(255,255,255,0.3)" }}
+      style={{ color: "#22E3A8", textDecorationColor: "rgba(255,255,255,0.35)" }}
       onMouseEnter={() => setShow(true)}
       onMouseLeave={() => setShow(false)}
     >
@@ -139,23 +139,25 @@ export function CodeSnippetTabs({
   }
 
   return (
-    <div className="mt-3 rounded-xl overflow-hidden" style={{ background: "#18181B", border: "1px solid rgba(255,255,255,0.07)" }}>
+    <div className="mt-3 rounded-xl overflow-hidden" style={{ background: "#0F0F11", border: "1px solid rgba(255,255,255,0.12)" }}>
       <div
-        className="flex items-center gap-2 px-3 py-2.5"
-        style={{ borderBottom: "1px solid rgba(255,255,255,0.07)" }}
+        className="flex flex-col gap-2 px-3 py-2.5 sm:flex-row sm:items-center"
+        style={{ background: "#17171A", borderBottom: "1px solid rgba(255,255,255,0.1)" }}
       >
-        <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ background: "#EF4444" }} />
-        <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ background: AMBER }} />
-        <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ background: "#00D68F" }} />
-        <span className="text-[11px] font-mono text-zinc-500">{FILENAMES[active]}</span>
+        <div className="flex items-center gap-2 shrink-0">
+          <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ background: "#EF4444" }} />
+          <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ background: AMBER }} />
+          <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ background: "#00D68F" }} />
+          <span className="text-[11px] font-mono text-zinc-500 ml-1">{FILENAMES[active]}</span>
+        </div>
 
-        <div className="flex items-center gap-0.5 ml-3">
+        <div className="flex items-center gap-1 overflow-x-auto sm:ml-3 -mx-1 px-1 sm:mx-0 sm:px-0 no-scrollbar">
           {(Object.keys(LANG_LABELS) as Lang[]).map((lang) => (
             <button
               key={lang}
               onClick={() => setActive(lang)}
-              className="relative px-2.5 py-1 text-[11px] font-medium rounded-md transition-colors"
-              style={{ color: active === lang ? "#ECECF0" : "#71717A", background: active === lang ? "rgba(255,255,255,0.06)" : "transparent" }}
+              className="relative px-2.5 py-1 text-[11px] font-medium rounded-md transition-colors whitespace-nowrap shrink-0"
+              style={{ color: active === lang ? "#0A0A0B" : "#A1A1AA", background: active === lang ? "#ECECF0" : "rgba(255,255,255,0.06)" }}
             >
               {LANG_LABELS[lang]}
             </button>
@@ -164,8 +166,8 @@ export function CodeSnippetTabs({
 
         <button
           onClick={copy}
-          className="ml-auto flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-[11px] font-medium transition-colors shrink-0"
-          style={{ background: copied ? "rgba(0,214,143,0.1)" : "rgba(255,255,255,0.05)", color: copied ? "#00D68F" : "#A1A1AA" }}
+          className="flex items-center justify-center gap-1.5 px-2.5 py-1.5 rounded-md text-[11px] font-medium transition-colors shrink-0 sm:ml-auto"
+          style={{ background: copied ? "rgba(0,214,143,0.15)" : "rgba(255,255,255,0.08)", color: copied ? "#22E3A8" : "#D4D4D8" }}
         >
           {copied ? <Check size={12} /> : <Copy size={12} />}
           {copied ? "Copied" : "Copy"}

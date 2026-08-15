@@ -72,14 +72,14 @@ export function GatewayAccessPanel() {
 
   return (
     <div className="space-y-4">
-      <div className="rounded-xl p-4" style={{ background: "#141416", border: "1px solid rgba(255,255,255,0.06)" }}>
-        <div className="flex items-start justify-between gap-4 mb-4">
+      <div className="rounded-xl p-4" style={{ background: "#1C1C1F", border: "1px solid rgba(255,255,255,0.1)" }}>
+        <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4 mb-4">
           <div>
             <h2 className="text-sm font-semibold text-zinc-100 mb-1">App tokens</h2>
             <p className="text-xs text-zinc-500 leading-relaxed max-w-md">
               Each token lets one app call your key pool. Keypool handles rotation and
               failover behind it — your app just sends a bearer token to{" "}
-              <code className="px-1 py-0.5 rounded font-mono" style={{ background: "rgba(255,255,255,0.06)" }}>/v1/chat/completions</code>.
+              <code className="px-1 py-0.5 rounded font-mono" style={{ background: "rgba(255,255,255,0.08)" }}>/v1/chat/completions</code>.
             </p>
           </div>
           <div className="flex items-center gap-5 shrink-0">
@@ -124,7 +124,7 @@ export function GatewayAccessPanel() {
         )}
 
         {freshToken && (
-          <div className="mt-4 p-3 rounded-lg" style={{ background: "rgba(0,214,143,0.06)", border: "1px solid rgba(0,214,143,0.25)" }}>
+          <div className="mt-4 p-3 rounded-lg" style={{ background: "rgba(0,214,143,0.07)", border: "1px solid rgba(0,214,143,0.35)" }}>
             <div className="flex items-center justify-between mb-2">
               <p className="text-xs font-medium text-zinc-200 flex items-center gap-1.5">
                 <CheckCircle2 size={13} color="#00D68F" />
@@ -138,11 +138,11 @@ export function GatewayAccessPanel() {
                 <X size={13} color="#71717A" />
               </button>
             </div>
-            <div className="flex items-center gap-2">
-              <code className="flex-1 px-2 py-1.5 rounded text-xs font-mono break-all" style={{ background: "#0A0A0B", color: "#00D68F", border: "1px solid rgba(0,214,143,0.2)" }}>
+            <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
+              <code className="flex-1 px-2 py-1.5 rounded text-xs font-mono break-all" style={{ background: "#0A0A0B", color: "#22E3A8", border: "1px solid rgba(0,214,143,0.3)" }}>
                 {freshToken.plaintext}
               </code>
-              <button onClick={() => copy(freshToken.plaintext)} className="px-2.5 py-1.5 rounded text-xs font-medium shrink-0" style={{ background: "rgba(255,255,255,0.06)", color: "#ECECF0" }}>
+              <button onClick={() => copy(freshToken.plaintext)} className="px-2.5 py-1.5 rounded text-xs font-medium shrink-0" style={{ background: "rgba(255,255,255,0.08)", color: "#ECECF0" }}>
                 {copied ? "Copied!" : "Copy"}
               </button>
             </div>
