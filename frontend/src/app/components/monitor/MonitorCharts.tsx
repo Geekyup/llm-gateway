@@ -158,8 +158,8 @@ function ChartCard({
 function RangeSwitch({ value, onChange }: { value: MonitorRange; onChange: (r: MonitorRange) => void }) {
   return (
     <div
-      className="inline-flex items-center rounded-lg p-0.5 self-start"
-      style={{ background: "#111113", border: "1px solid rgba(255,255,255,0.06)" }}
+      className="inline-flex items-center rounded-lg p-0.5"
+      style={{ background: "#0B0B0D", border: "1px solid rgba(255,255,255,0.08)" }}
       role="group"
       aria-label="Chart time range"
     >
@@ -170,10 +170,10 @@ function RangeSwitch({ value, onChange }: { value: MonitorRange; onChange: (r: M
             key={opt.value}
             onClick={() => onChange(opt.value)}
             aria-pressed={active}
-            className="px-3 py-1 rounded-md text-[11px] font-medium font-mono transition-colors"
+            className="px-2.5 py-1 rounded-md text-[11px] font-medium font-mono transition-colors"
             style={
               active
-                ? { background: "rgba(0,214,143,0.12)", color: ACCENT }
+                ? { background: "rgba(0,214,143,0.14)", color: "#22E3A8" }
                 : { background: "transparent", color: "#71717A" }
             }
           >
@@ -267,8 +267,6 @@ export function MonitorCharts({ reqs, now }: { reqs: LR[]; now: number }) {
 
   return (
     <div className="grid gap-3 mb-3">
-      <RangeSwitch value={range} onChange={setRange} />
-
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
         <ChartCard title="Requests / min" value={currentReq} unit={reqUnit}>
           {isLoadingRemote ? (
@@ -400,6 +398,10 @@ export function MonitorCharts({ reqs, now }: { reqs: LR[]; now: number }) {
         ) : (
           <EmptyChart message={emptyMessage} />
         )}
+
+        <div className="flex justify-end mt-2.5">
+          <RangeSwitch value={range} onChange={setRange} />
+        </div>
       </ChartCard>
     </div>
   );
