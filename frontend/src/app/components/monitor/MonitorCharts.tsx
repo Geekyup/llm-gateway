@@ -132,11 +132,13 @@ function ChartCard({
   value,
   unit,
   children,
+  footer,
 }: {
   title: string;
   value: string | number;
   unit?: string;
   children: React.ReactNode;
+  footer?: React.ReactNode;
 }) {
   return (
     <div
@@ -151,6 +153,7 @@ function ChartCard({
         </span>
       </div>
       <div className="h-[220px] sm:h-[240px]">{children}</div>
+      {footer && <div className="flex justify-end mt-2.5">{footer}</div>}
     </div>
   );
 }
@@ -349,7 +352,12 @@ export function MonitorCharts({ reqs, now }: { reqs: LR[]; now: number }) {
         </ChartCard>
       </div>
 
-      <ChartCard title="Requests by provider" value={totalReqInWindow} unit="total">
+      <ChartCard
+        title="Requests by provider"
+        value={totalReqInWindow}
+        unit="total"
+        footer={<RangeSwitch value={range} onChange={setRange} />}
+      >
         <div className="flex items-center justify-end gap-3.5 mb-1.5 -mt-1">
           {providersPresent.map((p) => {
             const meta = providerMeta(p);
@@ -398,10 +406,6 @@ export function MonitorCharts({ reqs, now }: { reqs: LR[]; now: number }) {
         ) : (
           <EmptyChart message={emptyMessage} />
         )}
-
-        <div className="flex justify-end mt-2.5">
-          <RangeSwitch value={range} onChange={setRange} />
-        </div>
       </ChartCard>
     </div>
   );
