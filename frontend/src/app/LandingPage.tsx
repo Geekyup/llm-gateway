@@ -170,11 +170,14 @@ function CodeToken({
       style={{ color: accent ? "var(--primary)" : "inherit" }}
       onMouseEnter={() => setShow(true)}
       onMouseLeave={() => setShow(false)}
+      onFocus={() => setShow(true)}
+      onBlur={() => setShow(false)}
+      tabIndex={0}
     >
       {children}
       {show && (
         <span
-          className={`absolute bottom-full mb-2 z-20 max-w-[min(280px,80vw)] whitespace-normal px-2.5 py-1.5 rounded-md text-[11px] font-mono normal-case bg-popover border border-border text-foreground ${
+          className={`absolute bottom-full mb-2.5 z-30 w-[240px] max-w-[80vw] whitespace-normal px-2.5 py-1.5 rounded-md text-[11px] font-mono normal-case bg-popover border border-border text-foreground ${
             align === "right" ? "right-0" : "left-0"
           }`}
           style={{ boxShadow: "0 4px 16px rgba(0,0,0,0.4)" }}
@@ -198,23 +201,25 @@ function CodeBlock() {
           hover the underlined bits
         </span>
       </div>
-      <pre className="px-4 py-4 text-[12.5px] font-mono leading-relaxed overflow-x-auto text-foreground">
-        {"curl https://api.your-gateway.dev/v1/chat/completions \\\n  -H \""}
-        <CodeToken
-          tip="Bearer + your gateway token, from Account -> Gateway tokens. Not a provider key."
-          accent
-        >
-          Authorization: Bearer $GATEWAY_TOKEN
-        </CodeToken>
-        {'" \\\n  -d \'{\n    "model": "'}
-        <CodeToken
-          tip="Any model any of your pooled providers serves. Omit it and Keypool picks from whatever's active."
-          align="right"
-        >
-          gemini-2.0-flash
-        </CodeToken>
-        {'",\n    "messages": [{ "role": "user", "content": "hi" }]\n  }\''}
-      </pre>
+      <div className="overflow-x-auto">
+        <pre className="px-4 pt-10 pb-4 text-[12.5px] font-mono leading-relaxed text-foreground w-max min-w-full">
+          {"curl https://api.your-gateway.dev/v1/chat/completions \\\n  -H \""}
+          <CodeToken
+            tip="Bearer + your gateway token, from Account -> Gateway tokens"
+            accent
+          >
+            Authorization: Bearer $GATEWAY_TOKEN
+          </CodeToken>
+          {'" \\\n  -d \'{\n    "model": "'}
+          <CodeToken
+            tip="Any model any of your pooled providers serves. Omit it and Keypool picks from whatever's active."
+            align="right"
+          >
+            gemini-2.0-flash
+          </CodeToken>
+          {'",\n    "messages": [{ "role": "user", "content": "hi" }]\n  }\''}
+        </pre>
+      </div>
     </div>
   );
 }
