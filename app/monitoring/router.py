@@ -9,7 +9,7 @@ from app.auth.deps import get_current_user
 from app.auth.models import User
 from app.db.redis import get_redis
 from app.monitoring.publisher import RequestEventPublisher, channel_for
-from app.monitoring.schemas import RequestEvent, RequestEventList
+from app.monitoring.schemas import MonitorRange, RequestEvent, RequestEventList, TimeseriesResponse
 
 logger = logging.getLogger(__name__)
 
@@ -26,6 +26,16 @@ async def recent_events(
 ) -> RequestEventList:
     events = await publisher.recent(user.id, limit=limit)
     return RequestEventList(events=events)
+
+
+@router.get("/timeseries", response_model=TimeseriesResponse)
+async def timeseries(
+    range: MonitorRange = Query(default="30m"),
+    user: User = Depends(get_current_user),
+    publisher: RequestEventPublisher = Depends(get_event_publisher),
+) -> TimeseriesResponse:
+    buckets = await publisher.timeseries_for_user(user.id, range)
+    return TimeseriesResponse(range=range, buckets=buckets)
 
 
 @router.get("/stream")

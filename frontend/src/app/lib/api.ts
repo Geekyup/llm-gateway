@@ -89,6 +89,20 @@ export interface ApiKeyHealthCheckResult {
   detail: string | null;
 }
 
+export type MonitorRange = "30m" | "6h" | "24h";
+
+export interface TimeseriesBucket {
+  ts: number;
+  count: number;
+  p50: number | null;
+  providers: Record<string, number>;
+}
+
+export interface TimeseriesResponse {
+  range: MonitorRange;
+  buckets: TimeseriesBucket[];
+}
+
 export interface HourlyUsagePoint {
   hour: number;
   requests: number;
@@ -258,6 +272,10 @@ export const api = {
     return data.events;
   },
 
+  async timeseries(range: MonitorRange): Promise<TimeseriesResponse> {
+    return request<TimeseriesResponse>(`/me/monitor/timeseries?range=${range}`);
+  },
+
   async listGatewayTokens(): Promise<GatewayTokenRead[]> {
     return request<GatewayTokenRead[]>("/me/gateway-tokens");
   },
@@ -309,10 +327,7 @@ export interface ChatStreamHandlers {
   onError: (message: string) => void;
 }
 
-/**
- * Streams a chat completion from the built-in playground endpoint, which is
- * authenticated with the user's normal session — no gateway token needed.
- */
+
 export async function streamPlaygroundChat(
   params: { messages: PlaygroundChatMessage[]; provider?: string; model?: string },
   handlers: ChatStreamHandlers,

@@ -1,5 +1,5 @@
-import { useMemo } from "react";
-import { BarChart3 } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+import { BarChart3, Loader2 } from "lucide-react";
 import {
   ResponsiveContainer,
   AreaChart,
@@ -13,6 +13,7 @@ import {
 } from "recharts";
 import type { LR } from "../../types";
 import { providerMeta } from "../../lib/domain";
+import { api, type MonitorRange, type TimeseriesBucket } from "../../lib/api";
 
 const MUTED = "#52525B";
 const GRID = "rgba(255,255,255,0.04)";
@@ -22,11 +23,21 @@ const MSK_TZ = "Europe/Moscow";
 const Y_AXIS_WIDTH = 30;
 
 const BUCKET_COUNT = 15;
-const BUCKET_MS = 120_000; 
+const BUCKET_MS = 120_000;
 
-function fmtMsk(ts: number): string {
+const RANGE_OPTIONS: { value: MonitorRange; label: string }[] = [
+  { value: "30m", label: "30m" },
+  { value: "6h", label: "6h" },
+  { value: "24h", label: "24h" },
+];
+
+
+const REMOTE_REFRESH_MS = 60_000;
+
+function fmtMsk(ts: number, includeDate: boolean): string {
   return new Intl.DateTimeFormat("ru-RU", {
     timeZone: MSK_TZ,
+    ...(includeDate ? { day: "2-digit", month: "2-digit" } : {}),
     hour: "2-digit",
     minute: "2-digit",
     hour12: false,
@@ -63,8 +74,8 @@ function bucketRequests(reqs: LR[], now: number): Bucket[] {
 
     const isNow = i === BUCKET_COUNT - 1;
     buckets.push({
-      label: fmtMsk(bucketStart),
-      fullTime: isNow ? `${fmtMsk(bucketStart)} MSK - now` : `${fmtMsk(bucketStart)} MSK`,
+      label: fmtMsk(bucketStart, false),
+      fullTime: isNow ? `${fmtMsk(bucketStart, false)} MSK - now` : `${fmtMsk(bucketStart, false)} MSK`,
       ts: bucketStart,
       count: inBucket.length,
       p50,
@@ -73,6 +84,19 @@ function bucketRequests(reqs: LR[], now: number): Bucket[] {
   }
 
   return buckets;
+}
+
+function fromRemoteBuckets(remote: TimeseriesBucket[], range: MonitorRange): Bucket[] {
+  const includeDate = range === "24h";
+  const last = remote.length - 1;
+  return remote.map((b, i) => ({
+    label: fmtMsk(b.ts, includeDate),
+    fullTime: i === last ? `${fmtMsk(b.ts, includeDate)} MSK - now` : `${fmtMsk(b.ts, includeDate)} MSK`,
+    ts: b.ts,
+    count: b.count,
+    p50: b.p50 ?? 0,
+    providers: b.providers,
+  }));
 }
 
 function tooltipStyle() {
@@ -91,6 +115,14 @@ function EmptyChart({ message }: { message: string }) {
     <div className="h-full flex flex-col items-center justify-center gap-2">
       <BarChart3 size={20} className="text-zinc-700" strokeWidth={1.5} />
       <span className="text-[11px] text-zinc-600">{message}</span>
+    </div>
+  );
+}
+
+function LoadingChart() {
+  return (
+    <div className="h-full flex items-center justify-center">
+      <Loader2 size={16} className="animate-spin text-zinc-700" />
     </div>
   );
 }
@@ -123,8 +155,74 @@ function ChartCard({
   );
 }
 
+function RangeSwitch({ value, onChange }: { value: MonitorRange; onChange: (r: MonitorRange) => void }) {
+  return (
+    <div
+      className="inline-flex items-center rounded-lg p-0.5 self-start"
+      style={{ background: "#111113", border: "1px solid rgba(255,255,255,0.06)" }}
+      role="group"
+      aria-label="Chart time range"
+    >
+      {RANGE_OPTIONS.map((opt) => {
+        const active = opt.value === value;
+        return (
+          <button
+            key={opt.value}
+            onClick={() => onChange(opt.value)}
+            aria-pressed={active}
+            className="px-3 py-1 rounded-md text-[11px] font-medium font-mono transition-colors"
+            style={
+              active
+                ? { background: "rgba(0,214,143,0.12)", color: ACCENT }
+                : { background: "transparent", color: "#71717A" }
+            }
+          >
+            {opt.label}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
 export function MonitorCharts({ reqs, now }: { reqs: LR[]; now: number }) {
-  const buckets = useMemo(() => bucketRequests(reqs, now), [reqs, now]);
+  const [range, setRange] = useState<MonitorRange>("30m");
+  const [remoteBuckets, setRemoteBuckets] = useState<TimeseriesBucket[] | null>(null);
+  const [remoteLoading, setRemoteLoading] = useState(false);
+
+  useEffect(() => {
+    if (range === "30m") {
+      setRemoteBuckets(null);
+      return;
+    }
+    let cancelled = false;
+
+    async function load() {
+      setRemoteLoading(true);
+      try {
+        const res = await api.timeseries(range);
+        if (!cancelled) setRemoteBuckets(res.buckets);
+      } catch {
+        // keep showing the last successful fetch rather than clearing the chart
+      } finally {
+        if (!cancelled) setRemoteLoading(false);
+      }
+    }
+
+    load();
+    const id = setInterval(load, REMOTE_REFRESH_MS);
+    return () => {
+      cancelled = true;
+      clearInterval(id);
+    };
+  }, [range]);
+
+  const liveBuckets = useMemo(() => bucketRequests(reqs, now), [reqs, now]);
+  const buckets = useMemo(
+    () => (range === "30m" ? liveBuckets : remoteBuckets ? fromRemoteBuckets(remoteBuckets, range) : []),
+    [range, liveBuckets, remoteBuckets]
+  );
+  const isLoadingRemote = range !== "30m" && remoteBuckets === null && remoteLoading;
 
   const providersPresent = useMemo(() => {
     const set = new Set<string>();
@@ -158,11 +256,24 @@ export function MonitorCharts({ reqs, now }: { reqs: LR[]; now: number }) {
   let grayIdx = 0;
   const providerColor = (p: string) => (p === busiest ? ACCENT : grays[grayIdx++ % grays.length]);
 
+  const emptyMessage =
+    range === "30m"
+      ? "No requests in the last 30 min"
+      : range === "6h"
+      ? "No requests in the last 6 hours"
+      : "No requests in the last 24 hours";
+
+  const reqUnit = range === "30m" ? "now" : "last bucket";
+
   return (
     <div className="grid gap-3 mb-3">
+      <RangeSwitch value={range} onChange={setRange} />
+
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-        <ChartCard title="Requests / min" value={currentReq} unit="now">
-          {hasData ? (
+        <ChartCard title="Requests / min" value={currentReq} unit={reqUnit}>
+          {isLoadingRemote ? (
+            <LoadingChart />
+          ) : hasData ? (
             <ResponsiveContainer width="100%" height="100%">
               <AreaChart data={buckets} margin={{ top: 4, right: 4, left: 4, bottom: 0 }}>
                 <CartesianGrid stroke={GRID} vertical={false} />
@@ -178,7 +289,7 @@ export function MonitorCharts({ reqs, now }: { reqs: LR[]; now: number }) {
                   contentStyle={tooltipStyle()}
                   labelStyle={{ color: MUTED, marginBottom: 2 }}
                   itemStyle={{ color: "#ECECF0" }}
-                  formatter={(v: number) => [`${v} req/min`, ""]}
+                  formatter={(v: number) => [`${v} req`, ""]}
                   labelFormatter={(_, payload) => payload?.[0]?.payload?.fullTime ?? ""}
                   cursor={{ stroke: "rgba(255,255,255,0.1)" }}
                 />
@@ -195,12 +306,14 @@ export function MonitorCharts({ reqs, now }: { reqs: LR[]; now: number }) {
               </AreaChart>
             </ResponsiveContainer>
           ) : (
-            <EmptyChart message="No requests in the last 30 min" />
+            <EmptyChart message={emptyMessage} />
           )}
         </ChartCard>
 
         <ChartCard title="Latency p50" value={currentP50 || "--"} unit="ms">
-          {hasData ? (
+          {isLoadingRemote ? (
+            <LoadingChart />
+          ) : hasData ? (
             <ResponsiveContainer width="100%" height="100%">
               <AreaChart data={buckets} margin={{ top: 4, right: 4, left: 4, bottom: 0 }}>
                 <CartesianGrid stroke={GRID} vertical={false} />
@@ -250,7 +363,9 @@ export function MonitorCharts({ reqs, now }: { reqs: LR[]; now: number }) {
             );
           })}
         </div>
-        {hasData ? (
+        {isLoadingRemote ? (
+          <LoadingChart />
+        ) : hasData ? (
           <ResponsiveContainer width="100%" height="100%">
             <BarChart data={providerChartData} margin={{ top: 4, right: 4, left: 4, bottom: 0 }}>
               <CartesianGrid stroke={GRID} vertical={false} />
@@ -283,7 +398,7 @@ export function MonitorCharts({ reqs, now }: { reqs: LR[]; now: number }) {
             </BarChart>
           </ResponsiveContainer>
         ) : (
-          <EmptyChart message="No requests in the last 30 min" />
+          <EmptyChart message={emptyMessage} />
         )}
       </ChartCard>
     </div>

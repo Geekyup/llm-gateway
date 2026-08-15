@@ -6,13 +6,19 @@ from sqlalchemy import delete, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.monitoring.models import RequestEventRecord
-from app.monitoring.schemas import RequestEvent
+from app.monitoring.schemas import MonitorRange, RequestEvent, TimeseriesBucket
 
 logger = logging.getLogger(__name__)
 
 CHANNEL_PREFIX = "monitoring:requests"
 HISTORY_KEY_PREFIX = "monitoring:requests:history"
 HISTORY_MAX_LEN = 200
+
+_RANGE_CONFIG: dict[MonitorRange, tuple[int, int]] = {
+    "30m": (30 * 60, 2 * 60),
+    "6h": (6 * 60 * 60, 15 * 60),
+    "24h": (24 * 60 * 60, 60 * 60),
+}
 
 
 def channel_for(user_id: int) -> str:
@@ -137,6 +143,58 @@ class RequestEventPublisher:
             completion[h] = int(c)
             total[h] = int(t)
         return list(zip(prompt, completion, total))
+
+    async def timeseries_for_user(self, user_id: int, range_: MonitorRange) -> list[TimeseriesBucket]:
+        assert self._session is not None, "timeseries aggregation requires a DB session"
+
+        window_seconds, bucket_seconds = _RANGE_CONFIG[range_]
+        now = datetime.now(UTC)
+        window_start = now - timedelta(seconds=window_seconds)
+
+        bucket_expr = (
+            func.floor(func.extract("epoch", RequestEventRecord.timestamp) / bucket_seconds) * bucket_seconds
+        )
+
+        stmt = (
+            select(
+                bucket_expr.label("bucket_ts"),
+                RequestEventRecord.provider,
+                func.count().label("count"),
+                func.percentile_cont(0.5)
+                .within_group(RequestEventRecord.latency_ms.asc())
+                .label("p50"),
+            )
+            .where(
+                RequestEventRecord.user_id == user_id,
+                RequestEventRecord.outcome.in_(("success", "rate_limited", "exhausted")),
+                RequestEventRecord.timestamp >= window_start,
+            )
+            .group_by("bucket_ts", RequestEventRecord.provider)
+            .order_by("bucket_ts")
+        )
+        rows = await self._session.execute(stmt)
+
+        by_bucket: dict[int, TimeseriesBucket] = {}
+        p50_weighted: dict[int, float] = {}
+        for bucket_ts, provider, count, p50 in rows:
+            ts_ms = int(bucket_ts) * 1000
+            bucket = by_bucket.setdefault(ts_ms, TimeseriesBucket(ts=ts_ms, count=0, p50=None, providers={}))
+            bucket.count += count
+            bucket.providers[provider] = count
+            if p50 is not None:
+                p50_weighted[ts_ms] = p50_weighted.get(ts_ms, 0.0) + float(p50) * count
+
+        for ts_ms, bucket in by_bucket.items():
+            if bucket.count > 0 and ts_ms in p50_weighted:
+                bucket.p50 = round(p50_weighted[ts_ms] / bucket.count, 1)
+
+        window_start_ts = int(window_start.timestamp() // bucket_seconds) * bucket_seconds
+        bucket_count = window_seconds // bucket_seconds
+        result: list[TimeseriesBucket] = []
+        for i in range(bucket_count):
+            ts_ms = (window_start_ts + i * bucket_seconds) * 1000
+            result.append(by_bucket.get(ts_ms) or TimeseriesBucket(ts=ts_ms, count=0, p50=None, providers={}))
+        return result
 
 
 def _today_range_utc() -> tuple[datetime, datetime]:
