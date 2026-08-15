@@ -21,8 +21,8 @@ client = OpenAI(
 )
 
 response = client.chat.completions.create(
-    model=None,  # необязательно — гейтвей сам подберёт ключ из пула
-    messages=[{"role": "user", "content": "Привет!"}],
+    model=None,  # optional — keypool picks one from the pool
+    messages=[{"role": "user", "content": "Hello!"}],
 )
 print(response.choices[0].message.content)`;
 
@@ -35,8 +35,8 @@ const client = new OpenAI({
 });
 
 const response = await client.chat.completions.create({
-  // model не обязателен — гейтвей сам подберёт ключ из пула
-  messages: [{ role: "user", content: "Привет!" }],
+  // model is optional — keypool picks one from the pool
+  messages: [{ role: "user", content: "Hello!" }],
 });
 console.log(response.choices[0].message.content);`;
 
@@ -45,7 +45,7 @@ console.log(response.choices[0].message.content);`;
   -H "Authorization: Bearer ${token}" \\
   -H "Content-Type: application/json" \\
   -d '{
-    "messages": [{"role": "user", "content": "Привет!"}]
+    "messages": [{"role": "user", "content": "Hello!"}]
   }'`;
 
     case "fetch":
@@ -56,8 +56,8 @@ console.log(response.choices[0].message.content);`;
     "Content-Type": "application/json",
   },
   body: JSON.stringify({
-    // model не обязателен — гейтвей сам подберёт ключ из пула
-    messages: [{ role: "user", content: "Привет!" }],
+    // model is optional — keypool picks one from the pool
+    messages: [{ role: "user", content: "Hello!" }],
   }),
 });
 const data = await response.json();
@@ -85,37 +85,42 @@ export function CodeSnippetTabs({
   }
 
   return (
-    <div className="mt-3">
-      <div className="flex items-center gap-1 mb-2">
-        {(Object.keys(LANG_LABELS) as Lang[]).map((lang) => (
-          <button
-            key={lang}
-            onClick={() => setActive(lang)}
-            className="px-2.5 py-1 rounded-md text-[11px] font-medium transition-colors"
-            style={
-              active === lang
-                ? { background: "rgba(0,214,143,0.12)", color: "#00D68F", border: "1px solid rgba(0,214,143,0.3)" }
-                : { background: "transparent", color: "#71717A", border: "1px solid transparent" }
-            }
-          >
-            {LANG_LABELS[lang]}
-          </button>
-        ))}
-      </div>
-
-      <div className="relative rounded-lg" style={{ background: "#0A0A0B", border: "1px solid rgba(255,255,255,0.08)" }}>
+    <div className="mt-3 rounded-xl overflow-hidden" style={{ background: "#0A0A0B", border: "1px solid rgba(255,255,255,0.08)" }}>
+      <div
+        className="flex items-center justify-between pl-1 pr-1.5"
+        style={{ borderBottom: "1px solid rgba(255,255,255,0.06)" }}
+      >
+        <div className="flex items-center gap-0.5">
+          {(Object.keys(LANG_LABELS) as Lang[]).map((lang) => (
+            <button
+              key={lang}
+              onClick={() => setActive(lang)}
+              className="relative px-3 py-2 text-[12px] font-medium transition-colors"
+              style={{ color: active === lang ? "#ECECF0" : "#71717A" }}
+            >
+              {LANG_LABELS[lang]}
+              {active === lang && (
+                <span
+                  className="absolute left-2 right-2 bottom-0 h-[2px] rounded-full"
+                  style={{ background: "#00D68F" }}
+                />
+              )}
+            </button>
+          ))}
+        </div>
         <button
           onClick={copy}
-          className="absolute top-2 right-2 flex items-center gap-1 px-2 py-1 rounded text-[11px] font-medium transition-colors"
-          style={{ background: "rgba(255,255,255,0.06)", color: copied ? "#00D68F" : "#ECECF0" }}
+          className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-[11px] font-medium transition-colors shrink-0"
+          style={{ background: copied ? "rgba(0,214,143,0.1)" : "rgba(255,255,255,0.05)", color: copied ? "#00D68F" : "#A1A1AA" }}
         >
           {copied ? <Check size={12} /> : <Copy size={12} />}
-          {copied ? "Скопировано" : "Copy"}
+          {copied ? "Copied" : "Copy"}
         </button>
-        <pre className="px-3 py-3 pr-20 text-xs font-mono overflow-x-auto whitespace-pre" style={{ color: "#D4D4D8" }}>
-          {snippet}
-        </pre>
       </div>
+
+      <pre className="px-4 py-3.5 text-[12.5px] leading-relaxed font-mono overflow-x-auto whitespace-pre" style={{ color: "#D4D4D8" }}>
+        {snippet}
+      </pre>
     </div>
   );
 }
