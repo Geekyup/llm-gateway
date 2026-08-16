@@ -40,8 +40,6 @@ export function ChatPlayground({ keys, active }: { keys: AK[]; active: boolean }
       el.style.height = "auto";
       el.style.height = `${Math.min(el.scrollHeight, 200)}px`;
     };
-    // When the tab was hidden (display: none), scrollHeight reads as 0 until
-    // the browser has actually laid the element out again — defer a frame.
     const raf = requestAnimationFrame(resize);
     return () => cancelAnimationFrame(raf);
   }, [input, active]);
