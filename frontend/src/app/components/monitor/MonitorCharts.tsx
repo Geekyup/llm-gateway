@@ -31,7 +31,6 @@ const RANGE_OPTIONS: { value: MonitorRange; label: string }[] = [
   { value: "24h", label: "24h" },
 ];
 
-
 const REMOTE_REFRESH_MS = 60_000;
 
 function fmtMsk(ts: number, includeDate: boolean): string {
@@ -206,7 +205,6 @@ export function MonitorCharts({ reqs, now }: { reqs: LR[]; now: number }) {
         const res = await api.timeseries(range);
         if (!cancelled) setRemoteBuckets(res.buckets);
       } catch {
-        // keep showing the last successful fetch rather than clearing the chart
       } finally {
         if (!cancelled) setRemoteLoading(false);
       }

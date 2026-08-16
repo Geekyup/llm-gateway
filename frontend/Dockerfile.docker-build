@@ -1,12 +1,3 @@
-# Альтернативный Dockerfile: собирает фронтенд полностью внутри Docker.
-# Используй, если у тебя Docker нормально резолвит npm-реестр (проверить:
-# `docker run --rm node:20-slim npm ping` не виснет), или для деплоя на
-# Railway (там сеть при билде не ограничена).
-#
-# Локальная сборка:
-#   docker build -f frontend/Dockerfile.docker-build -t llm-gateway-frontend ./frontend
-#   docker run -p 5173:80 llm-gateway-frontend
-
 FROM node:20-slim AS build
 
 WORKDIR /app
@@ -25,7 +16,7 @@ FROM nginx:1.27-alpine AS runtime
 
 COPY --from=build /app/dist /usr/share/nginx/html
 
-# Templated so $PORT (Railway injects this) picks the listen port.
+
 ENV PORT=80
 COPY --from=build /app/nginx.conf.template /etc/nginx/templates/default.conf.template
 

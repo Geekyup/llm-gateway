@@ -10,7 +10,6 @@ import { StatusFilterDropdown } from "./StatusFilterDropdown";
 import { ProviderGroupHeader } from "./ProviderGroupHeader";
 import { useFlipAnimation } from "../../lib/useFlipAnimation";
 
-
 const PROVIDER_ORDER = ["gemini", "openrouter", "groq"];
 
 function groupByProvider(list: AK[]): { provider: string; items: AK[] }[] {

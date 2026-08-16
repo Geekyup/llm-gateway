@@ -327,7 +327,6 @@ export interface ChatStreamHandlers {
   onError: (message: string) => void;
 }
 
-
 export async function streamPlaygroundChat(
   params: { messages: PlaygroundChatMessage[]; provider?: string; model?: string },
   handlers: ChatStreamHandlers,

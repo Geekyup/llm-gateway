@@ -12,7 +12,6 @@ const PROVIDERS = [
 
 type KeyState = "active" | "exhausting" | "idle" | "cooldown";
 
-
 function FailoverChain() {
   const KEYS = 5;
   const [active, setActive] = useState(0);
@@ -235,7 +234,6 @@ const FEED_POOL: FeedRow[] = [
   { provider: "openrouter", color: "#A78BFA", model: "gpt-4o-mini", ms: 512, status: "ok" },
   { provider: "gemini", color: "#4F8EF7", model: "gemini-1.5-pro", ms: 288, status: "ok" },
 ];
-
 
 function useLiveFeed(size = 4, intervalMs = 2600) {
   const [rows, setRows] = useState<FeedRow[]>(() => FEED_POOL.slice(0, size));
