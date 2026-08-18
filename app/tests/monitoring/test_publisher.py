@@ -8,6 +8,7 @@ from app.monitoring.models import RequestEventRecord
 from app.monitoring.publisher import (
     HISTORY_MAX_LEN,
     RequestEventPublisher,
+    _day_window_utc,
     channel_for,
     purge_old_request_events,
 )
@@ -24,20 +25,24 @@ def _event(
     prompt_tokens: int | None = None,
     completion_tokens: int | None = None,
     total_tokens: int | None = None,
+    provider: str = "gemini",
+    model: str | None = None,
+    latency_ms: int | None = 42,
 ) -> RequestEvent:
     return RequestEvent(
         user_id=user_id,
         request_id=request_id,
         attempt=attempt,
         timestamp=timestamp or datetime.now(UTC),
-        provider="gemini",
+        provider=provider,
         path="v1beta/models/gemini-1.5-flash:generateContent",
         method="POST",
         key_id=key_id,
         key_label="k1",
+        model=model,
         upstream_status=200,
         outcome=outcome,
-        latency_ms=42,
+        latency_ms=latency_ms,
         is_retry=attempt > 1,
         prompt_tokens=prompt_tokens,
         completion_tokens=completion_tokens,
@@ -276,3 +281,83 @@ async def test_purge_returns_zero_when_nothing_to_delete(fake_redis, db_session:
     deleted = await purge_old_request_events(db_session, older_than=timedelta(days=30))
 
     assert deleted == 0
+
+
+def test_day_window_utc_returns_labels_oldest_first_inclusive_of_today():
+    start, labels = _day_window_utc(7)
+
+    today = datetime.now(UTC).date()
+    assert len(labels) == 7
+    assert labels[-1] == today.isoformat()
+    assert labels[0] == (today - timedelta(days=6)).isoformat()
+    assert start.date() == today - timedelta(days=6)
+
+
+def test_day_window_utc_single_day_is_today_only():
+    _, labels = _day_window_utc(1)
+
+    assert labels == [datetime.now(UTC).date().isoformat()]
+
+
+@pytest.mark.asyncio
+async def test_activity_log_returns_entries_newest_first_with_model(fake_redis, db_session: AsyncSession):
+    publisher = RequestEventPublisher(fake_redis, session=db_session)
+    now = datetime.now(UTC)
+
+    await publisher.publish(_event(request_id="older", timestamp=now - timedelta(minutes=5), model="gemini-2.0-flash"))
+    await publisher.publish(_event(request_id="newer", timestamp=now, model="gemini-2.5-pro"))
+
+    entries, total = await publisher.activity_log(1, "7d", page=1, page_size=50)
+
+    assert total == 2
+    assert [e.model for e in entries] == ["gemini-2.5-pro", "gemini-2.0-flash"]
+
+
+@pytest.mark.asyncio
+async def test_activity_log_filters_by_provider_and_outcome(fake_redis, db_session: AsyncSession):
+    publisher = RequestEventPublisher(fake_redis, session=db_session)
+    now = datetime.now(UTC)
+
+    await publisher.publish(_event(request_id="a", provider="gemini", outcome="success", timestamp=now))
+    await publisher.publish(_event(request_id="b", provider="groq", outcome="success", timestamp=now))
+    await publisher.publish(_event(request_id="c", provider="gemini", outcome="rate_limited", timestamp=now))
+
+    entries, total = await publisher.activity_log(1, "7d", provider="gemini")
+    assert total == 2
+
+    entries, total = await publisher.activity_log(1, "7d", provider="gemini", outcome="success")
+    assert total == 1
+    assert entries[0].provider == "gemini"
+    assert entries[0].outcome == "success"
+
+
+@pytest.mark.asyncio
+async def test_activity_log_paginates(fake_redis, db_session: AsyncSession):
+    publisher = RequestEventPublisher(fake_redis, session=db_session)
+    now = datetime.now(UTC)
+
+    for i in range(5):
+        await publisher.publish(_event(request_id=f"r{i}", timestamp=now - timedelta(minutes=i)))
+
+    page1, total = await publisher.activity_log(1, "7d", page=1, page_size=2)
+    page2, _ = await publisher.activity_log(1, "7d", page=2, page_size=2)
+
+    assert total == 5
+    assert len(page1) == 2
+    assert len(page2) == 2
+    assert {e.id for e in page1}.isdisjoint({e.id for e in page2})
+
+
+@pytest.mark.asyncio
+async def test_activity_log_excludes_events_outside_range_and_other_users(fake_redis, db_session: AsyncSession):
+    publisher = RequestEventPublisher(fake_redis, session=db_session)
+    now = datetime.now(UTC)
+
+    await publisher.publish(_event(request_id="mine", user_id=1, timestamp=now))
+    await publisher.publish(_event(request_id="other-user", user_id=2, timestamp=now))
+    await publisher.publish(_event(request_id="stale", user_id=1, timestamp=now - timedelta(days=10)))
+
+    entries, total = await publisher.activity_log(1, "7d")
+
+    assert total == 1
+    assert entries[0].id is not None

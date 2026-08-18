@@ -61,6 +61,7 @@ class GatewayService:
         prompt_tokens: int | None = None,
         completion_tokens: int | None = None,
         total_tokens: int | None = None,
+        model: str | None = None,
     ) -> None:
         if self._events is None:
             return
@@ -75,6 +76,7 @@ class GatewayService:
                 method=method,
                 key_id=key_id,
                 key_label=key_label,
+                model=model,
                 upstream_status=upstream_status,
                 outcome=outcome,
                 latency_ms=latency_ms,
@@ -115,6 +117,7 @@ class GatewayService:
                     upstream_status=None,
                     outcome=outcome,
                     latency_ms=None,
+                    model=model,
                 )
                 provider_label = provider_type.value if provider_type is not None else "any"
                 if tried_key_ids:
@@ -131,6 +134,7 @@ class GatewayService:
             last_provider_type = key_provider_type
             provider: Provider = get_provider(key_provider_type.value)
             spec = build_request(dto)
+            effective_model = dto.model or model
 
             started = time.monotonic()
             response = await provider.forward(
@@ -157,6 +161,7 @@ class GatewayService:
                     upstream_status=response.status_code,
                     outcome="exhausted",
                     latency_ms=latency_ms,
+                    model=effective_model,
                 )
                 logger.info("attempt=%d key_id=%s provider=%s exhausted, retrying", attempt, dto.id, key_provider_type.value)
                 continue
@@ -175,6 +180,7 @@ class GatewayService:
                     upstream_status=response.status_code,
                     outcome="rate_limited",
                     latency_ms=latency_ms,
+                    model=effective_model,
                 )
                 logger.info("attempt=%d key_id=%s provider=%s rate-limited, retrying", attempt, dto.id, key_provider_type.value)
                 continue
@@ -210,6 +216,7 @@ class GatewayService:
                 prompt_tokens=prompt_tokens,
                 completion_tokens=completion_tokens,
                 total_tokens=total_tokens,
+                model=effective_model,
             )
             return response
 
@@ -249,6 +256,7 @@ class GatewayService:
                     upstream_status=None,
                     outcome=outcome,
                     latency_ms=None,
+                    model=model,
                 )
                 provider_label = provider_type.value if provider_type is not None else "any"
                 if tried_key_ids:
@@ -265,6 +273,7 @@ class GatewayService:
             last_provider_type = key_provider_type
             provider: Provider = get_provider(key_provider_type.value)
             spec = build_request(dto)
+            effective_model = dto.model or model
 
             started = time.monotonic()
             async with provider.forward_stream(
@@ -291,6 +300,7 @@ class GatewayService:
                         upstream_status=response.status_code,
                         outcome="exhausted",
                         latency_ms=latency_ms,
+                        model=effective_model,
                     )
                     logger.info(
                         "attempt=%d key_id=%s provider=%s exhausted (stream), retrying",
@@ -312,6 +322,7 @@ class GatewayService:
                         upstream_status=response.status_code,
                         outcome="rate_limited",
                         latency_ms=latency_ms,
+                        model=effective_model,
                     )
                     logger.info(
                         "attempt=%d key_id=%s provider=%s rate-limited (stream), retrying",
@@ -332,6 +343,7 @@ class GatewayService:
                     _dto: APIKeyDTO = dto,
                     _status_code: int = response.status_code,
                     _latency_ms: int = latency_ms,
+                    _model: str | None = effective_model,
                 ) -> None:
                     await self._emit(
                         user_id=user_id,
@@ -348,6 +360,7 @@ class GatewayService:
                         prompt_tokens=prompt_tokens,
                         completion_tokens=completion_tokens,
                         total_tokens=total_tokens,
+                        model=_model,
                     )
 
                 yield response, record_tokens

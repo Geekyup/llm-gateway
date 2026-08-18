@@ -17,6 +17,7 @@ from app.core.exceptions import (
 from app.core.logging import configure_logging
 from app.gateway.router import router as gateway_router
 from app.gateway.schemas import GatewayErrorBody
+from app.monitoring.activity_router import router as activity_router
 from app.monitoring.router import router as monitoring_router
 from app.openai_compat.router import router as openai_compat_router
 
@@ -66,6 +67,7 @@ def create_app() -> FastAPI:
     app.include_router(gateway_tokens_router)
     app.include_router(playground_router)
     app.include_router(monitoring_router)
+    app.include_router(activity_router)
     app.include_router(auth_router)
 
     @app.get("/health", tags=["meta"])

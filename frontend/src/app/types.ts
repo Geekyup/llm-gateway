@@ -1,6 +1,6 @@
 export type Status = "active" | "cooldown" | "exhausted" | "disabled";
 export type Provider = "gemini" | "openrouter" | "groq";
-export type View = "dashboard" | "monitor" | "playground" | "access";
+export type View = "dashboard" | "monitor" | "activity" | "playground" | "access";
 export type PF = "all" | Provider;
 export type SF = "all" | Status;
 

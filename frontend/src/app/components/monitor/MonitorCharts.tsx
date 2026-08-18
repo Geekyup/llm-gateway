@@ -1,5 +1,4 @@
 import { useEffect, useMemo, useState } from "react";
-import { BarChart3, Loader2 } from "lucide-react";
 import {
   ResponsiveContainer,
   AreaChart,
@@ -14,13 +13,19 @@ import {
 import type { LR } from "../../types";
 import { providerMeta } from "../../lib/domain";
 import { api, type MonitorRange, type TimeseriesBucket } from "../../lib/api";
+import { ChartCard } from "../shared/ChartCard";
+import { RangeSwitch } from "../shared/RangeSwitch";
+import {
+  CHART_MUTED as MUTED,
+  CHART_GRID as GRID,
+  CHART_ACCENT as ACCENT,
+  CHART_Y_AXIS_WIDTH as Y_AXIS_WIDTH,
+  tooltipStyle,
+  EmptyChart,
+  LoadingChart,
+} from "../shared/chartHelpers";
 
-const MUTED = "#52525B";
-const GRID = "rgba(255,255,255,0.04)";
-const ACCENT = "#00D68F";
 const MSK_TZ = "Europe/Moscow";
-
-const Y_AXIS_WIDTH = 30;
 
 const BUCKET_COUNT = 15;
 const BUCKET_MS = 120_000;
@@ -98,94 +103,6 @@ function fromRemoteBuckets(remote: TimeseriesBucket[], range: MonitorRange): Buc
   }));
 }
 
-function tooltipStyle() {
-  return {
-    background: "#141416",
-    border: "1px solid rgba(255,255,255,0.08)",
-    borderRadius: 6,
-    padding: "8px 10px",
-    fontSize: 11,
-    fontFamily: "inherit",
-  } as const;
-}
-
-function EmptyChart({ message }: { message: string }) {
-  return (
-    <div className="h-full flex flex-col items-center justify-center gap-2">
-      <BarChart3 size={20} className="text-zinc-700" strokeWidth={1.5} />
-      <span className="text-[11px] text-zinc-600">{message}</span>
-    </div>
-  );
-}
-
-function LoadingChart() {
-  return (
-    <div className="h-full flex items-center justify-center">
-      <Loader2 size={16} className="animate-spin text-zinc-700" />
-    </div>
-  );
-}
-
-function ChartCard({
-  title,
-  value,
-  unit,
-  children,
-  footer,
-}: {
-  title: string;
-  value: string | number;
-  unit?: string;
-  children: React.ReactNode;
-  footer?: React.ReactNode;
-}) {
-  return (
-    <div
-      className="rounded-[10px] p-3.5"
-      style={{ background: "#111113", border: "1px solid rgba(255,255,255,0.06)" }}
-    >
-      <div className="flex items-baseline justify-between mb-2.5">
-        <span className="text-[10px] text-zinc-500 uppercase tracking-wider">{title}</span>
-        <span className="text-[15px] font-medium text-zinc-100">
-          {value}
-          {unit && <span className="text-[10px] text-zinc-600 font-normal"> {unit}</span>}
-        </span>
-      </div>
-      <div className="h-[220px] sm:h-[240px]">{children}</div>
-      {footer && <div className="flex justify-end mt-2.5">{footer}</div>}
-    </div>
-  );
-}
-
-function RangeSwitch({ value, onChange }: { value: MonitorRange; onChange: (r: MonitorRange) => void }) {
-  return (
-    <div
-      className="inline-flex items-center rounded-lg p-0.5"
-      style={{ background: "#0B0B0D", border: "1px solid rgba(255,255,255,0.08)" }}
-      role="group"
-      aria-label="Chart time range"
-    >
-      {RANGE_OPTIONS.map((opt) => {
-        const active = opt.value === value;
-        return (
-          <button
-            key={opt.value}
-            onClick={() => onChange(opt.value)}
-            aria-pressed={active}
-            className="px-2.5 py-1 rounded-md text-[11px] font-medium font-mono transition-colors"
-            style={
-              active
-                ? { background: "rgba(0,214,143,0.14)", color: "#22E3A8" }
-                : { background: "transparent", color: "#71717A" }
-            }
-          >
-            {opt.label}
-          </button>
-        );
-      })}
-    </div>
-  );
-}
 
 export function MonitorCharts({ reqs, now }: { reqs: LR[]; now: number }) {
   const [range, setRange] = useState<MonitorRange>("30m");
@@ -354,7 +271,7 @@ export function MonitorCharts({ reqs, now }: { reqs: LR[]; now: number }) {
         title="Requests by provider"
         value={totalReqInWindow}
         unit="total"
-        footer={<RangeSwitch value={range} onChange={setRange} />}
+        footer={<RangeSwitch value={range} onChange={setRange} options={RANGE_OPTIONS} label="Chart time range" />}
       >
         <div className="flex items-center justify-end gap-3.5 mb-1.5 -mt-1">
           {providersPresent.map((p) => {

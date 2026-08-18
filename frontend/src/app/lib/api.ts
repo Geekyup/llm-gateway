@@ -125,6 +125,85 @@ export interface HourlyTokenUsageResponse {
   points: HourlyTokenPoint[];
 }
 
+export type ActivityRange = "24h" | "7d" | "30d";
+
+export interface ActivitySummary {
+  total_requests: number;
+  prev_total_requests: number;
+  success_rate: number;
+  prev_success_rate: number;
+  latency_p50: number | null;
+  latency_p95: number | null;
+  prev_latency_p95: number | null;
+  total_tokens: number;
+  prev_total_tokens: number;
+}
+
+export interface DailyOutcomeBucket {
+  date: string;
+  success: number;
+  rate_limited: number;
+  error: number;
+}
+
+export interface DailyTimeseriesResponse {
+  range: ActivityRange;
+  buckets: DailyOutcomeBucket[];
+}
+
+export interface LatencyPercentileBucket {
+  date: string;
+  p50: number | null;
+  p95: number | null;
+  p99: number | null;
+}
+
+export interface LatencyPercentilesResponse {
+  range: ActivityRange;
+  buckets: LatencyPercentileBucket[];
+}
+
+export interface TokensByProviderBucket {
+  date: string;
+  providers: Record<string, number>;
+}
+
+export interface TokensByProviderResponse {
+  range: ActivityRange;
+  buckets: TokensByProviderBucket[];
+}
+
+export interface TopModelEntry {
+  model: string;
+  provider: string;
+  requests: number;
+  total_tokens: number;
+}
+
+export interface TopModelsResponse {
+  range: ActivityRange;
+  models: TopModelEntry[];
+}
+
+export interface ActivityLogEntry {
+  id: number;
+  timestamp: string;
+  provider: string;
+  model: string | null;
+  key_label: string | null;
+  outcome: string;
+  latency_ms: number | null;
+  total_tokens: number | null;
+  upstream_status: number | null;
+}
+
+export interface ActivityLogResponse {
+  entries: ActivityLogEntry[];
+  page: number;
+  page_size: number;
+  total: number;
+}
+
 export interface GatewayTokenRead {
   id: number;
   label: string;
@@ -274,6 +353,48 @@ export const api = {
 
   async timeseries(range: MonitorRange): Promise<TimeseriesResponse> {
     return request<TimeseriesResponse>(`/me/monitor/timeseries?range=${range}`);
+  },
+
+  async activitySummary(range: ActivityRange): Promise<ActivitySummary> {
+    return request<ActivitySummary>(`/me/activity/summary?range=${range}`);
+  },
+
+  async activityDailyTimeseries(range: ActivityRange): Promise<DailyTimeseriesResponse> {
+    return request<DailyTimeseriesResponse>(`/me/activity/daily-timeseries?range=${range}`);
+  },
+
+  async activityLatencyPercentiles(range: ActivityRange): Promise<LatencyPercentilesResponse> {
+    return request<LatencyPercentilesResponse>(`/me/activity/latency-percentiles?range=${range}`);
+  },
+
+  async activityTokensByProvider(range: ActivityRange): Promise<TokensByProviderResponse> {
+    return request<TokensByProviderResponse>(`/me/activity/tokens-by-provider?range=${range}`);
+  },
+
+  async activityTopModels(range: ActivityRange, limit = 10): Promise<TopModelsResponse> {
+    return request<TopModelsResponse>(`/me/activity/top-models?range=${range}&limit=${limit}`);
+  },
+
+  async activityLog(params: {
+    range: ActivityRange;
+    page?: number;
+    pageSize?: number;
+    provider?: string | null;
+    outcome?: string | null;
+  }): Promise<ActivityLogResponse> {
+    const q = new URLSearchParams({ range: params.range });
+    if (params.page) q.set("page", String(params.page));
+    if (params.pageSize) q.set("page_size", String(params.pageSize));
+    if (params.provider) q.set("provider", params.provider);
+    if (params.outcome) q.set("outcome", params.outcome);
+    return request<ActivityLogResponse>(`/me/activity/log?${q.toString()}`);
+  },
+
+  activityLogExportCsvUrl(params: { range: ActivityRange; provider?: string | null; outcome?: string | null }): string {
+    const q = new URLSearchParams({ range: params.range });
+    if (params.provider) q.set("provider", params.provider);
+    if (params.outcome) q.set("outcome", params.outcome);
+    return `${API_BASE_URL}/me/activity/log/export.csv?${q.toString()}`;
   },
 
   async listGatewayTokens(): Promise<GatewayTokenRead[]> {
