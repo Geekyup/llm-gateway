@@ -54,6 +54,19 @@ export const PROVIDER_NAMES: Record<Provider, { name: string; Icon: typeof Spark
   groq:       { name: "Groq",       Icon: Zap      },
 };
 
+export const OUTCOME_META: Record<string, { text: string; color: string; bg: string }> = {
+  success:            { text: "success",            color: "#00D68F", bg: "rgba(0,214,143,0.1)" },
+  rate_limited:       { text: "rate limited",        color: "#F59E0B", bg: "rgba(245,158,11,0.1)" },
+  exhausted:          { text: "exhausted",           color: "#F59E0B", bg: "rgba(245,158,11,0.1)" },
+  no_keys:            { text: "no keys",             color: "#EF4444", bg: "rgba(239,68,68,0.1)" },
+  upstream_exhausted: { text: "upstream exhausted",  color: "#EF4444", bg: "rgba(239,68,68,0.1)" },
+  error:              { text: "error",               color: "#EF4444", bg: "rgba(239,68,68,0.1)" },
+};
+
+export function outcomeMeta(outcome: string) {
+  return OUTCOME_META[outcome] ?? { text: outcome, color: "#71717A", bg: "rgba(113,113,122,0.1)" };
+}
+
 export function rel(ts: number, now: number): string {
   const d = now - ts;
   if (d < 60000)    return `${Math.floor(d / 1000)}s ago`;

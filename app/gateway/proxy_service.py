@@ -38,10 +38,12 @@ class GatewayService:
         key_pool: KeyPoolService,
         max_attempts: int,
         event_publisher: RequestEventPublisher | None = None,
+        default_models: dict[ProviderType, str] | None = None,
     ) -> None:
         self._key_pool = key_pool
         self._max_attempts = max_attempts
         self._events = event_publisher
+        self._default_models = default_models or {}
 
     async def _emit(
         self,
@@ -134,7 +136,7 @@ class GatewayService:
             last_provider_type = key_provider_type
             provider: Provider = get_provider(key_provider_type.value)
             spec = build_request(dto)
-            effective_model = dto.model or model
+            effective_model = dto.model or model or self._default_models.get(key_provider_type)
 
             started = time.monotonic()
             response = await provider.forward(
@@ -273,7 +275,7 @@ class GatewayService:
             last_provider_type = key_provider_type
             provider: Provider = get_provider(key_provider_type.value)
             spec = build_request(dto)
-            effective_model = dto.model or model
+            effective_model = dto.model or model or self._default_models.get(key_provider_type)
 
             started = time.monotonic()
             async with provider.forward_stream(

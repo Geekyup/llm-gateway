@@ -1,22 +1,11 @@
 import { useEffect, useState } from "react";
 import { ChevronLeft, ChevronRight, Download, Loader2, ListX } from "lucide-react";
 import { api, ApiError, getAccessToken, type ActivityLogEntry, type ActivityRange } from "../../lib/api";
-import { providerMeta } from "../../lib/domain";
+import { providerMeta, outcomeMeta } from "../../lib/domain";
+import { ActivityProviderFilterDropdown } from "./ActivityProviderFilterDropdown";
+import { ActivityOutcomeFilterDropdown } from "./ActivityOutcomeFilterDropdown";
 
 const PAGE_SIZE = 20;
-
-const OUTCOME_META: Record<string, { text: string; color: string }> = {
-  success: { text: "success", color: "#00D68F" },
-  rate_limited: { text: "rate limited", color: "#F59E0B" },
-  exhausted: { text: "exhausted", color: "#F59E0B" },
-  no_keys: { text: "no keys", color: "#EF4444" },
-  upstream_exhausted: { text: "upstream exhausted", color: "#EF4444" },
-  error: { text: "error", color: "#EF4444" },
-};
-
-function outcomeMeta(outcome: string) {
-  return OUTCOME_META[outcome] ?? { text: outcome, color: "#71717A" };
-}
 
 function fmtTime(iso: string): string {
   return new Intl.DateTimeFormat("ru-RU", {
@@ -98,29 +87,8 @@ export function ActivityLogTable({ range }: { range: ActivityRange }) {
       >
         <span className="text-xs font-medium text-zinc-400 shrink-0">Request log</span>
         <div className="flex items-center gap-2 flex-wrap">
-          <select
-            value={provider}
-            onChange={(e) => setProvider(e.target.value)}
-            className="text-[11px] rounded-md px-2 py-1 outline-none"
-            style={{ color: "#ECECF0", background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.08)" }}
-          >
-            <option value="">All providers</option>
-            <option value="gemini">Gemini</option>
-            <option value="groq">Groq</option>
-            <option value="openrouter">OpenRouter</option>
-          </select>
-          <select
-            value={outcome}
-            onChange={(e) => setOutcome(e.target.value)}
-            className="text-[11px] rounded-md px-2 py-1 outline-none"
-            style={{ color: "#ECECF0", background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.08)" }}
-          >
-            <option value="">All outcomes</option>
-            <option value="success">Success</option>
-            <option value="rate_limited">Rate limited</option>
-            <option value="exhausted">Exhausted</option>
-            <option value="error">Error</option>
-          </select>
+          <ActivityProviderFilterDropdown value={provider} onChange={setProvider} />
+          <ActivityOutcomeFilterDropdown value={outcome} onChange={setOutcome} />
           <button
             onClick={handleExport}
             disabled={exporting || total === 0}

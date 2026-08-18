@@ -8,6 +8,7 @@ from app.config import Settings, get_settings
 from app.db.redis import get_redis
 from app.db.session import get_db
 from app.gateway.proxy_service import GatewayService
+from app.keys.enums import ProviderType
 from app.keys.factory import build_key_pool_service
 from app.keys.repository import APIKeyRepository
 from app.keys.service import KeyPoolService
@@ -50,4 +51,14 @@ def get_gateway_service(
     settings: Annotated[Settings, Depends(get_settings)],
     events: Annotated[RequestEventPublisher, Depends(get_event_publisher)],
 ) -> GatewayService:
-    return GatewayService(key_pool, max_attempts=settings.GATEWAY_MAX_RETRY_ATTEMPTS, event_publisher=events)
+    default_models = {
+        ProviderType.GEMINI: settings.DEFAULT_GEMINI_MODEL,
+        ProviderType.GROQ: settings.DEFAULT_GROQ_MODEL,
+        ProviderType.OPENROUTER: settings.DEFAULT_OPENROUTER_MODEL,
+    }
+    return GatewayService(
+        key_pool,
+        max_attempts=settings.GATEWAY_MAX_RETRY_ATTEMPTS,
+        event_publisher=events,
+        default_models=default_models,
+    )
