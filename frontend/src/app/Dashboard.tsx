@@ -11,6 +11,7 @@ import { KeysTable } from "./components/dashboard/KeysTable";
 import { AddEditModal } from "./components/dashboard/AddEditModal";
 import { KeyDetailDrawer } from "./components/dashboard/KeyDetailDrawer";
 import { LiveMonitor } from "./components/monitor/LiveMonitor";
+import { ActivityPage } from "./components/activity/ActivityPage";
 import { ChatPlayground } from "./components/playground/ChatPlayground";
 import { GatewayAccessPanel } from "./components/access/GatewayAccessPanel";
 
@@ -216,6 +217,11 @@ export function Dashboard({ user, onLogout }: { user: UserRead | null; onLogout:
               {view === "monitor" && (
                 <div key="monitor" className="animate-in fade-in slide-in-from-bottom-1 duration-300 ease-out">
                   <LiveMonitor reqs={reqs} now={now} />
+                </div>
+              )}
+              {view === "activity" && (
+                <div key="activity" className="animate-in fade-in slide-in-from-bottom-1 duration-300 ease-out">
+                  <ActivityPage />
                 </div>
               )}
               <div key="playground" className={view === "playground" ? "animate-in fade-in slide-in-from-bottom-1 duration-300 ease-out" : "hidden"}>

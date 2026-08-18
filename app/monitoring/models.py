@@ -24,6 +24,7 @@ class RequestEventRecord(Base):
     path: Mapped[str] = mapped_column(String(255), nullable=False, default="", server_default="")
     method: Mapped[str] = mapped_column(String(16), nullable=False, default="", server_default="")
     key_label: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    model: Mapped[str | None] = mapped_column(String(128), nullable=True, index=True)
 
     upstream_status: Mapped[int | None] = mapped_column(Integer, nullable=True)
     outcome: Mapped[str] = mapped_column(String(32), nullable=False)
@@ -37,6 +38,7 @@ class RequestEventRecord(Base):
 
     __table_args__ = (
         Index("ix_request_events_user_key_ts", "user_id", "key_id", "timestamp"),
+        Index("ix_request_events_user_ts", "user_id", "timestamp"),
     )
 
     def __repr__(self) -> str:  # pragma: no cover - debug convenience only
