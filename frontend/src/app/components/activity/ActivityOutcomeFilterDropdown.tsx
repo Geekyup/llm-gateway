@@ -42,7 +42,7 @@ export function ActivityOutcomeFilterDropdown({
     <div className="relative" ref={ref}>
       <button
         onClick={() => setOpen((o) => !o)}
-        className="flex items-center gap-1.5 text-[11px] rounded-md px-2 py-1 outline-none transition-colors"
+        className="flex items-center gap-1.5 text-[11px] rounded-md px-2 py-1 outline-none transition-colors hover:brightness-125"
         style={{
           color: "#ECECF0",
           background: active ? meta!.bg : "rgba(255,255,255,0.06)",
@@ -71,10 +71,15 @@ export function ActivityOutcomeFilterDropdown({
         >
           <button
             onClick={() => { onChange(""); setOpen(false); }}
-            className="w-full flex items-center justify-between gap-2 text-left px-3 py-2 text-xs transition-colors hover:bg-white/5"
+            className="group w-full flex items-center justify-between gap-2 text-left px-3 py-2 text-xs transition-colors hover:bg-white/10"
             style={{ background: !active ? "rgba(255,255,255,0.04)" : "transparent" }}
           >
-            <span style={{ color: !active ? "#ECECF0" : "#A1A1AA" }}>All outcomes</span>
+            <span
+              className="transition-colors group-hover:!text-[#ECECF0]"
+              style={{ color: !active ? "#ECECF0" : "#A1A1AA" }}
+            >
+              All outcomes
+            </span>
             {!active && <CheckCircle2 size={13} color="#ECECF0" className="shrink-0" />}
           </button>
           {OUTCOME_OPTIONS.map((o) => {
@@ -84,12 +89,17 @@ export function ActivityOutcomeFilterDropdown({
               <button
                 key={o.value}
                 onClick={() => { onChange(o.value); setOpen(false); }}
-                className="w-full flex items-center justify-between gap-2 text-left px-3 py-2 text-xs transition-colors hover:bg-white/5"
+                className="group w-full flex items-center justify-between gap-2 text-left px-3 py-2 text-xs transition-colors hover:bg-white/10"
                 style={{ background: isSelected ? "rgba(255,255,255,0.04)" : "transparent" }}
               >
                 <span className="flex items-center gap-1.5">
                   <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ background: m.color }} />
-                  <span style={{ color: isSelected ? "#ECECF0" : "#A1A1AA" }}>{o.label}</span>
+                  <span
+                    className="transition-colors group-hover:!text-[#ECECF0]"
+                    style={{ color: isSelected ? "#ECECF0" : "#A1A1AA" }}
+                  >
+                    {o.label}
+                  </span>
                 </span>
                 {isSelected && <CheckCircle2 size={13} color="#ECECF0" className="shrink-0" />}
               </button>

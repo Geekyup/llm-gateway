@@ -32,7 +32,7 @@ export function StatusFilterDropdown({ filter, onFilter }: { filter: SF; onFilte
       <div className="text-[10px] text-zinc-600 mb-1">Status</div>
       <button
         onClick={() => setOpen((o) => !o)}
-        className="flex items-center gap-1 sm:gap-1.5 px-2 sm:px-2.5 py-1 rounded-md text-[11px] font-medium transition-all whitespace-nowrap"
+        className="flex items-center gap-1 sm:gap-1.5 px-2 sm:px-2.5 py-1 rounded-md text-[11px] font-medium transition-all whitespace-nowrap hover:brightness-125"
         style={{
           color: "#ECECF0",
           background: active ? STATUS_META[filter].bg : "rgba(255,255,255,0.06)",
@@ -62,10 +62,15 @@ export function StatusFilterDropdown({ filter, onFilter }: { filter: SF; onFilte
               <button
                 key={f}
                 onClick={() => { onFilter(f); setOpen(false); }}
-                className="w-full flex items-center justify-between gap-2 text-left px-3 py-2 text-xs transition-colors hover:bg-white/5"
+                className="group w-full flex items-center justify-between gap-2 text-left px-3 py-2 text-xs transition-colors hover:bg-white/10"
                 style={{ background: isSelected ? "rgba(255,255,255,0.04)" : "transparent" }}
               >
-                <span style={{ color: isSelected ? "#ECECF0" : "#A1A1AA" }}>{f === "all" ? "All" : meta!.text}</span>
+                <span
+                  className="transition-colors group-hover:!text-[#ECECF0]"
+                  style={{ color: isSelected ? "#ECECF0" : "#A1A1AA" }}
+                >
+                  {f === "all" ? "All" : meta!.text}
+                </span>
                 {isSelected && <CheckCircle2 size={13} color="#ECECF0" className="shrink-0" />}
               </button>
             );
