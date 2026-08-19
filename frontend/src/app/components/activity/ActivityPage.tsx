@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   api,
   type ActivityRange,
@@ -8,6 +8,7 @@ import {
   type TokensByProviderBucket,
   type TopModelEntry,
 } from "../../lib/api";
+import { usePolling } from "../../lib/usePolling";
 import { RangeSwitch } from "../shared/RangeSwitch";
 import { ActivitySummaryCards } from "./ActivitySummaryCards";
 import {
@@ -24,6 +25,8 @@ const RANGE_OPTIONS: { value: ActivityRange; label: string }[] = [
   { value: "30d", label: "30d" },
 ];
 
+const POLL_INTERVAL_MS = 20000;
+
 export function ActivityPage() {
   const [range, setRange] = useState<ActivityRange>("7d");
 
@@ -33,31 +36,40 @@ export function ActivityPage() {
   const [tokenBuckets, setTokenBuckets] = useState<TokensByProviderBucket[]>([]);
   const [topModels, setTopModels] = useState<TopModelEntry[]>([]);
   const [loadingCharts, setLoadingCharts] = useState(true);
+  const [logRefreshTick, setLogRefreshTick] = useState(0);
+
+  const rangeRef = useRef(range);
+  rangeRef.current = range;
+
+  const loadCharts = useCallback(async (opts: { showLoading: boolean }) => {
+    if (opts.showLoading) setLoadingCharts(true);
+    const r = rangeRef.current;
+
+    const [s, d, l, t, m] = await Promise.allSettled([
+      api.activitySummary(r),
+      api.activityDailyTimeseries(r),
+      api.activityLatencyPercentiles(r),
+      api.activityTokensByProvider(r),
+      api.activityTopModels(r, 8),
+    ]);
+
+    if (rangeRef.current !== r) return;
+    if (s.status === "fulfilled") setSummary(s.value);
+    if (d.status === "fulfilled") setDailyBuckets(d.value.buckets);
+    if (l.status === "fulfilled") setLatencyBuckets(l.value.buckets);
+    if (t.status === "fulfilled") setTokenBuckets(t.value.buckets);
+    if (m.status === "fulfilled") setTopModels(m.value.models);
+    if (opts.showLoading) setLoadingCharts(false);
+  }, []);
 
   useEffect(() => {
-    let cancelled = false;
-    setLoadingCharts(true);
+    loadCharts({ showLoading: true });
+  }, [range, loadCharts]);
 
-    Promise.allSettled([
-      api.activitySummary(range),
-      api.activityDailyTimeseries(range),
-      api.activityLatencyPercentiles(range),
-      api.activityTokensByProvider(range),
-      api.activityTopModels(range, 8),
-    ]).then(([s, d, l, t, m]) => {
-      if (cancelled) return;
-      if (s.status === "fulfilled") setSummary(s.value);
-      if (d.status === "fulfilled") setDailyBuckets(d.value.buckets);
-      if (l.status === "fulfilled") setLatencyBuckets(l.value.buckets);
-      if (t.status === "fulfilled") setTokenBuckets(t.value.buckets);
-      if (m.status === "fulfilled") setTopModels(m.value.models);
-      setLoadingCharts(false);
-    });
-
-    return () => {
-      cancelled = true;
-    };
-  }, [range]);
+  usePolling(() => {
+    loadCharts({ showLoading: false });
+    setLogRefreshTick((n) => n + 1);
+  }, POLL_INTERVAL_MS);
 
   return (
     <div className="space-y-4">
@@ -75,7 +87,8 @@ export function ActivityPage() {
         <TopModelsChart models={topModels} loading={loadingCharts} />
       </div>
 
-      <ActivityLogTable range={range} />
+      <ActivityLogTable range={range} refreshSignal={logRefreshTick} />
     </div>
   );
 }
+

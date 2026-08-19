@@ -19,7 +19,7 @@ function fmtTime(iso: string): string {
   }).format(new Date(iso));
 }
 
-export function ActivityLogTable({ range }: { range: ActivityRange }) {
+export function ActivityLogTable({ range, refreshSignal = 0 }: { range: ActivityRange; refreshSignal?: number }) {
   const [entries, setEntries] = useState<ActivityLogEntry[]>([]);
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
@@ -55,6 +55,25 @@ export function ActivityLogTable({ range }: { range: ActivityRange }) {
       cancelled = true;
     };
   }, [range, page, provider, outcome]);
+
+
+  useEffect(() => {
+    if (refreshSignal === 0) return;
+    let cancelled = false;
+    api
+      .activityLog({ range, page, pageSize: PAGE_SIZE, provider: provider || null, outcome: outcome || null })
+      .then((res) => {
+        if (cancelled) return;
+        setEntries(res.entries);
+        setTotal(res.total);
+        setError(null);
+      })
+      .catch(() => {
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [refreshSignal]);
 
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
 

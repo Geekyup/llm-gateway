@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import { Loader2, AlertTriangle, CheckCircle2 } from "lucide-react";
 import { api, ApiError, type UserRead } from "./lib/api";
 import { toAK } from "./lib/domain";
+import { usePolling } from "./lib/usePolling";
 import type { AK, FormState, PF, SF, View } from "./types";
 import { Sidebar } from "./components/layout/Sidebar";
 import { MobileSidebarDrawer } from "./components/layout/MobileSidebarDrawer";
@@ -52,9 +53,9 @@ export function Dashboard({ user, onLogout }: { user: UserRead | null; onLogout:
 
   useEffect(() => {
     refreshKeys();
-    const id = setInterval(refreshKeys, 15000);
-    return () => clearInterval(id);
   }, [refreshKeys]);
+
+  usePolling(refreshKeys, 15000);
 
   const selectedKey = selectedId ? keys.find((k) => k.id === selectedId) ?? null : null;
   const editKey = editId ? keys.find((k) => k.id === editId) ?? null : null;

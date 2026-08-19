@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { AreaChart, Area, XAxis, Tooltip, ResponsiveContainer } from "recharts";
 import { X, Loader2, Stethoscope, RefreshCw, Power, Trash2 } from "lucide-react";
 import { api } from "../../lib/api";
+import { usePolling } from "../../lib/usePolling";
 import { STATUS_META, PROVIDER_META, rel, cd } from "../../lib/domain";
 import type { AK } from "../../types";
 import { StatusBadge } from "../shared/StatusBadge";
@@ -79,6 +80,19 @@ export function KeyDetailDrawer({
       });
     return () => { cancelled = true; };
   }, [chartMode, keyData.id, tokenData, tokenError]);
+
+  
+  usePolling(() => {
+    if (chartMode === "requests") {
+      api.hourlyUsage(Number(keyData.id))
+        .then((res) => setChartData(res.points.map((p) => ({ h: `${p.hour}h`, r: p.requests }))))
+        .catch(() => {});
+    } else {
+      api.hourlyTokenUsage(Number(keyData.id))
+        .then((res) => setTokenData(res.points.map((p) => ({ h: `${p.hour}h`, r: p.total_tokens, prompt: p.prompt_tokens, completion: p.completion_tokens }))))
+        .catch(() => {});
+    }
+  }, 20000);
 
   const meta = [
     { label: "Provider",   val: PROVIDER_META[keyData.provider].name, mono: false },

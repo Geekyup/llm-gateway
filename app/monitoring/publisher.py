@@ -362,7 +362,6 @@ def _today_range_utc() -> tuple[datetime, datetime]:
 
 
 def _day_window_utc(days: int) -> tuple[datetime, list[str]]:
-    """Return the UTC start of the window and ISO date labels, oldest first, inclusive of today."""
     today = datetime.now(UTC).date()
     start_date = today - timedelta(days=days - 1)
     start = datetime(start_date.year, start_date.month, start_date.day, tzinfo=UTC)
