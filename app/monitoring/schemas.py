@@ -4,7 +4,6 @@ from typing import Literal
 from pydantic import BaseModel, ConfigDict, Field
 
 Outcome = Literal["success", "rate_limited", "exhausted", "no_keys", "upstream_exhausted", "error"]
-MonitorRange = Literal["30m", "6h", "24h"]
 ActivityRange = Literal["24h", "7d", "30d"]
 
 
@@ -35,10 +34,6 @@ class RequestEvent(BaseModel):
     total_tokens: int | None = None
 
 
-class RequestEventList(BaseModel):
-    events: list[RequestEvent]
-
-
 class HourlyPoint(BaseModel):
     hour: int = Field(..., ge=0, le=23, description="UTC hour of day, 0-23")
 
@@ -61,18 +56,6 @@ class HourlyTokenPoint(HourlyPoint):
 class HourlyTokenUsageResponse(BaseModel):
     key_id: int
     points: list[HourlyTokenPoint]
-
-
-class TimeseriesBucket(BaseModel):
-    ts: int = Field(..., description="Bucket start, unix ms")
-    count: int = Field(..., ge=0)
-    p50: float | None = Field(default=None, description="Median latency in ms, null if no data")
-    providers: dict[str, int] = Field(default_factory=dict, description="Request count per provider in this bucket")
-
-
-class TimeseriesResponse(BaseModel):
-    range: MonitorRange
-    buckets: list[TimeseriesBucket]
 
 
 class ActivitySummary(BaseModel):

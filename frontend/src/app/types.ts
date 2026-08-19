@@ -1,6 +1,6 @@
 export type Status = "active" | "cooldown" | "exhausted" | "disabled";
 export type Provider = "gemini" | "openrouter" | "groq";
-export type View = "dashboard" | "monitor" | "activity" | "playground" | "access";
+export type View = "dashboard" | "activity" | "playground" | "access";
 export type PF = "all" | Provider;
 export type SF = "all" | Status;
 
@@ -17,17 +17,6 @@ export interface AK {
   lastUsed?: number;
   created: number;
   updated: number;
-}
-
-export interface LR {
-  id: string;
-  provider: string;
-  keyLabel: string;
-  code: number;
-  latency: number;
-  ts: number;
-  chain?: { label: string; code: number }[];
-  totalTokens: number | null;
 }
 
 export interface FormState {

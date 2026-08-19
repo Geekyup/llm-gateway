@@ -63,44 +63,10 @@ export interface ModelOption {
   label: string;
 }
 
-export interface RequestEvent {
-  user_id: number;
-  request_id: string;
-  attempt: number;
-  timestamp: string;
-  provider: string;
-  path: string;
-  method: string;
-  key_id: number | null;
-  key_label: string | null;
-  upstream_status: number | null;
-  outcome: string;
-  latency_ms: number | null;
-  is_retry: boolean;
-  error_detail: string | null;
-  prompt_tokens: number | null;
-  completion_tokens: number | null;
-  total_tokens: number | null;
-}
-
 export interface ApiKeyHealthCheckResult {
   key_id: number;
   ok: boolean;
   detail: string | null;
-}
-
-export type MonitorRange = "30m" | "6h" | "24h";
-
-export interface TimeseriesBucket {
-  ts: number;
-  count: number;
-  p50: number | null;
-  providers: Record<string, number>;
-}
-
-export interface TimeseriesResponse {
-  range: MonitorRange;
-  buckets: TimeseriesBucket[];
 }
 
 export interface HourlyUsagePoint {
@@ -344,17 +310,6 @@ export const api = {
     return request<HourlyTokenUsageResponse>(`/me/keys/${id}/hourly-token-usage`);
   },
 
-  async recentEvents(limit = 50): Promise<RequestEvent[]> {
-    const data = await request<{ events: RequestEvent[] }>(
-      `/me/monitor/recent?limit=${limit}`
-    );
-    return data.events;
-  },
-
-  async timeseries(range: MonitorRange): Promise<TimeseriesResponse> {
-    return request<TimeseriesResponse>(`/me/monitor/timeseries?range=${range}`);
-  },
-
   async activitySummary(range: ActivityRange): Promise<ActivitySummary> {
     return request<ActivitySummary>(`/me/activity/summary?range=${range}`);
   },
@@ -525,81 +480,4 @@ export async function streamPlaygroundChat(
     }
   }
   handlers.onDone();
-}
-
-export function streamEvents(
-  onEvent: (evt: RequestEvent) => void,
-  onError?: (err: unknown) => void
-): () => void {
-  const controller = new AbortController();
-  let stopped = false;
-  let retryDelayMs = 1000;
-
-  async function connect() {
-    while (!stopped) {
-      try {
-        const res = await fetch(`${API_BASE_URL}/me/monitor/stream`, {
-          headers: { Authorization: `Bearer ${getAccessToken()}` },
-          signal: controller.signal,
-        });
-
-        if (res.status === 401) {
-          const refreshed = await tryRefresh();
-          if (!refreshed) {
-            clearTokenPair();
-            onError?.(new Error("session expired"));
-            return;
-          }
-          continue;
-        }
-
-        if (!res.ok || !res.body) throw new Error(`stream failed: ${res.status}`);
-
-        const reader = res.body.getReader();
-        const decoder = new TextDecoder();
-        let buffer = "";
-        retryDelayMs = 1000;
-
-        while (true) {
-          const { done, value } = await reader.read();
-          if (done) break;
-          buffer += decoder.decode(value, { stream: true });
-          buffer = buffer.replace(/\r\n/g, "\n");
-
-          const chunks = buffer.split("\n\n");
-          buffer = chunks.pop() ?? "";
-
-          for (const chunk of chunks) {
-            const lines = chunk.split("\n");
-            let eventName = "message";
-            let data = "";
-            for (const line of lines) {
-              if (line.startsWith("event:")) eventName = line.slice(6).trim();
-              if (line.startsWith("data:")) data += line.slice(5).trim();
-            }
-            if (eventName === "request" && data) {
-              try {
-                onEvent(JSON.parse(data) as RequestEvent);
-              } catch {
-              }
-            }
-          }
-        }
-      } catch (err) {
-        if ((err as any)?.name === "AbortError" || stopped) return;
-        onError?.(err);
-      }
-
-      if (stopped) return;
-      await new Promise(r => setTimeout(r, retryDelayMs));
-      retryDelayMs = Math.min(retryDelayMs * 2, 15000);
-    }
-  }
-
-  connect();
-
-  return () => {
-    stopped = true;
-    controller.abort();
-  };
 }

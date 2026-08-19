@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useState } from "react";
 import { Loader2, AlertTriangle, CheckCircle2 } from "lucide-react";
-import { api, ApiError, streamEvents, type UserRead } from "./lib/api";
-import { toAK, toLR } from "./lib/domain";
-import type { AK, FormState, LR, PF, SF, View } from "./types";
+import { api, ApiError, type UserRead } from "./lib/api";
+import { toAK } from "./lib/domain";
+import type { AK, FormState, PF, SF, View } from "./types";
 import { Sidebar } from "./components/layout/Sidebar";
 import { MobileSidebarDrawer } from "./components/layout/MobileSidebarDrawer";
 import { TopBar } from "./components/layout/TopBar";
@@ -10,7 +10,6 @@ import { MetricCards } from "./components/dashboard/MetricCards";
 import { KeysTable } from "./components/dashboard/KeysTable";
 import { AddEditModal } from "./components/dashboard/AddEditModal";
 import { KeyDetailDrawer } from "./components/dashboard/KeyDetailDrawer";
-import { LiveMonitor } from "./components/monitor/LiveMonitor";
 import { ActivityPage } from "./components/activity/ActivityPage";
 import { ChatPlayground } from "./components/playground/ChatPlayground";
 import { GatewayAccessPanel } from "./components/access/GatewayAccessPanel";
@@ -28,7 +27,6 @@ export function Dashboard({ user, onLogout }: { user: UserRead | null; onLogout:
   const [menuOpen, setMenuOpen] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
-  const [reqs, setReqs] = useState<LR[]>([]);
   const [now, setNow] = useState(Date.now());
   const [checkingIds, setCheckingIds] = useState<Set<string>>(new Set());
   const [resettingIds, setResettingIds] = useState<Set<string>>(new Set());
@@ -57,25 +55,6 @@ export function Dashboard({ user, onLogout }: { user: UserRead | null; onLogout:
     const id = setInterval(refreshKeys, 15000);
     return () => clearInterval(id);
   }, [refreshKeys]);
-
-  useEffect(() => {
-    api
-      .recentEvents(50)
-      .then((events) => {
-        const fetched = events.map(toLR);
-        setReqs((prev) => {
-          const seen = new Set(prev.map((r) => r.id));
-          const merged = [...prev, ...fetched.filter((r) => !seen.has(r.id))];
-          return merged.sort((a, b) => b.ts - a.ts).slice(0, 50);
-        });
-      })
-      .catch(() => {});
-    const stop = streamEvents(
-      (evt) => setReqs((prev) => [toLR(evt), ...prev.filter((r) => r.id !== `${evt.request_id}-${evt.attempt}`)].slice(0, 50)),
-      (err) => console.warn("live event stream disconnected:", err)
-    );
-    return stop;
-  }, []);
 
   const selectedKey = selectedId ? keys.find((k) => k.id === selectedId) ?? null : null;
   const editKey = editId ? keys.find((k) => k.id === editId) ?? null : null;
@@ -212,11 +191,6 @@ export function Dashboard({ user, onLogout }: { user: UserRead | null; onLogout:
                     onCheck={checkKey}
                     checkingIds={checkingIds}
                   />
-                </div>
-              )}
-              {view === "monitor" && (
-                <div key="monitor" className="animate-in fade-in slide-in-from-bottom-1 duration-300 ease-out">
-                  <LiveMonitor reqs={reqs} now={now} />
                 </div>
               )}
               {view === "activity" && (

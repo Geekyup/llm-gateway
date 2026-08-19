@@ -1,9 +1,8 @@
-import { LayoutDashboard, Activity, BarChart2, MessageSquare, Shield } from "lucide-react";
+import { LayoutDashboard, BarChart2, MessageSquare, Shield } from "lucide-react";
 import type { View } from "../../types";
 
 const WORK_ITEMS: { v: View; label: string; Icon: typeof LayoutDashboard }[] = [
   { v: "dashboard",  label: "Dashboard",    Icon: LayoutDashboard },
-  { v: "monitor",    label: "Live Monitor", Icon: Activity },
   { v: "activity",   label: "Activity",     Icon: BarChart2 },
   { v: "playground", label: "Playground",   Icon: MessageSquare },
 ];

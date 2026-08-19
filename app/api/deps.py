@@ -40,10 +40,9 @@ def get_key_pool_service(
 
 
 def get_event_publisher(
-    redis: Annotated[Redis, Depends(get_redis)],
     session: Annotated[AsyncSession, Depends(get_db)],
 ) -> RequestEventPublisher:
-    return RequestEventPublisher(redis, session=session)
+    return RequestEventPublisher(session=session)
 
 
 def get_gateway_service(

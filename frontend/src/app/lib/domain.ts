@@ -1,6 +1,6 @@
 import { Sparkles, Route, Zap, KeyRound } from "lucide-react";
-import type { ApiKeyRead, RequestEvent as ApiRequestEvent } from "./api";
-import type { AK, LR, Provider, Status } from "../types";
+import type { ApiKeyRead } from "./api";
+import type { AK, Provider, Status } from "../types";
 
 export function toAK(k: ApiKeyRead): AK {
   return {
@@ -16,18 +16,6 @@ export function toAK(k: ApiKeyRead): AK {
     lastUsed: k.last_used_at ? new Date(k.last_used_at).getTime() : undefined,
     created: new Date(k.created_at).getTime(),
     updated: new Date(k.updated_at).getTime(),
-  };
-}
-
-export function toLR(e: ApiRequestEvent): LR {
-  return {
-    id: `${e.request_id}-${e.attempt}`,
-    provider: e.provider,
-    keyLabel: e.key_label ?? "—",
-    code: e.upstream_status ?? (e.outcome === "no_keys" ? 503 : 0),
-    latency: e.latency_ms ?? 0,
-    ts: new Date(e.timestamp).getTime(),
-    totalTokens: e.total_tokens,
   };
 }
 
