@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Ban, Plus, Loader2, AlertTriangle, CheckCircle2, Trash2, X } from "lucide-react";
 import { api, ApiError, API_BASE_URL, type GatewayTokenRead, type GatewayTokenCreated } from "../../lib/api";
 import { CodeSnippetTabs } from "../CodeSnippetTabs";
@@ -24,9 +24,6 @@ export function GatewayAccessPanel() {
   }, []);
 
   useEffect(() => { refresh(); }, [refresh]);
-
-  const activeCount = useMemo(() => tokens.filter((t) => t.is_active).length, [tokens]);
-  const revokedCount = tokens.length - activeCount;
 
   async function handleCreate() {
     if (!label.trim()) return;
@@ -81,16 +78,6 @@ export function GatewayAccessPanel() {
               failover behind it — your app just sends a bearer token to{" "}
               <code className="px-1 py-0.5 rounded font-mono" style={{ background: "rgba(255,255,255,0.08)" }}>/v1/chat/completions</code>.
             </p>
-          </div>
-          <div className="flex items-center gap-5 shrink-0">
-            <div className="text-right">
-              <div className="text-lg font-semibold text-zinc-100 leading-none">{activeCount}</div>
-              <div className="text-[11px] text-zinc-500 mt-1">active</div>
-            </div>
-            <div className="text-right">
-              <div className="text-lg font-semibold text-zinc-100 leading-none">{revokedCount}</div>
-              <div className="text-[11px] text-zinc-500 mt-1">revoked</div>
-            </div>
           </div>
         </div>
 

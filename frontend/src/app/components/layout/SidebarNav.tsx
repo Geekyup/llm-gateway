@@ -4,7 +4,7 @@ import type { View } from "../../types";
 const WORK_ITEMS: { v: View; label: string; Icon: typeof LayoutDashboard }[] = [
   { v: "dashboard",  label: "Dashboard",    Icon: LayoutDashboard },
   { v: "activity",   label: "Activity",     Icon: BarChart2 },
-  { v: "playground", label: "Playground",   Icon: MessageSquare },
+  { v: "playground", label: "Chat",   Icon: MessageSquare },
 ];
 
 const SETTINGS_ITEMS: { v: View; label: string; Icon: typeof LayoutDashboard }[] = [
