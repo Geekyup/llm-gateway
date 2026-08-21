@@ -202,7 +202,7 @@ export function Dashboard({ user, onLogout }: { user: UserRead | null; onLogout:
                 </div>
               )}
               <div key="playground" className={view === "playground" ? "animate-in fade-in slide-in-from-bottom-1 duration-300 ease-out" : "hidden"}>
-                <ChatPlayground keys={keys} active={view === "playground"} />
+                <ChatPlayground keys={keys} active={view === "playground"} onAddKey={() => setAddOpen(true)} />
               </div>
               {view === "access" && (
                 <div key="access" className="animate-in fade-in slide-in-from-bottom-1 duration-300 ease-out">

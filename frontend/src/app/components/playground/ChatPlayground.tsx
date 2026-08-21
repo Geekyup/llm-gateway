@@ -2,12 +2,12 @@ import { useEffect, useRef, useState } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import rehypeHighlight from "rehype-highlight";
-import { MessageSquare, User, Bot, AlertTriangle, Trash2, Square, Send } from "lucide-react";
+import { KeyRound, Plus, MessageSquare, User, Bot, AlertTriangle, Trash2, Square, Send } from "lucide-react";
 import { streamPlaygroundChat, type PlaygroundChatMessage } from "../../lib/api";
 import type { AK, Provider } from "../../types";
 import { ModelPill } from "./ModelPill";
 
-export function ChatPlayground({ keys, active }: { keys: AK[]; active: boolean }) {
+export function ChatPlayground({ keys, active, onAddKey }: { keys: AK[]; active: boolean; onAddKey?: () => void }) {
   const activeKeys = keys.filter((k) => k.status !== "disabled");
   const providers = Array.from(new Set(activeKeys.map((k) => k.provider))) as Provider[];
 
@@ -46,13 +46,39 @@ export function ChatPlayground({ keys, active }: { keys: AK[]; active: boolean }
 
   if (providers.length === 0) {
     return (
-      <div className="flex flex-col items-center justify-center py-24 gap-3 text-center">
-        <div className="w-11 h-11 rounded-xl flex items-center justify-center" style={{ background: "rgba(0,214,143,0.1)", border: "1px solid rgba(0,214,143,0.2)" }}>
-          <MessageSquare size={18} color="#00D68F" />
-        </div>
-        <div className="text-sm font-medium text-zinc-200">No active keys yet</div>
-        <div className="text-xs max-w-xs" style={{ color: "#52525B" }}>
-          Add at least one active API key to test it here in the playground.
+      <div className="flex items-center justify-center py-16">
+        <div
+          className="flex flex-col items-center text-center gap-4 px-8 py-12 rounded-2xl w-full max-w-md"
+          style={{ background: "#0A0A0B", border: "1px solid #232326" }}
+        >
+          <div
+            className="w-14 h-14 rounded-2xl flex items-center justify-center relative"
+            style={{ background: "rgba(0,214,143,0.1)", border: "1px solid rgba(0,214,143,0.2)" }}
+          >
+            <KeyRound size={22} color="#00D68F" />
+            <div
+              className="absolute -bottom-1 -right-1 w-[22px] h-[22px] rounded-full flex items-center justify-center"
+              style={{ background: "#18181B", border: "2px solid #0A0A0B" }}
+            >
+              <Plus size={12} color="#71717A" />
+            </div>
+          </div>
+
+          <div>
+            <div className="text-sm font-medium text-zinc-100">No active keys yet</div>
+            <div className="text-xs mt-1.5 max-w-xs" style={{ color: "#71717A" }}>
+              Add an API key from a provider to start testing prompts right here in the playground.
+            </div>
+          </div>
+
+          <button
+            onClick={onAddKey}
+            className="mt-1 flex items-center gap-1.5 text-xs font-medium px-4 py-2 rounded-lg transition-opacity hover:opacity-90"
+            style={{ background: "#00D68F", color: "#06281E" }}
+          >
+            <Plus size={14} />
+            Add API key
+          </button>
         </div>
       </div>
     );
