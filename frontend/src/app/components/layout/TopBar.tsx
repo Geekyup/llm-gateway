@@ -41,6 +41,14 @@ export function TopBar({
           onClick={onBulkAdd}
           className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all active:scale-95"
           style={{ background: "rgba(255,255,255,0.04)", color: "#ECECF0", border: "1px solid rgba(255,255,255,0.08)" }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.background = "rgba(255,255,255,0.08)";
+            e.currentTarget.style.borderColor = "rgba(255,255,255,0.16)";
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.background = "rgba(255,255,255,0.04)";
+            e.currentTarget.style.borderColor = "rgba(255,255,255,0.08)";
+          }}
         >
           <Layers size={13} /> Bulk Add
         </button>

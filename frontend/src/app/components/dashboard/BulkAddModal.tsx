@@ -193,8 +193,8 @@ export function BulkAddModal({
                   API Keys <span className="text-zinc-600 font-normal">— one per line (commas also work)</span>
                 </label>
                 <textarea
-                  className="w-full px-3 py-2 rounded-lg text-xs font-mono outline-none transition-all resize-y"
-                  style={baseInp}
+                  className="dark-scrollbar w-full px-3 py-2.5 rounded-lg text-xs font-mono leading-relaxed outline-none transition-all resize-none"
+                  style={{ ...baseInp, height: 200 }}
                   rows={8}
                   placeholder={"AIza...\nAIza...\nAIza..."}
                   value={rawKeys}
