@@ -1,4 +1,6 @@
+import hashlib
 import logging
+import re
 from datetime import UTC, datetime, timedelta
 
 from app.core.security import decrypt_key, encrypt_key
@@ -6,7 +8,15 @@ from app.keys.cache import KeyStatusCache
 from app.keys.enums import KeyStatus, ProviderType
 from app.keys.models import APIKey
 from app.keys.repository import APIKeyRepository
-from app.keys.schemas import APIKeyCreate, APIKeyDTO, APIKeyHealthCheckResult, APIKeyUpdate
+from app.keys.schemas import (
+    APIKeyBulkCreate,
+    APIKeyBulkCreateError,
+    APIKeyBulkCreateResult,
+    APIKeyCreate,
+    APIKeyDTO,
+    APIKeyHealthCheckResult,
+    APIKeyUpdate,
+)
 from app.keys.selector import KeySelector
 from app.providers.registry import get_provider
 
@@ -36,6 +46,64 @@ class KeyPoolService:
         )
         await self._cache.invalidate(user_id, payload.provider.value)
         return key
+
+    async def create_keys_bulk(self, user_id: int, payload: APIKeyBulkCreate) -> APIKeyBulkCreateResult:
+        raw_candidates = [c.strip() for c in re.split(r"[\s,]+", payload.raw_keys) if c.strip()]
+
+        seen_in_batch: set[str] = set()
+        existing = await self._repo.list_all(user_id=user_id, provider=payload.provider)
+        existing_raw_by_hash = {self._fingerprint(decrypt_key(k.key_encrypted)) for k in existing}
+
+        created = []
+        errors: list[APIKeyBulkCreateError] = []
+        skipped_duplicates = 0
+        seq = len(existing) + 1
+
+        for raw_key in raw_candidates:
+            fp = self._fingerprint(raw_key)
+            if fp in seen_in_batch or fp in existing_raw_by_hash:
+                skipped_duplicates += 1
+                continue
+            seen_in_batch.add(fp)
+
+            try:
+                key = await self._repo.create(
+                    user_id=user_id,
+                    label=f"{payload.label_prefix} {seq}",
+                    provider=payload.provider,
+                    key_encrypted=encrypt_key(raw_key),
+                    daily_limit=payload.daily_limit,
+                    model=payload.model,
+                )
+                created.append(key)
+                seq += 1
+            except Exception as exc:  
+                logger.warning("bulk key create failed: %s", exc)
+                errors.append(
+                    APIKeyBulkCreateError(
+                        raw_key_preview=self._preview(raw_key),
+                        detail=str(exc),
+                    )
+                )
+
+        if created:
+            await self._cache.invalidate(user_id, payload.provider.value)
+
+        return APIKeyBulkCreateResult(
+            created=created,
+            skipped_duplicates=skipped_duplicates,
+            errors=errors,
+        )
+
+    @staticmethod
+    def _fingerprint(raw_key: str) -> str:
+        return hashlib.sha256(raw_key.encode()).hexdigest()
+
+    @staticmethod
+    def _preview(raw_key: str) -> str:
+        if len(raw_key) <= 8:
+            return "***"
+        return f"{raw_key[:4]}...{raw_key[-4:]}"
 
     async def list_keys(self, user_id: int, provider: ProviderType | None = None):
         return await self._repo.list_all(user_id=user_id, provider=provider)

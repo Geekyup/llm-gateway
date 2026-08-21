@@ -18,6 +18,28 @@ class APIKeyCreate(BaseModel):
     )
 
 
+class APIKeyBulkCreate(BaseModel):
+    provider: ProviderType
+    raw_keys: str = Field(
+        ...,
+        description="Raw API keys separated by newlines, commas, or whitespace. Duplicates and blanks are ignored.",
+    )
+    label_prefix: str = Field(default="Key", max_length=240)
+    daily_limit: int = Field(..., gt=0)
+    model: str | None = Field(default=None, max_length=128)
+
+
+class APIKeyBulkCreateError(BaseModel):
+    raw_key_preview: str
+    detail: str
+
+
+class APIKeyBulkCreateResult(BaseModel):
+    created: list["APIKeyRead"]
+    skipped_duplicates: int
+    errors: list[APIKeyBulkCreateError]
+
+
 class APIKeyUpdate(BaseModel):
     label: str | None = Field(default=None, max_length=255)
     status: KeyStatus | None = None

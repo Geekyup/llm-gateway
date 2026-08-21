@@ -5,7 +5,14 @@ from app.api.deps import get_event_publisher, get_key_pool_service
 from app.auth.deps import get_current_user
 from app.auth.models import User
 from app.keys.enums import ProviderType
-from app.keys.schemas import APIKeyCreate, APIKeyHealthCheckResult, APIKeyRead, APIKeyUpdate
+from app.keys.schemas import (
+    APIKeyBulkCreate,
+    APIKeyBulkCreateResult,
+    APIKeyCreate,
+    APIKeyHealthCheckResult,
+    APIKeyRead,
+    APIKeyUpdate,
+)
 from app.keys.service import KeyPoolService
 from app.monitoring.publisher import RequestEventPublisher
 from app.monitoring.schemas import (
@@ -41,6 +48,15 @@ async def create_key(
 ) -> APIKeyRead:
     key = await service.create_key(user.id, payload)
     return APIKeyRead.model_validate(key)
+
+
+@router.post("/bulk", response_model=APIKeyBulkCreateResult, status_code=201)
+async def create_keys_bulk(
+    payload: APIKeyBulkCreate,
+    user: User = Depends(get_current_user),
+    service: KeyPoolService = Depends(get_key_pool_service),
+) -> APIKeyBulkCreateResult:
+    return await service.create_keys_bulk(user.id, payload)
 
 
 @router.post("/list-models", response_model=ListModelsResponse)

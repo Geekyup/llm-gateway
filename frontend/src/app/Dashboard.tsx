@@ -10,6 +10,7 @@ import { TopBar } from "./components/layout/TopBar";
 import { MetricCards } from "./components/dashboard/MetricCards";
 import { KeysTable } from "./components/dashboard/KeysTable";
 import { AddEditModal } from "./components/dashboard/AddEditModal";
+import { BulkAddModal } from "./components/dashboard/BulkAddModal";
 import { KeyDetailDrawer } from "./components/dashboard/KeyDetailDrawer";
 import { ActivityPage } from "./components/activity/ActivityPage";
 import { ChatPlayground } from "./components/playground/ChatPlayground";
@@ -25,6 +26,7 @@ export function Dashboard({ user, onLogout }: { user: UserRead | null; onLogout:
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [editId, setEditId] = useState<string | null>(null);
   const [addOpen, setAddOpen] = useState(false);
+  const [bulkAddOpen, setBulkAddOpen] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
@@ -160,7 +162,7 @@ export function Dashboard({ user, onLogout }: { user: UserRead | null; onLogout:
       {menuOpen && <MobileSidebarDrawer view={view} onView={setView} onClose={() => setMenuOpen(false)} />}
 
       <div className="flex-1 flex flex-col min-w-0">
-        <TopBar onAdd={() => setAddOpen(true)} operational={operational} onLogout={onLogout} userEmail={user?.email} onMenu={() => setMenuOpen(true)} />
+        <TopBar onAdd={() => setAddOpen(true)} onBulkAdd={() => setBulkAddOpen(true)} operational={operational} onLogout={onLogout} userEmail={user?.email} onMenu={() => setMenuOpen(true)} />
 
         <main className="flex-1 px-3 sm:px-6 py-4 sm:py-5 w-full max-w-[1400px] mx-auto space-y-4">
           {loadError && (
@@ -237,6 +239,13 @@ export function Dashboard({ user, onLogout }: { user: UserRead | null; onLogout:
           onClose={() => { setAddOpen(false); setEditId(null); setFormError(null); }}
           error={formError}
           saving={saving}
+        />
+      )}
+
+      {bulkAddOpen && (
+        <BulkAddModal
+          onDone={refreshKeys}
+          onClose={() => setBulkAddOpen(false)}
         />
       )}
 

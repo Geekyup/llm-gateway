@@ -51,6 +51,25 @@ export interface ApiKeyCreate {
   model?: string | null;
 }
 
+export interface ApiKeyBulkCreate {
+  provider: ApiProvider;
+  raw_keys: string;
+  label_prefix: string;
+  daily_limit: number;
+  model?: string | null;
+}
+
+export interface ApiKeyBulkCreateError {
+  raw_key_preview: string;
+  detail: string;
+}
+
+export interface ApiKeyBulkCreateResult {
+  created: ApiKeyRead[];
+  skipped_duplicates: number;
+  errors: ApiKeyBulkCreateError[];
+}
+
 export interface ApiKeyUpdate {
   label?: string;
   status?: ApiKeyStatus;
@@ -264,6 +283,13 @@ export const api = {
 
   async createKey(payload: ApiKeyCreate): Promise<ApiKeyRead> {
     return request<ApiKeyRead>("/me/keys", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    });
+  },
+
+  async createKeysBulk(payload: ApiKeyBulkCreate): Promise<ApiKeyBulkCreateResult> {
+    return request<ApiKeyBulkCreateResult>("/me/keys/bulk", {
       method: "POST",
       body: JSON.stringify(payload),
     });

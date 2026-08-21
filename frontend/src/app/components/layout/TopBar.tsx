@@ -1,13 +1,15 @@
-import { Menu, Plus, LogOut } from "lucide-react";
+import { Menu, Plus, Layers, LogOut } from "lucide-react";
 
 export function TopBar({
   onAdd,
+  onBulkAdd,
   operational,
   onLogout,
   userEmail,
   onMenu,
 }: {
   onAdd: () => void;
+  onBulkAdd: () => void;
   operational: boolean;
   onLogout: () => void;
   userEmail?: string | null;
@@ -35,6 +37,13 @@ export function TopBar({
       </div>
 
       <div className="flex items-center gap-3 sm:gap-4">
+        <button
+          onClick={onBulkAdd}
+          className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all active:scale-95"
+          style={{ background: "rgba(255,255,255,0.04)", color: "#ECECF0", border: "1px solid rgba(255,255,255,0.08)" }}
+        >
+          <Layers size={13} /> Bulk Add
+        </button>
         <button
           onClick={onAdd}
           className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all active:scale-95"
