@@ -77,7 +77,7 @@ class KeyPoolService:
                 )
                 created.append(key)
                 seq += 1
-            except Exception as exc:  
+            except Exception as exc:
                 logger.warning("bulk key create failed: %s", exc)
                 errors.append(
                     APIKeyBulkCreateError(
