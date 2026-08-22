@@ -4,6 +4,7 @@ import {
 } from "lucide-react";
 import { api, ApiError, type ModelOption } from "../../lib/api";
 import { PROVIDER_NAMES } from "../../lib/domain";
+import { ProviderIcon } from "../shared/ProviderIcon";
 import type { AK, FormState, Provider } from "../../types";
 
 export function AddEditModal({
@@ -134,8 +135,8 @@ export function AddEditModal({
                 style={{ ...baseInp, borderColor: providerPickerOpen ? "rgba(0,214,143,0.4)" : (baseInp.border as string) }}
               >
                 <span className="flex items-center gap-2">
-                  <span className="w-5 h-5 rounded-md flex items-center justify-center shrink-0" style={{ background: "#0F0F11", border: "1px solid rgba(255,255,255,0.08)" }}>
-                    {(() => { const Icon = PROVIDER_NAMES[form.provider].Icon; return <Icon size={12} color="#00D68F" />; })()}
+                  <span className="flex items-center justify-center shrink-0">
+                    <ProviderIcon provider={form.provider} size={15} />
                   </span>
                   <span className="font-medium text-zinc-100">{PROVIDER_NAMES[form.provider].name}</span>
                 </span>
@@ -149,7 +150,6 @@ export function AddEditModal({
                 >
                   {(Object.keys(PROVIDER_NAMES) as Provider[]).map((p) => {
                     const meta = PROVIDER_NAMES[p];
-                    const Icon = meta.Icon;
                     const active = form.provider === p;
                     return (
                       <button
@@ -163,8 +163,8 @@ export function AddEditModal({
                         className="w-full flex items-center gap-2.5 text-left px-3 py-2.5 text-sm transition-colors hover:bg-white/5"
                         style={{ background: active ? "#26262B" : "transparent", borderLeft: active ? "2px solid #00D68F" : "2px solid transparent" }}
                       >
-                        <span className="w-5 h-5 rounded-md flex items-center justify-center shrink-0" style={{ background: "#0F0F11" }}>
-                          <Icon size={12} color={active ? "#00D68F" : "#ECECF0"} />
+                        <span className="flex items-center justify-center shrink-0">
+                          <ProviderIcon provider={p} size={15} />
                         </span>
                         <span className="flex-1" style={{ color: active ? "#ECECF0" : "#A1A1AA" }}>{meta.name}</span>
                         {active && <CheckCircle2 size={14} color="#00D68F" className="shrink-0" />}

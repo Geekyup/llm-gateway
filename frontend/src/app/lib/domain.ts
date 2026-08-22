@@ -1,4 +1,3 @@
-import { Sparkles, Route, Zap, KeyRound } from "lucide-react";
 import type { ApiKeyRead } from "./api";
 import type { AK, Provider, Status } from "../types";
 
@@ -26,20 +25,20 @@ export const STATUS_META: Record<Status, { text: string; color: string; bg: stri
   disabled:  { text: "Disabled",  color: "#52525B", bg: "rgba(82,82,91,0.08)",   bd: "rgba(82,82,91,0.18)"   },
 };
 
-export const PROVIDER_META: Record<string, { name: string; color: string; bg: string; Icon: typeof Sparkles }> = {
-  gemini:     { name: "Gemini",     color: "#4F8EF7", bg: "rgba(79,142,247,0.1)",  Icon: Sparkles },
-  openrouter: { name: "OpenRouter", color: "#A78BFA", bg: "rgba(167,139,250,0.1)", Icon: Route    },
-  groq:       { name: "Groq",       color: "#F97316", bg: "rgba(249,115,22,0.1)",  Icon: Zap      },
+export const PROVIDER_META: Record<string, { name: string; color: string; bg: string }> = {
+  gemini:     { name: "Gemini",     color: "#4F8EF7", bg: "rgba(79,142,247,0.1)"  },
+  openrouter: { name: "OpenRouter", color: "#A78BFA", bg: "rgba(167,139,250,0.1)" },
+  groq:       { name: "Groq",       color: "#F97316", bg: "rgba(249,115,22,0.1)"  },
 };
 
 export function providerMeta(provider: string) {
-  return PROVIDER_META[provider] ?? { name: provider, color: "#71717A", bg: "rgba(113,113,122,0.1)", Icon: KeyRound };
+  return PROVIDER_META[provider] ?? { name: provider, color: "#71717A", bg: "rgba(113,113,122,0.1)" };
 }
 
-export const PROVIDER_NAMES: Record<Provider, { name: string; Icon: typeof Sparkles }> = {
-  gemini:     { name: "Gemini",     Icon: Sparkles },
-  openrouter: { name: "OpenRouter", Icon: Route    },
-  groq:       { name: "Groq",       Icon: Zap      },
+export const PROVIDER_NAMES: Record<Provider, { name: string }> = {
+  gemini:     { name: "Gemini"     },
+  openrouter: { name: "OpenRouter" },
+  groq:       { name: "Groq"       },
 };
 
 export const OUTCOME_META: Record<string, { text: string; color: string; bg: string }> = {

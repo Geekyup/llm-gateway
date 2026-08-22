@@ -3,6 +3,7 @@ import { ChevronDown, CheckCircle2, Plug } from "lucide-react";
 import { PROVIDER_META } from "../../lib/domain";
 import type { PF, Provider } from "../../types";
 import { DropdownPortal } from "../shared/DropdownPortal";
+import { ProviderIcon } from "../shared/ProviderIcon";
 
 export function ProviderFilterDropdown({ filter, onFilter }: { filter: PF; onFilter: (f: PF) => void }) {
   const [open, setOpen] = useState(false);
@@ -25,8 +26,6 @@ export function ProviderFilterDropdown({ filter, onFilter }: { filter: PF; onFil
   const active = filter !== "all";
   const fullLabel = active ? PROVIDER_META[filter].name : "All providers";
   const shortLabel = active ? PROVIDER_META[filter].name : "All";
-  const ActiveIcon = active ? PROVIDER_META[filter].Icon : Plug;
-  const iconColor = active ? PROVIDER_META[filter].color : "#71717A";
 
   return (
     <div className="relative" ref={ref}>
@@ -40,7 +39,7 @@ export function ProviderFilterDropdown({ filter, onFilter }: { filter: PF; onFil
           border: `1px solid ${active ? PROVIDER_META[filter].color + "38" : "rgba(255,255,255,0.08)"}`,
         }}
       >
-        <ActiveIcon size={12} color={iconColor} className="shrink-0" />
+        {active ? <ProviderIcon provider={filter} size={12} className="shrink-0" /> : <Plug size={12} color="#71717A" className="shrink-0" />}
         <span className="sm:hidden">{shortLabel}</span>
         <span className="hidden sm:inline">{fullLabel}</span>
         <ChevronDown size={11} color="#71717A" className="shrink-0" style={{ transform: open ? "rotate(180deg)" : "none", transition: "transform 0.15s ease" }} />

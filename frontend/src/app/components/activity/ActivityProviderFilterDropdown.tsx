@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { ChevronDown, CheckCircle2, Plug } from "lucide-react";
 import { PROVIDER_META } from "../../lib/domain";
 import { DropdownPortal } from "../shared/DropdownPortal";
+import { ProviderIcon } from "../shared/ProviderIcon";
 
 const PROVIDER_OPTIONS = Object.keys(PROVIDER_META);
 
@@ -30,8 +31,6 @@ export function ActivityProviderFilterDropdown({
 
   const active = value !== "";
   const fullLabel = active ? PROVIDER_META[value]?.name ?? value : "All providers";
-  const ActiveIcon = active ? PROVIDER_META[value]?.Icon ?? Plug : Plug;
-  const iconColor = active ? PROVIDER_META[value]?.color ?? "#71717A" : "#71717A";
 
   return (
     <div className="relative" ref={ref}>
@@ -44,7 +43,7 @@ export function ActivityProviderFilterDropdown({
           border: `1px solid ${active ? (PROVIDER_META[value]?.color ?? "#71717A") + "38" : "rgba(255,255,255,0.08)"}`,
         }}
       >
-        <ActiveIcon size={11} color={iconColor} className="shrink-0" />
+        {active ? <ProviderIcon provider={value} size={11} className="shrink-0" /> : <Plug size={11} color="#71717A" className="shrink-0" />}
         {fullLabel}
         <ChevronDown
           size={11}
@@ -84,7 +83,7 @@ export function ActivityProviderFilterDropdown({
                 style={{ background: isSelected ? "rgba(255,255,255,0.04)" : "transparent" }}
               >
                 <span className="flex items-center gap-1.5">
-                  <meta.Icon size={12} color={meta.color} className="shrink-0" />
+                  <ProviderIcon provider={p} size={12} className="shrink-0" />
                   <span
                     className="transition-colors group-hover:!text-[#ECECF0]"
                     style={{ color: isSelected ? "#ECECF0" : "#A1A1AA" }}
