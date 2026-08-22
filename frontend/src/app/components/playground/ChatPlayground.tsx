@@ -2,10 +2,12 @@ import { useEffect, useRef, useState } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import rehypeHighlight from "rehype-highlight";
-import { KeyRound, Plus, MessageSquare, User, Bot, AlertTriangle, Trash2, Square, Send } from "lucide-react";
+import { KeyRound, Plus, MessageSquare, User, Bot, AlertTriangle, Trash2, Square, ArrowUp } from "lucide-react";
 import { streamPlaygroundChat, type PlaygroundChatMessage } from "../../lib/api";
 import type { AK, Provider } from "../../types";
 import { ModelPill } from "./ModelPill";
+import { MessageActions } from "./MessageActions";
+import { CodeBlock } from "../shared/CodeBlock";
 
 export function ChatPlayground({ keys, active, onAddKey }: { keys: AK[]; active: boolean; onAddKey?: () => void }) {
   const activeKeys = keys.filter((k) => k.status !== "disabled");
@@ -84,12 +86,8 @@ export function ChatPlayground({ keys, active, onAddKey }: { keys: AK[]; active:
     );
   }
 
-  async function send() {
-    const text = input.trim();
-    if (!text || streaming) return;
+  async function runCompletion(nextMessages: PlaygroundChatMessage[]) {
     setError(null);
-    setInput("");
-    const nextMessages: PlaygroundChatMessage[] = [...messages, { role: "user", content: text }];
     setMessages([...nextMessages, { role: "assistant", content: "" }]);
     setStreaming(true);
 
@@ -117,16 +115,31 @@ export function ChatPlayground({ keys, active, onAddKey }: { keys: AK[]; active:
     );
   }
 
+  async function send() {
+    const text = input.trim();
+    if (!text || streaming) return;
+    setInput("");
+    await runCompletion([...messages, { role: "user", content: text }]);
+  }
+
+  async function regenerate(assistantIndex: number) {
+    if (streaming) return;
+    const prior = messages.slice(0, assistantIndex);
+    await runCompletion(prior);
+  }
+
   function stop() {
     abortRef.current?.abort();
     setStreaming(false);
   }
 
+  const [focused, setFocused] = useState(false);
+
   return (
-    <div className="flex flex-col mx-auto w-full max-w-3xl" style={{ height: "calc(100vh - 130px)" }}>
-      <div className="flex-1 overflow-y-auto thin-scrollbar pr-2">
+    <div className="flex flex-col mx-auto w-full max-w-3xl playground-shell">
+      <div className="flex-1 overflow-y-auto thin-scrollbar px-1 sm:px-2">
         {messages.length === 0 ? (
-          <div className="flex flex-col items-center justify-center h-full gap-3 text-center" style={{ color: "#3F3F46" }}>
+          <div className="flex flex-col items-center justify-center h-full gap-3 text-center px-4" style={{ color: "#3F3F46" }}>
             <div className="w-11 h-11 rounded-xl flex items-center justify-center" style={{ background: "rgba(0,214,143,0.1)", border: "1px solid rgba(0,214,143,0.2)" }}>
               <MessageSquare size={18} color="#00D68F" />
             </div>
@@ -134,54 +147,91 @@ export function ChatPlayground({ keys, active, onAddKey }: { keys: AK[]; active:
             <div className="text-xs max-w-xs">Send a message below — it goes through the same failover and retry logic as any client of the gateway.</div>
           </div>
         ) : (
-          <div className="py-6 space-y-6">
-            {messages.map((m, i) => (
-              <div key={i} className="flex gap-3" style={{ opacity: streaming && i === messages.length - 1 && !m.content ? 0.6 : 1 }}>
-                <div
-                  className="w-7 h-7 rounded-full flex items-center justify-center shrink-0"
-                  style={{
-                    background: m.role === "user" ? "rgba(255,255,255,0.06)" : "rgba(0,214,143,0.12)",
-                    border: m.role === "user" ? "1px solid rgba(255,255,255,0.08)" : "1px solid rgba(0,214,143,0.2)",
-                  }}
-                >
-                  {m.role === "user" ? <User size={13} color="#A1A1AA" /> : <Bot size={13} color="#00D68F" />}
-                </div>
-                <div className="min-w-0 flex-1 pt-1">
-                  <div className="text-[11px] font-medium mb-1" style={{ color: "#52525B" }}>
-                    {m.role === "user" ? "You" : "Assistant"}
+          <div className="py-6 sm:py-8 space-y-7 sm:space-y-8">
+            {messages.map((m, i) => {
+              const isLastAssistant = m.role === "assistant" && i === messages.length - 1;
+              const isPending = streaming && isLastAssistant && !m.content;
+              return (
+                <div key={i} className="group flex gap-3" style={{ opacity: isPending ? 0.65 : 1 }}>
+                  <div
+                    className="w-7 h-7 rounded-full flex items-center justify-center shrink-0"
+                    style={{
+                      background: m.role === "user" ? "rgba(255,255,255,0.06)" : "rgba(0,214,143,0.12)",
+                      border: m.role === "user" ? "1px solid rgba(255,255,255,0.08)" : "1px solid rgba(0,214,143,0.2)",
+                    }}
+                  >
+                    {m.role === "user" ? <User size={13} color="#A1A1AA" /> : <Bot size={13} color="#00D68F" />}
                   </div>
-                  {m.content ? (
-                    <div className="markdown-body">
-                      <ReactMarkdown remarkPlugins={[remarkGfm]} rehypePlugins={[rehypeHighlight]}>
-                        {m.content}
-                      </ReactMarkdown>
+                  <div className="min-w-0 flex-1 pt-1">
+                    <div className="text-[11px] font-medium mb-1.5" style={{ color: "#52525B" }}>
+                      {m.role === "user" ? "You" : "Assistant"}
                     </div>
-                  ) : (
-                    <div className="text-sm leading-relaxed" style={{ color: "#DCDCE1" }}>
-                      {streaming && i === messages.length - 1 ? "···" : ""}
-                    </div>
-                  )}
+                    {m.content ? (
+                      <div className="markdown-body">
+                        <ReactMarkdown
+                          remarkPlugins={[remarkGfm]}
+                          rehypePlugins={[rehypeHighlight]}
+                          components={{
+                            pre: ({ children }) => <>{children}</>,
+                            code: ({ className, children, ...props }) => {
+                              const isBlock = /language-/.test(className ?? "");
+                              if (!isBlock) {
+                                return (
+                                  <code className={className} {...props}>
+                                    {children}
+                                  </code>
+                                );
+                              }
+                              return <CodeBlock className={className}>{children}</CodeBlock>;
+                            },
+                          }}
+                        >
+                          {m.content}
+                        </ReactMarkdown>
+                      </div>
+                    ) : (
+                      <div className="text-sm leading-relaxed flex items-center h-5" style={{ color: "#DCDCE1" }}>
+                        {isPending && <span className="typing-dots" aria-label="Generating" />}
+                      </div>
+                    )}
+                    {m.content && !isPending && (
+                      <MessageActions
+                        content={m.content}
+                        onRegenerate={m.role === "assistant" && !streaming ? () => regenerate(i) : undefined}
+                        className="mt-1.5 opacity-0 group-hover:opacity-100 focus-within:opacity-100 sm:opacity-0"
+                      />
+                    )}
+                  </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
             <div ref={bottomRef} />
           </div>
         )}
       </div>
 
       {error && (
-        <div className="flex items-center gap-2 px-3.5 py-2 mb-2 rounded-lg text-xs shrink-0" style={{ color: "#EF4444", background: "rgba(239,68,68,0.08)", border: "1px solid rgba(239,68,68,0.15)" }}>
+        <div className="flex items-center gap-2 px-3.5 py-2 mb-2 mx-1 sm:mx-2 rounded-lg text-xs shrink-0" style={{ color: "#EF4444", background: "rgba(239,68,68,0.08)", border: "1px solid rgba(239,68,68,0.15)" }}>
           <AlertTriangle size={12} className="shrink-0" /> {error}
         </div>
       )}
 
-      <div className="shrink-0 pb-4 sm:pb-6">
-        <div className="rounded-2xl overflow-visible" style={{ background: "#18181B", border: "1px solid rgba(255,255,255,0.09)" }}>
+      <div className="shrink-0 pb-3 sm:pb-6 px-1 sm:px-0 playground-composer-wrap">
+        <div
+          className="rounded-2xl overflow-visible transition-shadow duration-150"
+          style={{
+            background: "#18181B",
+            border: focused ? "1px solid rgba(0,214,143,0.35)" : "1px solid rgba(255,255,255,0.09)",
+            boxShadow: focused ? "0 0 0 3px rgba(0,214,143,0.08), 0 8px 24px rgba(0,0,0,0.28)" : "0 4px 16px rgba(0,0,0,0.18)",
+          }}
+        >
           <textarea
             ref={textareaRef}
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); send(); } }}
+            onFocus={() => setFocused(true)}
+            onBlur={() => setFocused(false)}
             placeholder="Message the gateway…"
             disabled={streaming}
             rows={1}
@@ -207,17 +257,26 @@ export function ChatPlayground({ keys, active, onAddKey }: { keys: AK[]; active:
 
             <div className="flex items-center gap-1.5 shrink-0">
               {messages.length > 0 && (
-                <button onClick={() => setMessages([])} title="Clear chat" className="p-1.5 rounded-full transition-colors hover:bg-white/5">
+                <button onClick={() => setMessages([])} title="Clear chat" type="button" className="p-2 -m-0.5 rounded-full transition-colors hover:bg-white/5">
                   <Trash2 size={13} color="#52525B" />
                 </button>
               )}
               {streaming ? (
-                <button onClick={stop} className="flex items-center justify-center w-8 h-8 rounded-full shrink-0 transition-all active:scale-95" style={{ background: "rgba(239,68,68,0.12)", border: "1px solid rgba(239,68,68,0.3)" }}>
+                <button onClick={stop} type="button" className="flex items-center justify-center w-8 h-8 rounded-full shrink-0 transition-all active:scale-95" style={{ background: "rgba(239,68,68,0.12)", border: "1px solid rgba(239,68,68,0.3)" }}>
                   <Square size={12} color="#EF4444" />
                 </button>
               ) : (
-                <button onClick={send} disabled={!input.trim()} className="flex items-center justify-center w-8 h-8 rounded-full shrink-0 transition-all active:scale-95 disabled:opacity-30" style={{ background: "#00D68F" }}>
-                  <Send size={12} color="#0A0A0B" />
+                <button
+                  onClick={send}
+                  disabled={!input.trim()}
+                  type="button"
+                  className="flex items-center justify-center w-8 h-8 rounded-full shrink-0 transition-all active:scale-95 disabled:scale-100"
+                  style={{
+                    background: input.trim() ? "#00D68F" : "rgba(255,255,255,0.08)",
+                    boxShadow: input.trim() ? "0 2px 10px rgba(0,214,143,0.35)" : "none",
+                  }}
+                >
+                  <ArrowUp size={15} color={input.trim() ? "#0A0A0B" : "#52525B"} strokeWidth={2.5} />
                 </button>
               )}
             </div>
