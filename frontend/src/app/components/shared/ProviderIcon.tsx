@@ -1,10 +1,10 @@
 import { KeyRound } from "lucide-react";
-import { Gemini, Groq, Openrouter } from "@thesvg/react";
+import { GoogleGemini, Groq, Openrouter } from "@thesvg/react";
 import type { ComponentType, SVGProps } from "react";
 import type { Provider } from "../../types";
 
 const ICONS: Record<Provider, ComponentType<SVGProps<SVGSVGElement>>> = {
-  gemini: Gemini,
+  gemini: GoogleGemini,
   openrouter: Openrouter,
   groq: Groq,
 };

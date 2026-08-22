@@ -43,7 +43,7 @@ export function ActivityProviderFilterDropdown({
           border: `1px solid ${active ? (PROVIDER_META[value]?.color ?? "#71717A") + "38" : "rgba(255,255,255,0.08)"}`,
         }}
       >
-        {active ? <ProviderIcon provider={value} size={11} className="shrink-0" /> : <Plug size={11} color="#71717A" className="shrink-0" />}
+        {active ? <ProviderIcon provider={value} size={13} className="shrink-0" /> : <Plug size={11} color="#71717A" className="shrink-0" />}
         {fullLabel}
         <ChevronDown
           size={11}

@@ -38,7 +38,7 @@ export function ModelPill({
           className="flex items-center gap-1.5 pl-2 pr-1.5 py-1 rounded-full text-xs font-medium transition-colors"
           style={{ background: open === "provider" ? "rgba(255,255,255,0.09)" : "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.08)", color: "#DCDCE1" }}
         >
-          <ProvIcon provider={provider} size={11} />
+          <ProvIcon provider={provider} size={13} />
           {PROVIDER_NAMES[provider].name}
           <ChevronDown size={11} color="#71717A" style={{ transform: open === "provider" ? "rotate(180deg)" : "none", transition: "transform 0.15s ease" }} />
         </button>
