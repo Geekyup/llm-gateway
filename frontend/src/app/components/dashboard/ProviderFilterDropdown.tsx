@@ -61,11 +61,14 @@ export function ProviderFilterDropdown({ filter, onFilter }: { filter: PF; onFil
                 className="group w-full flex items-center justify-between gap-2 text-left px-3 py-2 text-xs transition-colors hover:bg-white/10"
                 style={{ background: isSelected ? "rgba(255,255,255,0.04)" : "transparent" }}
               >
-                <span
-                  className="transition-colors group-hover:!text-[#ECECF0]"
-                  style={{ color: isSelected ? "#ECECF0" : "#A1A1AA" }}
-                >
-                  {f === "all" ? "All" : meta!.name}
+                <span className="flex items-center gap-1.5">
+                  {f === "all" ? <Plug size={12} color="#71717A" className="shrink-0" /> : <ProviderIcon provider={f} size={12} className="shrink-0" />}
+                  <span
+                    className="transition-colors group-hover:!text-[#ECECF0]"
+                    style={{ color: isSelected ? "#ECECF0" : "#A1A1AA" }}
+                  >
+                    {f === "all" ? "All" : meta!.name}
+                  </span>
                 </span>
                 {isSelected && <CheckCircle2 size={13} color="#ECECF0" className="shrink-0" />}
               </button>
