@@ -152,7 +152,7 @@ export function ChatPlayground({ keys, active, onAddKey }: { keys: AK[]; active:
               const isLastAssistant = m.role === "assistant" && i === messages.length - 1;
               const isPending = streaming && isLastAssistant && !m.content;
               return (
-                <div key={i} className="group flex gap-3" style={{ opacity: isPending ? 0.65 : 1 }}>
+                <div key={i} className="group flex gap-2.5 sm:gap-3" style={{ opacity: isPending ? 0.65 : 1 }}>
                   <div
                     className="w-7 h-7 rounded-full flex items-center justify-center shrink-0"
                     style={{
@@ -235,7 +235,7 @@ export function ChatPlayground({ keys, active, onAddKey }: { keys: AK[]; active:
             placeholder="Message the gateway…"
             disabled={streaming}
             rows={1}
-            className="w-full resize-none px-4 pt-3.5 pb-2 text-sm outline-none bg-transparent"
+            className="w-full resize-none px-4 pt-3.5 pb-2 outline-none bg-transparent playground-textarea"
             style={{ color: "#ECECF0", maxHeight: 200 }}
           />
 
@@ -255,14 +255,14 @@ export function ChatPlayground({ keys, active, onAddKey }: { keys: AK[]; active:
               <div />
             )}
 
-            <div className="flex items-center gap-1.5 shrink-0">
+            <div className="flex items-center gap-1 sm:gap-1.5 shrink-0">
               {messages.length > 0 && (
-                <button onClick={() => setMessages([])} title="Clear chat" type="button" className="p-2 -m-0.5 rounded-full transition-colors hover:bg-white/5">
+                <button onClick={() => setMessages([])} title="Clear chat" type="button" className="playground-icon-btn rounded-full transition-colors hover:bg-white/5">
                   <Trash2 size={13} color="#52525B" />
                 </button>
               )}
               {streaming ? (
-                <button onClick={stop} type="button" className="flex items-center justify-center w-8 h-8 rounded-full shrink-0 transition-all active:scale-95" style={{ background: "rgba(239,68,68,0.12)", border: "1px solid rgba(239,68,68,0.3)" }}>
+                <button onClick={stop} type="button" className="playground-icon-btn playground-send-btn rounded-full shrink-0 transition-all active:scale-95" style={{ background: "rgba(239,68,68,0.12)", border: "1px solid rgba(239,68,68,0.3)" }}>
                   <Square size={12} color="#EF4444" />
                 </button>
               ) : (
@@ -270,7 +270,7 @@ export function ChatPlayground({ keys, active, onAddKey }: { keys: AK[]; active:
                   onClick={send}
                   disabled={!input.trim()}
                   type="button"
-                  className="flex items-center justify-center w-8 h-8 rounded-full shrink-0 transition-all active:scale-95 disabled:scale-100"
+                  className="playground-icon-btn playground-send-btn rounded-full shrink-0 transition-all active:scale-95 disabled:scale-100"
                   style={{
                     background: input.trim() ? "#00D68F" : "rgba(255,255,255,0.08)",
                     boxShadow: input.trim() ? "0 2px 10px rgba(0,214,143,0.35)" : "none",
