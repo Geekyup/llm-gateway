@@ -40,19 +40,20 @@ export function BulkAddModal({
   }, [providerPickerOpen]);
 
   const baseInp: React.CSSProperties = {
-    background: "rgba(255,255,255,0.04)",
-    border: "1px solid rgba(255,255,255,0.08)",
+    background: "#1A1A1D",
+    border: "1px solid rgba(255,255,255,0.10)",
+    boxShadow: "inset 0 1px 0 rgba(0,0,0,0.25)",
     color: "#ECECF0",
   };
 
   function focus(e: React.FocusEvent<HTMLElement>) {
     e.currentTarget.style.borderColor = "rgba(0,214,143,0.4)";
-    e.currentTarget.style.boxShadow = "0 0 0 3px rgba(0,214,143,0.07)";
+    e.currentTarget.style.boxShadow = "inset 0 1px 0 rgba(0,0,0,0.25), 0 0 0 3px rgba(0,214,143,0.07)";
   }
 
   function blur(e: React.FocusEvent<HTMLElement>) {
-    e.currentTarget.style.borderColor = "rgba(255,255,255,0.08)";
-    e.currentTarget.style.boxShadow = "none";
+    e.currentTarget.style.borderColor = "rgba(255,255,255,0.10)";
+    e.currentTarget.style.boxShadow = "inset 0 1px 0 rgba(0,0,0,0.25)";
   }
 
   const keyCount = rawKeys.split(/[\s,]+/).map((s) => s.trim()).filter(Boolean).length;
@@ -151,8 +152,8 @@ export function BulkAddModal({
                     style={{ ...baseInp, borderColor: providerPickerOpen ? "rgba(0,214,143,0.4)" : (baseInp.border as string) }}
                   >
                     <span className="flex items-center gap-2">
-                      <span className="w-5 h-5 rounded-md flex items-center justify-center shrink-0" style={{ background: "rgba(255,255,255,0.06)" }}>
-                        {(() => { const Icon = PROVIDER_NAMES[provider].Icon; return <Icon size={12} color="#ECECF0" />; })()}
+                      <span className="w-5 h-5 rounded-md flex items-center justify-center shrink-0" style={{ background: "#0F0F11", border: "1px solid rgba(255,255,255,0.08)" }}>
+                        {(() => { const Icon = PROVIDER_NAMES[provider].Icon; return <Icon size={12} color="#00D68F" />; })()}
                       </span>
                       <span className="font-medium text-zinc-100">{PROVIDER_NAMES[provider].name}</span>
                     </span>
@@ -162,7 +163,7 @@ export function BulkAddModal({
                   {providerPickerOpen && (
                     <div
                       className="absolute z-10 mt-1.5 w-full rounded-lg shadow-lg animate-in fade-in slide-in-from-top-1 duration-150 overflow-hidden"
-                      style={{ background: "#1C1C1E", border: "1px solid rgba(255,255,255,0.1)" }}
+                      style={{ background: "#202024", border: "1px solid rgba(255,255,255,0.12)", boxShadow: "0 12px 32px rgba(0,0,0,0.5)" }}
                     >
                       {(Object.keys(PROVIDER_NAMES) as Provider[]).map((p) => {
                         const meta = PROVIDER_NAMES[p];
@@ -173,13 +174,13 @@ export function BulkAddModal({
                             key={p}
                             onClick={() => { setProvider(p); setProviderPickerOpen(false); }}
                             className="w-full flex items-center gap-2.5 text-left px-3 py-2.5 text-sm transition-colors hover:bg-white/5"
-                            style={{ background: active ? "rgba(255,255,255,0.04)" : "transparent" }}
+                            style={{ background: active ? "#26262B" : "transparent", borderLeft: active ? "2px solid #00D68F" : "2px solid transparent" }}
                           >
-                            <span className="w-5 h-5 rounded-md flex items-center justify-center shrink-0" style={{ background: "rgba(255,255,255,0.06)" }}>
-                              <Icon size={12} color="#ECECF0" />
+                            <span className="w-5 h-5 rounded-md flex items-center justify-center shrink-0" style={{ background: "#0F0F11" }}>
+                              <Icon size={12} color={active ? "#00D68F" : "#ECECF0"} />
                             </span>
                             <span className="flex-1" style={{ color: active ? "#ECECF0" : "#A1A1AA" }}>{meta.name}</span>
-                            {active && <CheckCircle2 size={14} color="#ECECF0" className="shrink-0" />}
+                            {active && <CheckCircle2 size={14} color="#00D68F" className="shrink-0" />}
                           </button>
                         );
                       })}
