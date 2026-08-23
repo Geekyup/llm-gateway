@@ -298,11 +298,11 @@ export default function LandingPage({ onSignIn }: { onSignIn: () => void }) {
 
         <header className="sticky top-0 z-10 backdrop-blur-sm border-b border-border" style={{ background: "rgba(10,10,11,0.8)" }}>
           <div className="max-w-5xl mx-auto px-6 h-14 flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <div className="w-6 h-6 rounded-md flex items-center justify-center" style={{ background: "rgba(0,214,143,0.1)" }}>
-                <KeyRound size={13} className="text-primary" />
-              </div>
-              <span className="text-[13px] font-medium tracking-tight">keypool</span>
+            <div className="flex items-center">
+              <span className="font-mono font-semibold tracking-tight" style={{ fontSize: "22px" }}>
+                <span>key</span>
+                <span className="text-primary">pool</span>
+              </span>
             </div>
             <div className="flex items-center gap-3">
               <a
@@ -441,7 +441,10 @@ export default function LandingPage({ onSignIn }: { onSignIn: () => void }) {
 
       <footer className="max-w-5xl mx-auto px-6 py-6 text-[12px] font-mono flex flex-col sm:flex-row gap-2 sm:items-center sm:justify-between text-muted-foreground border-t border-border">
         <div className="flex items-center gap-4">
-          <span>keypool</span>
+          <span className="font-semibold">
+            <span>key</span>
+            <span className="text-primary">pool</span>
+          </span>
           <a
             href={REPO_URL}
             target="_blank"

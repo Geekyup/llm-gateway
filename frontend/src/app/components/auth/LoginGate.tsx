@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { KeyRound, AlertTriangle, Loader2 } from "lucide-react";
+import { AlertTriangle, Loader2 } from "lucide-react";
 import { startGoogleLogin } from "../../lib/api";
 
 export function LoginGate({ error }: { error?: string | null }) {
@@ -11,17 +11,12 @@ export function LoginGate({ error }: { error?: string | null }) {
         className="w-full max-w-sm rounded-2xl p-6"
         style={{ background: "#141416", border: "1px solid rgba(255,255,255,0.09)", boxShadow: "0 32px 80px rgba(0,0,0,0.6)" }}
       >
-        <div className="flex items-center gap-2.5 mb-6">
-          <div
-            className="w-8 h-8 rounded-lg flex items-center justify-center"
-            style={{ background: "rgba(0,214,143,0.12)", border: "1px solid rgba(0,214,143,0.2)" }}
-          >
-            <KeyRound size={16} color="#00D68F" />
-          </div>
-          <div>
-            <p className="font-mono text-sm font-medium text-zinc-100">keypool</p>
-            <p className="text-[11px] text-zinc-600">Sign in to manage your keys</p>
-          </div>
+        <div className="mb-6">
+          <p className="font-mono text-sm font-semibold tracking-tight" style={{ letterSpacing: "0.01em" }}>
+            <span className="text-zinc-100">key</span>
+            <span style={{ color: "#00D68F" }}>pool</span>
+          </p>
+          <p className="text-[11px] text-zinc-600 mt-1">Sign in to manage your keys</p>
         </div>
 
         {error && (

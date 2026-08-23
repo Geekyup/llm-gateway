@@ -27,7 +27,8 @@ export default function App() {
         const refreshToken = params.get("refresh_token");
         if (accessToken && refreshToken) {
           setTokenPair(accessToken, refreshToken);
-          history.replaceState(null, "", location.pathname + location.search);
+          location.replace(location.pathname + location.search);
+          return;
         }
       }
 
