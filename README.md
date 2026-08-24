@@ -18,10 +18,10 @@ cooldown и переключается на следующий. Один энд�
 
 - Ротация ключей и авто-failover при `429` / исчерпании квоты
 - OpenAI-совместимый `/v1/chat/completions` (+ стриминг) для Gemini, Groq, OpenRouter
-- Дашборд: живой монитор запросов (SSE), графики usage/токенов по ключам, health-check в один клик
+- Дашборд: живой монитор запросов (SSE), графики usage/токенов по ключам, чат-плейграунд, health-check в один клик
 - Вход через Google OAuth, отдельные отзываемые gateway-токены для самого API
 - Фоновый воркер снимает cooldown'ы и сбрасывает дневные лимиты сам
-- 
+
 ## Стек
 
 **Backend**
@@ -59,6 +59,12 @@ python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().d
 `JWT_SECRET_KEY`, `SESSION_SECRET_KEY`, `ADMIN_API_KEY` — любые длинные
 случайные строки.
 
+Вход в дашборд идёт через Google OAuth — без этого не залогинишься:
+
+1. Создай OAuth Client ID в [Google Cloud Console](https://console.cloud.google.com/apis/credentials) (тип — Web application)
+2. Authorized redirect URI: `http://localhost:8000/auth/google/callback`
+3. Впиши `GOOGLE_CLIENT_ID` и `GOOGLE_CLIENT_SECRET` в `.env`
+
 ```bash
 docker compose up --build
 ```
@@ -87,6 +93,9 @@ cd frontend && npm install && npm run dev
 </details>
 
 ## Использование
+
+Заведи ключи провайдеров и gateway-токен в дашборде, затем стучись как в
+обычный OpenAI API:
 
 ```python
 from openai import OpenAI
@@ -120,6 +129,26 @@ response = client.chat.completions.create(
 через репозитории. Адаптеры провайдеров (`app/providers/`) прячут разницу
 форматов Gemini/Groq/OpenRouter за одним интерфейсом. ARQ гоняет
 housekeeping-задачи по расписанию вместо cron-скриптов.
+
+## Структура
+
+```
+app/
+├── gateway/          выбор ключа, ротация, обработка 429/cooldown
+├── openai_compat/    /v1/chat/completions — трансляция в формат провайдера
+├── providers/        адаптеры Gemini / Groq / OpenRouter за одним интерфейсом
+├── keys/              модели, репозиторий и Redis-кэш статусов ключей
+├── account/           CRUD ключей и gateway-токенов авторизованного пользователя
+├── tokens/             выпуск и проверка gateway-токенов (sha256-хэш)
+├── auth/               Google OAuth, JWT-сессии
+├── monitoring/        live-события через SSE, история активности
+└── housekeeping/       ARQ-воркер: сброс лимитов, снятие cooldown
+
+frontend/src/app/
+├── components/playground/   чат-плейграунд с реальным SSE-стримингом
+├── components/dashboard/    графики usage, статус ключей
+└── LandingPage.tsx           публичная страница для неавторизованных
+```
 
 ## Тесты
 
