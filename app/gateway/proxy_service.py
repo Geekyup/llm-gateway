@@ -90,6 +90,110 @@ class GatewayService:
             )
         )
 
+    async def _select_next_key(
+        self,
+        *,
+        user_id: int,
+        request_id: str,
+        attempt: int,
+        provider_type: ProviderType | None,
+        model: str | None,
+        tried_key_ids: set[int],
+        last_provider_type: ProviderType | None,
+    ) -> APIKeyDTO:
+        dto = await self._key_pool.select_key(user_id, provider_type, model=model)
+        if dto is None:
+            outcome = "upstream_exhausted" if tried_key_ids else "no_keys"
+            await self._emit(
+                user_id=user_id,
+                request_id=request_id,
+                attempt=attempt,
+                provider_type=last_provider_type,
+                path=None,
+                method="POST",
+                key_id=None,
+                key_label=None,
+                upstream_status=None,
+                outcome=outcome,
+                latency_ms=None,
+                model=model,
+            )
+            provider_label = provider_type.value if provider_type is not None else "any"
+            if tried_key_ids:
+                raise UpstreamExhaustedError(provider=provider_label, attempts=len(tried_key_ids))
+            if model:
+                provider_label = f"{provider_label}' for model '{model}"
+            raise NoAvailableKeysError(provider=provider_label)
+        return dto
+
+    async def _record_attempt_outcome(
+        self,
+        *,
+        provider: Provider,
+        response: httpx.Response,
+        dto: APIKeyDTO,
+        user_id: int,
+        request_id: str,
+        attempt: int,
+        key_provider_type: ProviderType,
+        spec: UpstreamRequestSpec,
+        latency_ms: int,
+        effective_model: str | None,
+    ) -> str:
+        if provider.is_key_exhausted(response):
+            await self._key_pool.record_exhausted(dto.id, user_id, key_provider_type)
+            await self._emit(
+                user_id=user_id,
+                request_id=request_id,
+                attempt=attempt,
+                provider_type=key_provider_type,
+                path=spec.path,
+                method=spec.method,
+                key_id=dto.id,
+                key_label=dto.label,
+                upstream_status=response.status_code,
+                outcome="exhausted",
+                latency_ms=latency_ms,
+                model=effective_model,
+            )
+            logger.info("attempt=%d key_id=%s provider=%s exhausted, retrying", attempt, dto.id, key_provider_type.value)
+            return "exhausted"
+
+        if provider.is_rate_limited(response):
+            await self._key_pool.record_rate_limited(dto.id, user_id, key_provider_type)
+            await self._emit(
+                user_id=user_id,
+                request_id=request_id,
+                attempt=attempt,
+                provider_type=key_provider_type,
+                path=spec.path,
+                method=spec.method,
+                key_id=dto.id,
+                key_label=dto.label,
+                upstream_status=response.status_code,
+                outcome="rate_limited",
+                latency_ms=latency_ms,
+                model=effective_model,
+            )
+            logger.info("attempt=%d key_id=%s provider=%s rate-limited, retrying", attempt, dto.id, key_provider_type.value)
+            return "rate_limited"
+
+        await self._key_pool.record_success(dto.id, user_id, key_provider_type)
+        return "success"
+
+    @staticmethod
+    def _extract_usage(response: httpx.Response) -> tuple[int | None, int | None, int | None]:
+        try:
+            body = response.json()
+            if "usageMetadata" in body:
+                usage = body.get("usageMetadata") or {}
+                return usage.get("promptTokenCount"), usage.get("candidatesTokenCount"), usage.get("totalTokenCount")
+            usage = body.get("usage") or {}
+            return usage.get("prompt_tokens"), usage.get("completion_tokens"), usage.get("total_tokens")
+        except Exception:
+            logger.warning("failed to parse usage data for token accounting", exc_info=True)
+            return None, None, None
+
     async def proxy_request(
         self,
         *,
@@ -104,30 +208,15 @@ class GatewayService:
         last_provider_type: ProviderType | None = provider_type
 
         for attempt in range(1, self._max_attempts + 1):
-            dto = await self._key_pool.select_key(user_id, provider_type, model=model)
-            if dto is None:
-                outcome = "upstream_exhausted" if tried_key_ids else "no_keys"
-                await self._emit(
-                    user_id=user_id,
-                    request_id=request_id,
-                    attempt=attempt,
-                    provider_type=last_provider_type,
-                    path=None,
-                    method="POST",
-                    key_id=None,
-                    key_label=None,
-                    upstream_status=None,
-                    outcome=outcome,
-                    latency_ms=None,
-                    model=model,
-                )
-                provider_label = provider_type.value if provider_type is not None else "any"
-                if tried_key_ids:
-                    raise UpstreamExhaustedError(provider=provider_label, attempts=len(tried_key_ids))
-                if model:
-                    provider_label = f"{provider_label}' for model '{model}"
-                raise NoAvailableKeysError(provider=provider_label)
-
+            dto = await self._select_next_key(
+                user_id=user_id,
+                request_id=request_id,
+                attempt=attempt,
+                provider_type=provider_type,
+                model=model,
+                tried_key_ids=tried_key_ids,
+                last_provider_type=last_provider_type,
+            )
             if dto.id in tried_key_ids:
                 break
             tried_key_ids.add(dto.id)
@@ -149,60 +238,22 @@ class GatewayService:
             latency_ms = int((time.monotonic() - started) * 1000)
             last_response = response
 
-            if provider.is_key_exhausted(response):
-                await self._key_pool.record_exhausted(dto.id, user_id, key_provider_type)
-                await self._emit(
-                    user_id=user_id,
-                    request_id=request_id,
-                    attempt=attempt,
-                    provider_type=key_provider_type,
-                    path=spec.path,
-                    method=spec.method,
-                    key_id=dto.id,
-                    key_label=dto.label,
-                    upstream_status=response.status_code,
-                    outcome="exhausted",
-                    latency_ms=latency_ms,
-                    model=effective_model,
-                )
-                logger.info("attempt=%d key_id=%s provider=%s exhausted, retrying", attempt, dto.id, key_provider_type.value)
+            outcome = await self._record_attempt_outcome(
+                provider=provider,
+                response=response,
+                dto=dto,
+                user_id=user_id,
+                request_id=request_id,
+                attempt=attempt,
+                key_provider_type=key_provider_type,
+                spec=spec,
+                latency_ms=latency_ms,
+                effective_model=effective_model,
+            )
+            if outcome in ("exhausted", "rate_limited"):
                 continue
 
-            if provider.is_rate_limited(response):
-                await self._key_pool.record_rate_limited(dto.id, user_id, key_provider_type)
-                await self._emit(
-                    user_id=user_id,
-                    request_id=request_id,
-                    attempt=attempt,
-                    provider_type=key_provider_type,
-                    path=spec.path,
-                    method=spec.method,
-                    key_id=dto.id,
-                    key_label=dto.label,
-                    upstream_status=response.status_code,
-                    outcome="rate_limited",
-                    latency_ms=latency_ms,
-                    model=effective_model,
-                )
-                logger.info("attempt=%d key_id=%s provider=%s rate-limited, retrying", attempt, dto.id, key_provider_type.value)
-                continue
-
-            await self._key_pool.record_success(dto.id, user_id, key_provider_type)
-            prompt_tokens = completion_tokens = total_tokens = None
-            try:
-                body = response.json()
-                if "usageMetadata" in body:
-                    usage = body.get("usageMetadata") or {}
-                    prompt_tokens = usage.get("promptTokenCount")
-                    completion_tokens = usage.get("candidatesTokenCount")
-                    total_tokens = usage.get("totalTokenCount")
-                else:
-                    usage = body.get("usage") or {}
-                    prompt_tokens = usage.get("prompt_tokens")
-                    completion_tokens = usage.get("completion_tokens")
-                    total_tokens = usage.get("total_tokens")
-            except Exception:
-                logger.warning("failed to parse usage data for token accounting", exc_info=True)
+            prompt_tokens, completion_tokens, total_tokens = self._extract_usage(response)
             await self._emit(
                 user_id=user_id,
                 request_id=request_id,
@@ -243,30 +294,15 @@ class GatewayService:
         last_provider_type: ProviderType | None = provider_type
 
         for attempt in range(1, self._max_attempts + 1):
-            dto = await self._key_pool.select_key(user_id, provider_type, model=model)
-            if dto is None:
-                outcome = "upstream_exhausted" if tried_key_ids else "no_keys"
-                await self._emit(
-                    user_id=user_id,
-                    request_id=request_id,
-                    attempt=attempt,
-                    provider_type=last_provider_type,
-                    path=None,
-                    method="POST",
-                    key_id=None,
-                    key_label=None,
-                    upstream_status=None,
-                    outcome=outcome,
-                    latency_ms=None,
-                    model=model,
-                )
-                provider_label = provider_type.value if provider_type is not None else "any"
-                if tried_key_ids:
-                    raise UpstreamExhaustedError(provider=provider_label, attempts=len(tried_key_ids))
-                if model:
-                    provider_label = f"{provider_label}' for model '{model}"
-                raise NoAvailableKeysError(provider=provider_label)
-
+            dto = await self._select_next_key(
+                user_id=user_id,
+                request_id=request_id,
+                attempt=attempt,
+                provider_type=provider_type,
+                model=model,
+                tried_key_ids=tried_key_ids,
+                last_provider_type=last_provider_type,
+            )
             if dto.id in tried_key_ids:
                 break
             tried_key_ids.add(dto.id)
@@ -288,51 +324,20 @@ class GatewayService:
                 latency_ms = int((time.monotonic() - started) * 1000)
                 last_status = response.status_code
 
-                if provider.is_key_exhausted(response):
-                    await self._key_pool.record_exhausted(dto.id, user_id, key_provider_type)
-                    await self._emit(
-                        user_id=user_id,
-                        request_id=request_id,
-                        attempt=attempt,
-                        provider_type=key_provider_type,
-                        path=spec.path,
-                        method=spec.method,
-                        key_id=dto.id,
-                        key_label=dto.label,
-                        upstream_status=response.status_code,
-                        outcome="exhausted",
-                        latency_ms=latency_ms,
-                        model=effective_model,
-                    )
-                    logger.info(
-                        "attempt=%d key_id=%s provider=%s exhausted (stream), retrying",
-                        attempt, dto.id, key_provider_type.value,
-                    )
+                outcome = await self._record_attempt_outcome(
+                    provider=provider,
+                    response=response,
+                    dto=dto,
+                    user_id=user_id,
+                    request_id=request_id,
+                    attempt=attempt,
+                    key_provider_type=key_provider_type,
+                    spec=spec,
+                    latency_ms=latency_ms,
+                    effective_model=effective_model,
+                )
+                if outcome in ("exhausted", "rate_limited"):
                     continue
-
-                if provider.is_rate_limited(response):
-                    await self._key_pool.record_rate_limited(dto.id, user_id, key_provider_type)
-                    await self._emit(
-                        user_id=user_id,
-                        request_id=request_id,
-                        attempt=attempt,
-                        provider_type=key_provider_type,
-                        path=spec.path,
-                        method=spec.method,
-                        key_id=dto.id,
-                        key_label=dto.label,
-                        upstream_status=response.status_code,
-                        outcome="rate_limited",
-                        latency_ms=latency_ms,
-                        model=effective_model,
-                    )
-                    logger.info(
-                        "attempt=%d key_id=%s provider=%s rate-limited (stream), retrying",
-                        attempt, dto.id, key_provider_type.value,
-                    )
-                    continue
-
-                await self._key_pool.record_success(dto.id, user_id, key_provider_type)
 
                 async def record_tokens(
                     prompt_tokens: int | None,
