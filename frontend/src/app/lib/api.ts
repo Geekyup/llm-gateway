@@ -303,6 +303,11 @@ export const api = {
     return res.models;
   },
 
+  async listModelsForKey(id: number): Promise<ModelOption[]> {
+    const res = await request<{ models: ModelOption[] }>(`/me/keys/${id}/models`);
+    return res.models;
+  },
+
   async updateKey(id: number, payload: ApiKeyUpdate): Promise<ApiKeyRead> {
     return request<ApiKeyRead>(`/me/keys/${id}`, {
       method: "PATCH",

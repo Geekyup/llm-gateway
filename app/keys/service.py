@@ -131,6 +131,12 @@ class KeyPoolService:
         await self._cache.invalidate(user_id, key.provider.value)
         return key
 
+    async def list_models_for_key(self, key_id: int, user_id: int):
+        key_row = await self._repo.get(key_id, user_id=user_id)
+        provider = get_provider(key_row.provider.value)
+        decrypted = decrypt_key(key_row.key_encrypted)
+        return await provider.list_models(decrypted)
+
     async def reset_cooldown(self, key_id: int, user_id: int):
         key = await self._repo.mark_status(key_id, KeyStatus.ACTIVE, user_id=user_id, cooldown_until=None)
         await self._cache.invalidate(user_id, key.provider.value)

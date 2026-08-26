@@ -69,6 +69,16 @@ async def list_models(
     return ListModelsResponse(models=[ModelOption(id=m.model_id, label=m.label) for m in models])
 
 
+@router.get("/{key_id}/models", response_model=ListModelsResponse)
+async def list_models_for_key(
+    key_id: int,
+    user: User = Depends(get_current_user),
+    service: KeyPoolService = Depends(get_key_pool_service),
+) -> ListModelsResponse:
+    models = await service.list_models_for_key(key_id, user.id)
+    return ListModelsResponse(models=[ModelOption(id=m.model_id, label=m.label) for m in models])
+
+
 @router.get("", response_model=list[APIKeyRead])
 async def list_keys(
     provider: ProviderType | None = None,

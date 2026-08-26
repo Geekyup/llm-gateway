@@ -36,14 +36,16 @@ export function AddEditModal({
   const [modelSearch, setModelSearch] = useState("");
 
   async function fetchModels() {
-    if (!form.rawKey.trim()) {
+    if (!form.rawKey.trim() && !editKey) {
       setModelError("Enter the API key above to look up models for it.");
       return;
     }
     setModelLoading(true);
     setModelError(null);
     try {
-      const models = await api.listModels(form.provider, form.rawKey.trim());
+      const models = form.rawKey.trim()
+        ? await api.listModels(form.provider, form.rawKey.trim())
+        : await api.listModelsForKey(Number(editKey!.id));
       setModelOptions(models);
       setModelPickerOpen(true);
     } catch (err) {
@@ -227,7 +229,7 @@ export function AddEditModal({
                   style={{ background: "#1A1A1D", color: "#A1A1AA", border: "1px solid rgba(255,255,255,0.10)", boxShadow: "inset 0 1px 0 rgba(0,0,0,0.25)" }}
                 >
                   {modelLoading ? <Loader2 size={13} className="animate-spin" /> : <ChevronDown size={13} />}
-                  {modelLoading ? "Loading models…" : "Select Model"}
+                  {modelLoading ? "Loading models…" : editKey ? "Select Model (uses saved key)" : "Select Model"}
                 </button>
 
                 {modelPickerOpen && modelOptions && (
