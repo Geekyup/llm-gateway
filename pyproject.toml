@@ -4,7 +4,7 @@ version = "0.1.0"
 description = "Gateway API with rotating pool of multi-provider (Gemini/Groq/OpenRouter) API keys and automatic failover"
 requires-python = ">=3.12"
 dependencies = [
-    "fastapi>=0.115.0",
+    "fastapi>=0.141.1",
     "uvicorn[standard]>=0.52.4",
     "sqlalchemy[asyncio]>=2.0.52",
     "asyncpg>=0.31.0",
