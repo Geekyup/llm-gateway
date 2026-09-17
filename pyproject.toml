@@ -16,7 +16,7 @@ dependencies = [
     "cryptography>=43.0.0",
     "httpx>=0.28.1",
     "sse-starlette>=3.4.8",
-    "PyJWT>=2.9.0",
+    "PyJWT>=2.13.0",
     "Authlib>=1.7.2",
     "itsdangerous>=2.2.0",
 ]
