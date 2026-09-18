@@ -1,6 +1,7 @@
 class LLMGatewayError(Exception):
     status_code: int = 400
     detail: str = "Application error"
+    slug: str | None = None
 
     def __init__(self, detail: str | None = None, **fmt_kwargs: object) -> None:
         if fmt_kwargs:
@@ -14,11 +15,13 @@ class LLMGatewayError(Exception):
 
 class NoAvailableKeysError(LLMGatewayError):
     status_code = 503
+    slug = "no_available_keys"
     detail = "No available API keys for provider '{provider}'"
 
 
 class UpstreamExhaustedError(LLMGatewayError):
     status_code = 503
+    slug = "upstream_exhausted"
     detail = "All {attempts} candidate key(s) for '{provider}' were rate-limited or exhausted"
 
 
@@ -29,6 +32,7 @@ class KeyNotFoundError(LLMGatewayError):
 
 class ProviderNotSupportedError(LLMGatewayError):
     status_code = 404
+    slug = "provider_not_supported"
     detail = "Provider '{provider}' is not registered"
 
 
@@ -49,4 +53,5 @@ class InactiveUserError(LLMGatewayError):
 
 class TokenRevokedError(LLMGatewayError):
     status_code = 401
+    slug = "token_revoked"
     detail = "Refresh token has been revoked"
