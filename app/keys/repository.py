@@ -92,10 +92,14 @@ class APIKeyRepository:
     ) -> APIKey:
         return await self.update_fields(key_id, user_id=user_id, status=status, cooldown_until=cooldown_until)
 
-    async def increment_usage(self, key_id: int, user_id: int) -> None:
-        await self._session.execute(
+    async def increment_usage(self, key_id: int, user_id: int) -> bool:
+        result = await self._session.execute(
             update(APIKey)
-            .where(APIKey.id == key_id, APIKey.user_id == user_id)
+            .where(
+                APIKey.id == key_id,
+                APIKey.user_id == user_id,
+                APIKey.requests_today < APIKey.daily_limit,
+            )
             .values(
                 requests_today=APIKey.requests_today + 1,
                 last_used_at=datetime.now(UTC),
@@ -103,6 +107,7 @@ class APIKeyRepository:
             .execution_options(synchronize_session="fetch")
         )
         await self._session.commit()
+        return result.rowcount > 0
 
     async def reset_daily_counters(self, provider: ProviderType | None = None) -> list[APIKey]:
         query = select(APIKey).where(

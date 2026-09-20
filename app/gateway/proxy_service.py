@@ -178,7 +178,13 @@ class GatewayService:
             logger.info("attempt=%d key_id=%s provider=%s rate-limited, retrying", attempt, dto.id, key_provider_type.value)
             return "rate_limited"
 
-        await self._key_pool.record_success(dto.id, user_id, key_provider_type)
+        recorded = await self._key_pool.record_success(dto.id, user_id, key_provider_type)
+        if not recorded:
+            logger.warning(
+                "key_id=%s provider=%s succeeded upstream but daily limit was already exhausted "
+                "at the moment of recording (concurrent request likely used the last slot first)",
+                dto.id, key_provider_type.value,
+            )
         return "success"
 
     @staticmethod

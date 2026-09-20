@@ -192,9 +192,10 @@ class KeyPoolService:
             update={"decrypted_key": decrypt_key(key_row.key_encrypted)}
         )
 
-    async def record_success(self, key_id: int, user_id: int, provider: ProviderType) -> None:
-        await self._repo.increment_usage(key_id, user_id=user_id)
+    async def record_success(self, key_id: int, user_id: int, provider: ProviderType) -> bool:
+        incremented = await self._repo.increment_usage(key_id, user_id=user_id)
         await self._cache.invalidate(user_id, provider.value)
+        return incremented
 
     async def record_rate_limited(
         self,
