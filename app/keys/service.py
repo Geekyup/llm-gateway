@@ -1,20 +1,16 @@
 import hashlib
 import logging
 import re
-from datetime import UTC, datetime, timedelta
 
 from app.core.security import decrypt_key, encrypt_key
 from app.keys.cache import KeyStatusCache
 from app.keys.enums import KeyStatus, ProviderType
-from app.keys.models import APIKey
 from app.keys.repository import APIKeyRepository
 from app.keys.schemas import (
     APIKeyBulkCreate,
     APIKeyBulkCreateError,
     APIKeyBulkCreateResult,
     APIKeyCreate,
-    APIKeyDTO,
-    APIKeyHealthCheckResult,
     APIKeyUpdate,
 )
 from app.keys.selector import KeySelector
