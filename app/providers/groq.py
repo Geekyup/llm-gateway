@@ -23,4 +23,7 @@ class GroqProvider(HTTPProvider):
         return response.status_code == 429
 
     def is_key_exhausted(self, response: httpx.Response) -> bool:
-        return response.status_code in (401, 403)
+        return response.status_code == 403
+
+    def is_key_invalid(self, response: httpx.Response) -> bool:
+        return response.status_code == 401

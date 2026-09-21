@@ -1,5 +1,4 @@
 import logging
-from abc import ABC, abstractmethod
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from dataclasses import dataclass
@@ -26,38 +25,48 @@ class ModelInfo:
         self.label = label or model_id
 
 
-class Provider(ABC):
+class Provider:
+    """Описывает, что должен уметь любой провайдер LLM в этом проекте.
+
+    Это не строгий контракт, проверяемый Python — просто общий вид,
+    на который ориентируются HTTPProvider и его наследники (Gemini,
+    Groq, OpenRouter). У проекта всего три провайдера, все они на виду
+    в одной папке, поэтому принудительная проверка через ABC добавляла
+    сложность, не принося реальной пользы.
+    """
+
     name: ClassVar[str]
 
-    @abstractmethod
     async def forward(
         self, *, key: str, path: str, method: str,
         payload: dict[str, Any] | None, headers: dict[str, str],
     ) -> httpx.Response:
-        pass
+        raise NotImplementedError
 
-    @abstractmethod
     def forward_stream(
         self, *, key: str, path: str, method: str,
         payload: dict[str, Any] | None, headers: dict[str, str],
     ):
-        pass
+        raise NotImplementedError
 
-    @abstractmethod
     def is_rate_limited(self, response: httpx.Response) -> bool:
-        pass
+        raise NotImplementedError
 
-    @abstractmethod
     def is_key_exhausted(self, response: httpx.Response) -> bool:
-        pass
+        raise NotImplementedError
 
-    @abstractmethod
+    def is_key_invalid(self, response: httpx.Response) -> bool:
+        """Ключ навсегда невалиден (например, отозван) — в отличие от
+        is_key_exhausted, которое означает временное исчерпание квоты.
+        По умолчанию False: большинство провайдеров в этом проекте не
+        разделяют эти два случая."""
+        return False
+
     async def health_check(self, key: str) -> HealthCheckResult:
-        pass
+        raise NotImplementedError
 
-    @abstractmethod
     async def list_models(self, key: str) -> list[ModelInfo]:
-        pass
+        raise NotImplementedError
 
 
 class HTTPProvider(Provider):
@@ -73,6 +82,17 @@ class HTTPProvider(Provider):
     def _auth_headers(self, key: str) -> dict[str, str]:
         return {"authorization": f"Bearer {key}"}
 
+    def _build_request(self, key: str, path: str, headers: dict[str, str]) -> tuple[str, dict[str, str]]:
+        """Собирает полный URL и итоговые заголовки — общая часть для forward и forward_stream."""
+        url = f"{self._base_url}/{path.lstrip('/')}"
+        forward_headers = {
+            k: v for k, v in headers.items()
+            if k.lower() not in {"host", "content-length", "authorization"}
+        }
+        forward_headers.update(self._auth_headers(key))
+        forward_headers.setdefault("content-type", "application/json")
+        return url, forward_headers
+
     async def forward(
         self,
         *,
@@ -82,13 +102,7 @@ class HTTPProvider(Provider):
         payload: dict[str, Any] | None,
         headers: dict[str, str],
     ) -> httpx.Response:
-        url = f"{self._base_url}/{path.lstrip('/')}"
-        forward_headers = {
-            k: v for k, v in headers.items()
-            if k.lower() not in {"host", "content-length", "authorization"}
-        }
-        forward_headers.update(self._auth_headers(key))
-        forward_headers.setdefault("content-type", "application/json")
+        url, forward_headers = self._build_request(key, path, headers)
 
         client = self._client or httpx.AsyncClient(timeout=self._timeout)
         try:
@@ -107,13 +121,7 @@ class HTTPProvider(Provider):
         payload: dict[str, Any] | None,
         headers: dict[str, str],
     ) -> AsyncIterator[httpx.Response]:
-        url = f"{self._base_url}/{path.lstrip('/')}"
-        forward_headers = {
-            k: v for k, v in headers.items()
-            if k.lower() not in {"host", "content-length", "authorization"}
-        }
-        forward_headers.update(self._auth_headers(key))
-        forward_headers.setdefault("content-type", "application/json")
+        url, forward_headers = self._build_request(key, path, headers)
 
         client = self._client or httpx.AsyncClient(timeout=self._timeout)
         try:

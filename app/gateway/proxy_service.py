@@ -140,6 +140,25 @@ class GatewayService:
         latency_ms: int,
         effective_model: str | None,
     ) -> str:
+        if provider.is_key_invalid(response):
+            await self._key_pool.record_invalid(dto.id, user_id, key_provider_type)
+            await self._emit(
+                user_id=user_id,
+                request_id=request_id,
+                attempt=attempt,
+                provider_type=key_provider_type,
+                path=spec.path,
+                method=spec.method,
+                key_id=dto.id,
+                key_label=dto.label,
+                upstream_status=response.status_code,
+                outcome="invalid",
+                latency_ms=latency_ms,
+                model=effective_model,
+            )
+            logger.info("attempt=%d key_id=%s provider=%s invalid, retrying", attempt, dto.id, key_provider_type.value)
+            return "invalid"
+
         if provider.is_key_exhausted(response):
             await self._key_pool.record_exhausted(dto.id, user_id, key_provider_type)
             await self._emit(
@@ -256,7 +275,7 @@ class GatewayService:
                 latency_ms=latency_ms,
                 effective_model=effective_model,
             )
-            if outcome in ("exhausted", "rate_limited"):
+            if outcome in ("invalid", "exhausted", "rate_limited"):
                 continue
 
             prompt_tokens, completion_tokens, total_tokens = self._extract_usage(response)
@@ -342,7 +361,7 @@ class GatewayService:
                     latency_ms=latency_ms,
                     effective_model=effective_model,
                 )
-                if outcome in ("exhausted", "rate_limited"):
+                if outcome in ("invalid", "exhausted", "rate_limited"):
                     continue
 
                 async def record_tokens(
