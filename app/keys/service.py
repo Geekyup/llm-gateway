@@ -1,6 +1,7 @@
 import hashlib
 import logging
 import re
+from datetime import UTC, datetime, timedelta
 
 from app.core.security import decrypt_key, encrypt_key
 from app.keys.cache import KeyStatusCache
@@ -11,12 +12,16 @@ from app.keys.schemas import (
     APIKeyBulkCreateError,
     APIKeyBulkCreateResult,
     APIKeyCreate,
+    APIKeyDTO,
+    APIKeyHealthCheckResult,
     APIKeyUpdate,
 )
 from app.keys.selector import KeySelector
 from app.providers.registry import get_provider
 
 logger = logging.getLogger(__name__)
+
+DEFAULT_COOLDOWN_SECONDS = 60
 
 
 class KeyPoolService:
@@ -25,10 +30,13 @@ class KeyPoolService:
         repository: APIKeyRepository,
         cache: KeyStatusCache,
         selector: KeySelector,
+        *,
+        cooldown_seconds: int = DEFAULT_COOLDOWN_SECONDS,
     ) -> None:
         self._repo = repository
         self._cache = cache
         self._selector = selector
+        self._cooldown_seconds = cooldown_seconds
 
     async def create_key(self, user_id: int, payload: APIKeyCreate):
         encrypted = encrypt_key(payload.raw_key)
@@ -137,3 +145,105 @@ class KeyPoolService:
         key = await self._repo.mark_status(key_id, KeyStatus.ACTIVE, user_id=user_id, cooldown_until=None)
         await self._cache.invalidate(user_id, key.provider.value)
         return key
+
+    async def delete_key(self, key_id: int, user_id: int) -> None:
+        key = await self._repo.get(key_id, user_id=user_id)
+        provider = key.provider
+        await self._repo.delete(key_id, user_id=user_id)
+        await self._cache.invalidate(user_id, provider.value)
+
+    async def clear_expired_cooldowns(self):
+        return await self._repo.clear_expired_cooldowns()
+
+    async def reset_daily_counters(self, provider: ProviderType | None = None):
+        return await self._repo.reset_daily_counters(provider=provider)
+
+    async def get_candidate_keys(
+        self,
+        user_id: int,
+        provider: ProviderType,
+        *,
+        model: str | None = None,
+    ) -> list[APIKeyDTO]:
+        active = await self._cache.get_active(user_id, provider.value)
+        if active is None:
+            rows = await self._repo.list_active(user_id=user_id, provider=provider)
+            active = [
+                APIKeyDTO(
+                    id=row.id,
+                    user_id=row.user_id,
+                    label=row.label,
+                    provider=row.provider,
+                    status=row.status,
+                    requests_today=row.requests_today,
+                    daily_limit=row.daily_limit,
+                    model=row.model,
+                    decrypted_key=decrypt_key(row.key_encrypted),
+                )
+                for row in rows
+            ]
+            await self._cache.set_active(user_id, provider.value, active)
+
+        if model is None:
+            return active
+        return [dto for dto in active if dto.model is None or dto.model == model]
+
+    async def select_key(
+        self,
+        user_id: int,
+        provider: ProviderType,
+        *,
+        model: str | None = None,
+    ) -> APIKeyDTO | None:
+        candidates = await self.get_candidate_keys(user_id, provider, model=model)
+        return await self._selector.select(user_id, provider.value, candidates)
+
+    async def record_success(self, key_id: int, user_id: int, provider: ProviderType) -> bool:
+        recorded = await self._repo.increment_usage(key_id, user_id=user_id)
+        await self._cache.invalidate(user_id, provider.value)
+        return recorded
+
+    async def record_invalid(self, key_id: int, user_id: int, provider: ProviderType):
+        key = await self._repo.mark_status(key_id, KeyStatus.DISABLED, user_id=user_id)
+        await self._cache.invalidate(user_id, provider.value)
+        return key
+
+    async def record_exhausted(self, key_id: int, user_id: int, provider: ProviderType):
+        key = await self._repo.mark_status(key_id, KeyStatus.EXHAUSTED, user_id=user_id)
+        await self._cache.invalidate(user_id, provider.value)
+        return key
+
+    async def record_rate_limited(self, key_id: int, user_id: int, provider: ProviderType):
+        cooldown_until = datetime.now(UTC) + timedelta(seconds=self._cooldown_seconds)
+        key = await self._repo.mark_status(
+            key_id, KeyStatus.COOLDOWN, user_id=user_id, cooldown_until=cooldown_until
+        )
+        await self._cache.invalidate(user_id, provider.value)
+        return key
+
+    async def check_key_health(self, key_id: int, user_id: int) -> APIKeyHealthCheckResult:
+        key = await self._repo.get(key_id, user_id=user_id)
+        provider = get_provider(key.provider.value)
+        decrypted = decrypt_key(key.key_encrypted)
+        result = await provider.health_check(decrypted)
+
+        if key.status != KeyStatus.DISABLED:
+            if result.ok:
+                await self._repo.mark_status(key_id, KeyStatus.ACTIVE, user_id=user_id, cooldown_until=None)
+                await self._cache.invalidate(user_id, key.provider.value)
+            elif key.status not in (KeyStatus.COOLDOWN,):
+                await self._repo.mark_status(key_id, KeyStatus.EXHAUSTED, user_id=user_id)
+                await self._cache.invalidate(user_id, key.provider.value)
+
+        return APIKeyHealthCheckResult(key_id=key_id, ok=result.ok, detail=result.detail)
+
+    async def check_all_keys(
+        self, user_id: int, provider: ProviderType | None = None
+    ) -> list[APIKeyHealthCheckResult]:
+        keys = await self._repo.list_all(user_id=user_id, provider=provider)
+        results = []
+        for key in keys:
+            if key.status == KeyStatus.DISABLED:
+                continue
+            results.append(await self.check_key_health(key.id, user_id))
+        return results

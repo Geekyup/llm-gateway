@@ -140,7 +140,8 @@ class GatewayService:
         latency_ms: int,
         effective_model: str | None,
     ) -> str:
-        if provider.is_key_invalid(response):
+        is_key_invalid = getattr(provider, "is_key_invalid", None)
+        if is_key_invalid is not None and is_key_invalid(response):
             await self._key_pool.record_invalid(dto.id, user_id, key_provider_type)
             await self._emit(
                 user_id=user_id,
