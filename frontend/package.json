@@ -13,7 +13,7 @@
     "@thesvg/react": "^3.3.8",
     "lucide-react": "0.487.0",
     "react": "18.3.1",
-    "react-dom": "18.3.1",
+    "react-dom": "19.3.0",
     "react-markdown": "^10.1.0",
     "recharts": "3.10.1",
     "rehype-highlight": "^7.0.2",
@@ -23,7 +23,7 @@
   "devDependencies": {
     "@tailwindcss/vite": "4.3.3",
     "@types/react": "^18.3.31",
-    "@types/react-dom": "^18.3.7",
+    "@types/react-dom": "^19.3.0",
     "@vitejs/plugin-react": "4.7.0",
     "tailwindcss": "4.3.3",
     "typescript": "^7.0.2",
