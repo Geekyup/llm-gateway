@@ -9,7 +9,7 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@thesvg/icons": "^3.3.2",
+    "@thesvg/icons": "^3.3.8",
     "@thesvg/react": "^3.3.8",
     "lucide-react": "0.487.0",
     "react": "18.3.1",
