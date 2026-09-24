@@ -52,10 +52,16 @@ class APIKeyRepository:
         result = await self._session.execute(query)
         return list(result.scalars().all())
 
-    async def list_all_system_wide(self, provider: ProviderType | None = None) -> list[APIKey]:
+    async def list_all_system_wide(
+        self,
+        provider: ProviderType | None = None,
+        status: KeyStatus | None = None,
+    ) -> list[APIKey]:
         query = select(APIKey).order_by(APIKey.id)
         if provider is not None:
             query = query.where(APIKey.provider == provider)
+        if status is not None:
+            query = query.where(APIKey.status == status)
         result = await self._session.execute(query)
         return list(result.scalars().all())
 

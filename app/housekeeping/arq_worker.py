@@ -33,7 +33,7 @@ class WorkerSettings:
     on_shutdown = shutdown
     cron_jobs: ClassVar[list] = [
         cron(clear_expired_cooldowns, minute=set(range(0, 60, 5)), run_at_startup=True),
-        cron(reset_daily_limits, hour=0, minute=0),
+        cron(reset_daily_limits, hour=0, minute=get_settings().HOUSEKEEPING_RESET_CRON_MINUTE),
         cron(health_check_exhausted_keys, minute={0, 30}, run_at_startup=True),
         cron(purge_old_monitoring_events, hour=3, minute=0),
     ]

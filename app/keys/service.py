@@ -1,11 +1,15 @@
+import asyncio
 import hashlib
 import logging
 import re
+from collections import defaultdict
+from collections.abc import Sequence
 from datetime import UTC, datetime, timedelta
 
 from app.core.security import decrypt_key, encrypt_key
 from app.keys.cache import KeyStatusCache
 from app.keys.enums import KeyStatus, ProviderType
+from app.keys.models import APIKey
 from app.keys.repository import APIKeyRepository
 from app.keys.schemas import (
     APIKeyBulkCreate,
@@ -17,6 +21,7 @@ from app.keys.schemas import (
     APIKeyUpdate,
 )
 from app.keys.selector import KeySelector
+from app.providers.base import HealthCheckResult
 from app.providers.registry import get_provider
 
 logger = logging.getLogger(__name__)
@@ -112,8 +117,12 @@ class KeyPoolService:
     async def list_keys(self, user_id: int, provider: ProviderType | None = None):
         return await self._repo.list_all(user_id=user_id, provider=provider)
 
-    async def list_all_keys_system_wide(self, provider: ProviderType | None = None):
-        return await self._repo.list_all_system_wide(provider=provider)
+    async def list_all_keys_system_wide(
+        self,
+        provider: ProviderType | None = None,
+        status: KeyStatus | None = None,
+    ):
+        return await self._repo.list_all_system_wide(provider=provider, status=status)
 
     async def get_key(self, key_id: int, user_id: int):
         return await self._repo.get(key_id, user_id=user_id)
@@ -223,27 +232,69 @@ class KeyPoolService:
 
     async def check_key_health(self, key_id: int, user_id: int) -> APIKeyHealthCheckResult:
         key = await self._repo.get(key_id, user_id=user_id)
-        provider = get_provider(key.provider.value)
-        decrypted = decrypt_key(key.key_encrypted)
-        result = await provider.health_check(decrypted)
-
-        if key.status != KeyStatus.DISABLED:
-            if result.ok:
-                await self._repo.mark_status(key_id, KeyStatus.ACTIVE, user_id=user_id, cooldown_until=None)
-                await self._cache.invalidate(user_id, key.provider.value)
-            elif key.status not in (KeyStatus.COOLDOWN,):
-                await self._repo.mark_status(key_id, KeyStatus.EXHAUSTED, user_id=user_id)
-                await self._cache.invalidate(user_id, key.provider.value)
-
-        return APIKeyHealthCheckResult(key_id=key_id, ok=result.ok, detail=result.detail)
+        result = await self._probe_key(key)
+        return await self._apply_health_result(key, result)
 
     async def check_all_keys(
         self, user_id: int, provider: ProviderType | None = None
     ) -> list[APIKeyHealthCheckResult]:
         keys = await self._repo.list_all(user_id=user_id, provider=provider)
-        results = []
+        return [await self.check_key_health(key.id, user_id) for key in keys if key.status != KeyStatus.DISABLED]
+
+    async def check_keys(
+        self,
+        keys: Sequence[APIKey],
+        *,
+        concurrency: int = 1,
+        delay_seconds: float = 0.0,
+    ) -> list[APIKeyHealthCheckResult]:
+        by_provider: dict[ProviderType, list[APIKey]] = defaultdict(list)
         for key in keys:
-            if key.status == KeyStatus.DISABLED:
-                continue
-            results.append(await self.check_key_health(key.id, user_id))
+            by_provider[key.provider].append(key)
+
+        probed_per_provider = await asyncio.gather(
+            *(
+                self._probe_provider_keys(group, concurrency=concurrency, delay_seconds=delay_seconds)
+                for group in by_provider.values()
+            )
+        )
+
+        results: list[APIKeyHealthCheckResult] = []
+        for probed in probed_per_provider:
+            for key, probe_result in probed:
+                results.append(await self._apply_health_result(key, probe_result))
         return results
+
+    async def _probe_provider_keys(
+        self,
+        keys: Sequence[APIKey],
+        *,
+        concurrency: int,
+        delay_seconds: float,
+    ) -> list[tuple[APIKey, HealthCheckResult]]:
+        semaphore = asyncio.Semaphore(concurrency)
+
+        async def probe(key: APIKey) -> tuple[APIKey, HealthCheckResult]:
+            async with semaphore:
+                result = await self._probe_key(key)
+                if delay_seconds:
+                    await asyncio.sleep(delay_seconds)
+                return key, result
+
+        return list(await asyncio.gather(*(probe(key) for key in keys)))
+
+    @staticmethod
+    async def _probe_key(key: APIKey) -> HealthCheckResult:
+        provider = get_provider(key.provider.value)
+        return await provider.health_check(decrypt_key(key.key_encrypted))
+
+    async def _apply_health_result(self, key: APIKey, result: HealthCheckResult) -> APIKeyHealthCheckResult:
+        if key.status != KeyStatus.DISABLED:
+            if result.ok:
+                await self._repo.mark_status(key.id, KeyStatus.ACTIVE, user_id=key.user_id, cooldown_until=None)
+                await self._cache.invalidate(key.user_id, key.provider.value)
+            elif key.status != KeyStatus.COOLDOWN:
+                await self._repo.mark_status(key.id, KeyStatus.EXHAUSTED, user_id=key.user_id)
+                await self._cache.invalidate(key.user_id, key.provider.value)
+
+        return APIKeyHealthCheckResult(key_id=key.id, ok=result.ok, detail=result.detail)

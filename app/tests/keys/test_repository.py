@@ -141,3 +141,53 @@ async def test_clear_expired_cooldowns_only_touches_past_deadlines(key_repo, tes
     still_cooling = await key_repo.get(future_key.id, user_id=test_user.id)
     assert revived.status == KeyStatus.ACTIVE
     assert still_cooling.status == KeyStatus.COOLDOWN
+
+
+@pytest.mark.asyncio
+async def test_list_all_system_wide_filters_by_status_in_sql(key_repo, test_user, other_user):
+    exhausted_mine = await key_repo.create(
+        user_id=test_user.id, label="e1", provider=ProviderType.GEMINI, key_encrypted="c1", daily_limit=100
+    )
+    exhausted_theirs = await key_repo.create(
+        user_id=other_user.id, label="e2", provider=ProviderType.GROQ, key_encrypted="c2", daily_limit=100
+    )
+    active = await key_repo.create(
+        user_id=test_user.id, label="a", provider=ProviderType.GEMINI, key_encrypted="c3", daily_limit=100
+    )
+    await key_repo.mark_status(exhausted_mine.id, KeyStatus.EXHAUSTED, user_id=test_user.id)
+    await key_repo.mark_status(exhausted_theirs.id, KeyStatus.EXHAUSTED, user_id=other_user.id)
+
+    result = await key_repo.list_all_system_wide(status=KeyStatus.EXHAUSTED)
+
+    assert [k.id for k in result] == [exhausted_mine.id, exhausted_theirs.id]
+    assert active.id not in [k.id for k in result]
+
+
+@pytest.mark.asyncio
+async def test_list_all_system_wide_combines_provider_and_status(key_repo, test_user):
+    gemini = await key_repo.create(
+        user_id=test_user.id, label="g", provider=ProviderType.GEMINI, key_encrypted="c1", daily_limit=100
+    )
+    groq = await key_repo.create(
+        user_id=test_user.id, label="q", provider=ProviderType.GROQ, key_encrypted="c2", daily_limit=100
+    )
+    await key_repo.mark_status(gemini.id, KeyStatus.EXHAUSTED, user_id=test_user.id)
+    await key_repo.mark_status(groq.id, KeyStatus.EXHAUSTED, user_id=test_user.id)
+
+    result = await key_repo.list_all_system_wide(provider=ProviderType.GROQ, status=KeyStatus.EXHAUSTED)
+
+    assert [k.id for k in result] == [groq.id]
+
+
+@pytest.mark.asyncio
+async def test_list_all_system_wide_without_filters_returns_everything(key_repo, test_user):
+    first = await key_repo.create(
+        user_id=test_user.id, label="a", provider=ProviderType.GEMINI, key_encrypted="c1", daily_limit=100
+    )
+    second = await key_repo.create(
+        user_id=test_user.id, label="b", provider=ProviderType.GROQ, key_encrypted="c2", daily_limit=100
+    )
+
+    result = await key_repo.list_all_system_wide()
+
+    assert [k.id for k in result] == [first.id, second.id]

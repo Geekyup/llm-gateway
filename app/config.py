@@ -44,6 +44,9 @@ class Settings(BaseSettings):
     DEFAULT_GROQ_MODEL: str = "llama-3.1-8b-instant"
 
     HOUSEKEEPING_RESET_CRON_MINUTE: int = 0
+    HOUSEKEEPING_HEALTH_CHECK_CONCURRENCY: int = Field(default=3, ge=1)
+    HOUSEKEEPING_HEALTH_CHECK_DELAY_SECONDS: float = Field(default=0.2, ge=0)
+    REQUEST_EVENTS_RETENTION_DAYS: int = Field(default=30, ge=1)
 
     JWT_ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 15

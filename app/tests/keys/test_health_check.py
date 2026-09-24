@@ -1,3 +1,4 @@
+import asyncio
 from unittest.mock import AsyncMock, patch
 
 import pytest
@@ -133,3 +134,162 @@ async def test_check_all_keys_never_touches_other_users_keys(key_repo, key_pool_
         results = await key_pool_service.check_all_keys(test_user.id)
 
     assert [r.key_id for r in results] == [mine.id]
+
+
+@pytest.mark.asyncio
+async def test_check_keys_revives_exhausted_and_reports_per_key_results(
+    key_repo, key_pool_service, test_user, other_user
+):
+    mine = await key_repo.create(
+        user_id=test_user.id, label="m", provider=ProviderType.GEMINI, key_encrypted="c1", daily_limit=100
+    )
+    theirs = await key_repo.create(
+        user_id=other_user.id, label="t", provider=ProviderType.GEMINI, key_encrypted="c2", daily_limit=100
+    )
+    await key_repo.mark_status(mine.id, KeyStatus.EXHAUSTED, user_id=test_user.id)
+    await key_repo.mark_status(theirs.id, KeyStatus.EXHAUSTED, user_id=other_user.id)
+
+    fake_provider = AsyncMock()
+    fake_provider.health_check.return_value = HealthCheckResult(ok=True)
+    keys = await key_pool_service.list_all_keys_system_wide(status=KeyStatus.EXHAUSTED)
+
+    with patch("app.keys.service.get_provider", return_value=fake_provider), \
+         patch("app.keys.service.decrypt_key", return_value="plaintext-key"):
+        results = await key_pool_service.check_keys(keys)
+
+    assert sorted(r.key_id for r in results) == sorted([mine.id, theirs.id])
+    assert all(r.ok for r in results)
+    assert (await key_repo.get(mine.id, user_id=test_user.id)).status == KeyStatus.ACTIVE
+    assert (await key_repo.get(theirs.id, user_id=other_user.id)).status == KeyStatus.ACTIVE
+
+
+@pytest.mark.asyncio
+async def test_check_keys_keeps_failing_key_exhausted(key_repo, key_pool_service, test_user):
+    key = await key_repo.create(
+        user_id=test_user.id, label="k", provider=ProviderType.GEMINI, key_encrypted="c1", daily_limit=100
+    )
+    await key_repo.mark_status(key.id, KeyStatus.EXHAUSTED, user_id=test_user.id)
+
+    fake_provider = AsyncMock()
+    fake_provider.health_check.return_value = HealthCheckResult(ok=False, detail="HTTP 429")
+    keys = await key_pool_service.list_all_keys_system_wide(status=KeyStatus.EXHAUSTED)
+
+    with patch("app.keys.service.get_provider", return_value=fake_provider), \
+         patch("app.keys.service.decrypt_key", return_value="plaintext-key"):
+        results = await key_pool_service.check_keys(keys)
+
+    assert [(r.key_id, r.ok, r.detail) for r in results] == [(key.id, False, "HTTP 429")]
+    assert (await key_repo.get(key.id, user_id=test_user.id)).status == KeyStatus.EXHAUSTED
+
+
+@pytest.mark.asyncio
+async def test_check_keys_with_empty_list_makes_no_requests(key_pool_service):
+    fake_provider = AsyncMock()
+
+    with patch("app.keys.service.get_provider", return_value=fake_provider):
+        results = await key_pool_service.check_keys([])
+
+    assert results == []
+    fake_provider.health_check.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_check_keys_limits_concurrency_per_provider(key_repo, key_pool_service, test_user):
+    keys = []
+    for i in range(6):
+        key = await key_repo.create(
+            user_id=test_user.id, label=f"k{i}", provider=ProviderType.GEMINI, key_encrypted=f"c{i}", daily_limit=100
+        )
+        await key_repo.mark_status(key.id, KeyStatus.EXHAUSTED, user_id=test_user.id)
+        keys.append(key)
+
+    in_flight = 0
+    peak = 0
+
+    async def slow_health_check(_key: str) -> HealthCheckResult:
+        nonlocal in_flight, peak
+        in_flight += 1
+        peak = max(peak, in_flight)
+        await asyncio.sleep(0.01)
+        in_flight -= 1
+        return HealthCheckResult(ok=True)
+
+    fake_provider = AsyncMock()
+    fake_provider.health_check.side_effect = slow_health_check
+    exhausted = await key_pool_service.list_all_keys_system_wide(status=KeyStatus.EXHAUSTED)
+
+    with patch("app.keys.service.get_provider", return_value=fake_provider), \
+         patch("app.keys.service.decrypt_key", return_value="plaintext-key"):
+        results = await key_pool_service.check_keys(exhausted, concurrency=2)
+
+    assert len(results) == 6
+    assert peak == 2
+
+
+@pytest.mark.asyncio
+async def test_check_keys_runs_different_providers_in_parallel(key_repo, key_pool_service, test_user):
+    for provider in (ProviderType.GEMINI, ProviderType.GROQ, ProviderType.OPENROUTER):
+        key = await key_repo.create(
+            user_id=test_user.id, label=provider.value, provider=provider, key_encrypted="c", daily_limit=100
+        )
+        await key_repo.mark_status(key.id, KeyStatus.EXHAUSTED, user_id=test_user.id)
+
+    in_flight = 0
+    peak = 0
+
+    async def slow_health_check(_key: str) -> HealthCheckResult:
+        nonlocal in_flight, peak
+        in_flight += 1
+        peak = max(peak, in_flight)
+        await asyncio.sleep(0.01)
+        in_flight -= 1
+        return HealthCheckResult(ok=True)
+
+    fake_provider = AsyncMock()
+    fake_provider.health_check.side_effect = slow_health_check
+    exhausted = await key_pool_service.list_all_keys_system_wide(status=KeyStatus.EXHAUSTED)
+
+    with patch("app.keys.service.get_provider", return_value=fake_provider), \
+         patch("app.keys.service.decrypt_key", return_value="plaintext-key"):
+        await key_pool_service.check_keys(exhausted, concurrency=1)
+
+    assert peak == 3
+
+
+@pytest.mark.asyncio
+async def test_check_keys_applies_delay_between_requests(key_repo, key_pool_service, test_user):
+    for i in range(3):
+        key = await key_repo.create(
+            user_id=test_user.id, label=f"k{i}", provider=ProviderType.GEMINI, key_encrypted=f"c{i}", daily_limit=100
+        )
+        await key_repo.mark_status(key.id, KeyStatus.EXHAUSTED, user_id=test_user.id)
+
+    fake_provider = AsyncMock()
+    fake_provider.health_check.return_value = HealthCheckResult(ok=True)
+    exhausted = await key_pool_service.list_all_keys_system_wide(status=KeyStatus.EXHAUSTED)
+
+    with patch("app.keys.service.get_provider", return_value=fake_provider), \
+         patch("app.keys.service.decrypt_key", return_value="plaintext-key"), \
+         patch("app.keys.service.asyncio.sleep", new_callable=AsyncMock) as sleep:
+        await key_pool_service.check_keys(exhausted, concurrency=1, delay_seconds=0.5)
+
+    assert sleep.await_count == 3
+    sleep.assert_awaited_with(0.5)
+
+
+@pytest.mark.asyncio
+async def test_check_keys_never_reactivates_disabled_key(key_repo, key_pool_service, test_user):
+    key = await key_repo.create(
+        user_id=test_user.id, label="k", provider=ProviderType.GEMINI, key_encrypted="c1", daily_limit=100
+    )
+    await key_repo.mark_status(key.id, KeyStatus.DISABLED, user_id=test_user.id)
+
+    fake_provider = AsyncMock()
+    fake_provider.health_check.return_value = HealthCheckResult(ok=True)
+    keys = await key_pool_service.list_all_keys_system_wide()
+
+    with patch("app.keys.service.get_provider", return_value=fake_provider), \
+         patch("app.keys.service.decrypt_key", return_value="plaintext-key"):
+        await key_pool_service.check_keys(keys)
+
+    assert (await key_repo.get(key.id, user_id=test_user.id)).status == KeyStatus.DISABLED
