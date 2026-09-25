@@ -102,9 +102,12 @@ async def test_health_check_exhausted_keys_passes_limits_from_settings():
     service.list_all_keys_system_wide.return_value = exhausted
     service.check_keys.return_value = []
 
-    with _patch_service(service), _patch_settings(
-        HOUSEKEEPING_HEALTH_CHECK_CONCURRENCY=5,
-        HOUSEKEEPING_HEALTH_CHECK_DELAY_SECONDS=1.5,
+    with (
+        _patch_service(service),
+        _patch_settings(
+            HOUSEKEEPING_HEALTH_CHECK_CONCURRENCY=5,
+            HOUSEKEEPING_HEALTH_CHECK_DELAY_SECONDS=1.5,
+        ),
     ):
         await tasks.health_check_exhausted_keys({})
 
@@ -121,7 +124,11 @@ async def test_health_check_exhausted_keys_logs_checked_and_revived(caplog):
         APIKeyHealthCheckResult(key_id=3, ok=True),
     ]
 
-    with _patch_service(service), _patch_settings(), caplog.at_level(logging.INFO, logger=tasks.logger.name):
+    with (
+        _patch_service(service),
+        _patch_settings(),
+        caplog.at_level(logging.INFO, logger=tasks.logger.name),
+    ):
         await tasks.health_check_exhausted_keys({})
 
     assert "checked 3, revived 2" in caplog.text
@@ -133,7 +140,11 @@ async def test_health_check_exhausted_keys_is_silent_when_no_exhausted_keys(capl
     service.list_all_keys_system_wide.return_value = []
     service.check_keys.return_value = []
 
-    with _patch_service(service), _patch_settings(), caplog.at_level(logging.INFO, logger=tasks.logger.name):
+    with (
+        _patch_service(service),
+        _patch_settings(),
+        caplog.at_level(logging.INFO, logger=tasks.logger.name),
+    ):
         await tasks.health_check_exhausted_keys({})
 
     assert caplog.text == ""
@@ -144,11 +155,13 @@ async def test_purge_old_monitoring_events_uses_retention_from_settings(caplog):
     sessionmaker_patch, session = _patch_sessionmaker()
     purge = AsyncMock(return_value=7)
 
-    with sessionmaker_patch, _patch_settings(REQUEST_EVENTS_RETENTION_DAYS=14), \
-         patch.object(tasks, "purge_old_request_events", purge), \
-         caplog.at_level(logging.INFO, logger=tasks.logger.name):
+    with (
+        sessionmaker_patch,
+        _patch_settings(REQUEST_EVENTS_RETENTION_DAYS=14),
+        patch.object(tasks, "purge_old_request_events", purge),
+        caplog.at_level(logging.INFO, logger=tasks.logger.name),
+    ):
         await tasks.purge_old_monitoring_events({})
 
     purge.assert_awaited_once_with(session, older_than=timedelta(days=14))
     assert "deleted 7 row(s)" in caplog.text
-

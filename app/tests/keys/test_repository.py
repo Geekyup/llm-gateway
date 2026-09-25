@@ -1,6 +1,7 @@
 from datetime import UTC, datetime, timedelta
 
 import pytest
+from sqlalchemy import event
 
 from app.core.exceptions import KeyNotFoundError
 from app.keys.enums import KeyStatus, ProviderType
@@ -146,13 +147,25 @@ async def test_clear_expired_cooldowns_only_touches_past_deadlines(key_repo, tes
 @pytest.mark.asyncio
 async def test_list_all_system_wide_filters_by_status_in_sql(key_repo, test_user, other_user):
     exhausted_mine = await key_repo.create(
-        user_id=test_user.id, label="e1", provider=ProviderType.GEMINI, key_encrypted="c1", daily_limit=100
+        user_id=test_user.id,
+        label="e1",
+        provider=ProviderType.GEMINI,
+        key_encrypted="c1",
+        daily_limit=100,
     )
     exhausted_theirs = await key_repo.create(
-        user_id=other_user.id, label="e2", provider=ProviderType.GROQ, key_encrypted="c2", daily_limit=100
+        user_id=other_user.id,
+        label="e2",
+        provider=ProviderType.GROQ,
+        key_encrypted="c2",
+        daily_limit=100,
     )
     active = await key_repo.create(
-        user_id=test_user.id, label="a", provider=ProviderType.GEMINI, key_encrypted="c3", daily_limit=100
+        user_id=test_user.id,
+        label="a",
+        provider=ProviderType.GEMINI,
+        key_encrypted="c3",
+        daily_limit=100,
     )
     await key_repo.mark_status(exhausted_mine.id, KeyStatus.EXHAUSTED, user_id=test_user.id)
     await key_repo.mark_status(exhausted_theirs.id, KeyStatus.EXHAUSTED, user_id=other_user.id)
@@ -166,15 +179,25 @@ async def test_list_all_system_wide_filters_by_status_in_sql(key_repo, test_user
 @pytest.mark.asyncio
 async def test_list_all_system_wide_combines_provider_and_status(key_repo, test_user):
     gemini = await key_repo.create(
-        user_id=test_user.id, label="g", provider=ProviderType.GEMINI, key_encrypted="c1", daily_limit=100
+        user_id=test_user.id,
+        label="g",
+        provider=ProviderType.GEMINI,
+        key_encrypted="c1",
+        daily_limit=100,
     )
     groq = await key_repo.create(
-        user_id=test_user.id, label="q", provider=ProviderType.GROQ, key_encrypted="c2", daily_limit=100
+        user_id=test_user.id,
+        label="q",
+        provider=ProviderType.GROQ,
+        key_encrypted="c2",
+        daily_limit=100,
     )
     await key_repo.mark_status(gemini.id, KeyStatus.EXHAUSTED, user_id=test_user.id)
     await key_repo.mark_status(groq.id, KeyStatus.EXHAUSTED, user_id=test_user.id)
 
-    result = await key_repo.list_all_system_wide(provider=ProviderType.GROQ, status=KeyStatus.EXHAUSTED)
+    result = await key_repo.list_all_system_wide(
+        provider=ProviderType.GROQ, status=KeyStatus.EXHAUSTED
+    )
 
     assert [k.id for k in result] == [groq.id]
 
@@ -182,12 +205,116 @@ async def test_list_all_system_wide_combines_provider_and_status(key_repo, test_
 @pytest.mark.asyncio
 async def test_list_all_system_wide_without_filters_returns_everything(key_repo, test_user):
     first = await key_repo.create(
-        user_id=test_user.id, label="a", provider=ProviderType.GEMINI, key_encrypted="c1", daily_limit=100
+        user_id=test_user.id,
+        label="a",
+        provider=ProviderType.GEMINI,
+        key_encrypted="c1",
+        daily_limit=100,
     )
     second = await key_repo.create(
-        user_id=test_user.id, label="b", provider=ProviderType.GROQ, key_encrypted="c2", daily_limit=100
+        user_id=test_user.id,
+        label="b",
+        provider=ProviderType.GROQ,
+        key_encrypted="c2",
+        daily_limit=100,
     )
 
     result = await key_repo.list_all_system_wide()
 
     assert [k.id for k in result] == [first.id, second.id]
+
+
+def _record_statements(db_session) -> list[str]:
+    statements: list[str] = []
+    event.listen(
+        db_session.bind.sync_engine,
+        "before_cursor_execute",
+        lambda conn, cursor, statement, *args: statements.append(statement),
+    )
+    return statements
+
+
+async def _create_exhausted_key(key_repo, user, label, provider=ProviderType.GEMINI):
+    key = await key_repo.create(
+        user_id=user.id,
+        label=label,
+        provider=provider,
+        key_encrypted="c",
+        daily_limit=100,
+    )
+    await key_repo.increment_usage(key.id, user_id=user.id)
+    await key_repo.mark_status(key.id, KeyStatus.EXHAUSTED, user_id=user.id)
+    return key
+
+
+@pytest.mark.asyncio
+async def test_reset_daily_counters_runs_a_single_update(key_repo, db_session, test_user):
+    keys = [await _create_exhausted_key(key_repo, test_user, f"k{i}") for i in range(3)]
+    statements = _record_statements(db_session)
+
+    affected = await key_repo.reset_daily_counters()
+
+    assert [k.id for k in affected] == [k.id for k in keys]
+    assert len(statements) == 1
+    assert statements[0].lstrip().upper().startswith("UPDATE")
+    assert all(k.status == KeyStatus.ACTIVE and k.requests_today == 0 for k in affected)
+
+
+@pytest.mark.asyncio
+async def test_reset_daily_counters_filters_by_provider(key_repo, test_user):
+    gemini = await _create_exhausted_key(key_repo, test_user, "g", ProviderType.GEMINI)
+    groq = await _create_exhausted_key(key_repo, test_user, "q", ProviderType.GROQ)
+
+    affected = await key_repo.reset_daily_counters(provider=ProviderType.GROQ)
+
+    assert [k.id for k in affected] == [groq.id]
+    assert (await key_repo.get(gemini.id, user_id=test_user.id)).status == KeyStatus.EXHAUSTED
+    assert (await key_repo.get(groq.id, user_id=test_user.id)).status == KeyStatus.ACTIVE
+
+
+@pytest.mark.asyncio
+async def test_reset_daily_counters_returns_empty_when_nothing_to_reset(key_repo, test_user):
+    key = await key_repo.create(
+        user_id=test_user.id,
+        label="k",
+        provider=ProviderType.GEMINI,
+        key_encrypted="c",
+        daily_limit=100,
+    )
+    await key_repo.mark_status(key.id, KeyStatus.DISABLED, user_id=test_user.id)
+
+    assert await key_repo.reset_daily_counters() == []
+
+
+@pytest.mark.asyncio
+async def test_clear_expired_cooldowns_runs_a_single_update(key_repo, db_session, test_user):
+    now = datetime.now(UTC)
+    keys = []
+    for i in range(3):
+        key = await key_repo.create(
+            user_id=test_user.id,
+            label=f"k{i}",
+            provider=ProviderType.GEMINI,
+            key_encrypted="c",
+            daily_limit=100,
+        )
+        await key_repo.mark_status(
+            key.id,
+            KeyStatus.COOLDOWN,
+            user_id=test_user.id,
+            cooldown_until=now - timedelta(minutes=1),
+        )
+        keys.append(key)
+    statements = _record_statements(db_session)
+
+    affected = await key_repo.clear_expired_cooldowns(now=now)
+
+    assert [k.id for k in affected] == [k.id for k in keys]
+    assert len(statements) == 1
+    assert statements[0].lstrip().upper().startswith("UPDATE")
+    assert all(k.status == KeyStatus.ACTIVE and k.cooldown_until is None for k in affected)
+
+
+@pytest.mark.asyncio
+async def test_clear_expired_cooldowns_returns_empty_when_nothing_expired(key_repo, test_user):
+    assert await key_repo.clear_expired_cooldowns() == []

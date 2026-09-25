@@ -116,46 +116,30 @@ class APIKeyRepository:
         return result.rowcount > 0
 
     async def reset_daily_counters(self, provider: ProviderType | None = None) -> list[APIKey]:
-        query = select(APIKey).where(
-            APIKey.status.in_([KeyStatus.COOLDOWN, KeyStatus.EXHAUSTED, KeyStatus.ACTIVE])
-        )
-        if provider is not None:
-            query = query.where(APIKey.provider == provider)
-        result = await self._session.execute(query)
-        affected = list(result.scalars().all())
-        if not affected:
-            return []
-
-        await self._session.execute(
+        statement = (
             update(APIKey)
-            .where(APIKey.id.in_([key.id for key in affected]))
+            .where(APIKey.status.in_([KeyStatus.COOLDOWN, KeyStatus.EXHAUSTED, KeyStatus.ACTIVE]))
             .values(requests_today=0, status=KeyStatus.ACTIVE, cooldown_until=None)
+            .returning(APIKey)
             .execution_options(synchronize_session="fetch")
         )
-        await self._session.commit()
-        for key in affected:
-            key.requests_today = 0
-            key.status = KeyStatus.ACTIVE
-            key.cooldown_until = None
-        return affected
+        if provider is not None:
+            statement = statement.where(APIKey.provider == provider)
+        return await self._execute_bulk_update(statement)
 
     async def clear_expired_cooldowns(self, now: datetime | None = None) -> list[APIKey]:
         now = now or datetime.now(UTC)
-        result = await self._session.execute(
-            select(APIKey).where(APIKey.status == KeyStatus.COOLDOWN, APIKey.cooldown_until <= now)
-        )
-        affected = list(result.scalars().all())
-        if not affected:
-            return []
-
-        await self._session.execute(
+        statement = (
             update(APIKey)
-            .where(APIKey.id.in_([key.id for key in affected]))
+            .where(APIKey.status == KeyStatus.COOLDOWN, APIKey.cooldown_until <= now)
             .values(status=KeyStatus.ACTIVE, cooldown_until=None)
+            .returning(APIKey)
             .execution_options(synchronize_session="fetch")
         )
+        return await self._execute_bulk_update(statement)
+
+    async def _execute_bulk_update(self, statement) -> list[APIKey]:
+        result = await self._session.execute(statement)
+        affected = list(result.scalars().all())
         await self._session.commit()
-        for key in affected:
-            key.status = KeyStatus.ACTIVE
-            key.cooldown_until = None
-        return affected
+        return sorted(affected, key=lambda key: key.id)

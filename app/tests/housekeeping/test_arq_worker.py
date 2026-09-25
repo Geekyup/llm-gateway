@@ -32,3 +32,10 @@ def test_all_four_housekeeping_jobs_are_registered():
         "cron:health_check_exhausted_keys",
         "cron:purge_old_monitoring_events",
     }
+
+
+def test_health_check_job_has_explicit_timeout_from_settings():
+    job = _cron_by_name(arq_worker.WorkerSettings)["cron:health_check_exhausted_keys"]
+
+    assert job.timeout_s == 1500
+
