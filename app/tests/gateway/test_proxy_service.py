@@ -137,13 +137,14 @@ async def test_first_key_succeeds_no_retry(key_pool, test_user, _patch_registry)
     _patch_registry(provider)
     gateway = GatewayService(key_pool, max_attempts=3)
 
-    response = await gateway.proxy_request(
+    response, answered_by = await gateway.proxy_request(
         user_id=test_user.id,
         build_request=_build_request(path="v1beta/models/gemini-1.5-flash:generateContent", payload={"hello": "world"}),
         provider_type=ProviderType.GEMINI,
     )
 
     assert response.status_code == 200
+    assert answered_by == ProviderType.GEMINI
     assert len(provider.calls) == 1
 
 
@@ -155,13 +156,14 @@ async def test_429_triggers_failover_to_second_key(key_pool, test_user, _patch_r
     _patch_registry(provider)
     gateway = GatewayService(key_pool, max_attempts=3)
 
-    response = await gateway.proxy_request(
+    response, answered_by = await gateway.proxy_request(
         user_id=test_user.id,
         build_request=_build_request(),
         provider_type=ProviderType.GEMINI,
     )
 
     assert response.status_code == 200
+    assert answered_by == ProviderType.GEMINI
     assert len(provider.calls) == 2
     assert provider.calls[0] != provider.calls[1]
 
@@ -204,13 +206,14 @@ async def test_exhausted_key_marked_and_skipped_next_call(key_pool, test_user, _
     _patch_registry(provider)
     gateway = GatewayService(key_pool, max_attempts=3)
 
-    response = await gateway.proxy_request(
+    response, answered_by = await gateway.proxy_request(
         user_id=test_user.id,
         build_request=_build_request(),
         provider_type=ProviderType.GEMINI,
     )
 
     assert response.status_code == 200
+    assert answered_by == ProviderType.GEMINI
     keys = await key_pool.list_keys(test_user.id, provider=ProviderType.GEMINI)
     statuses = sorted(k.status.value for k in keys)
     assert statuses == ["active", "exhausted"]
@@ -336,13 +339,14 @@ async def test_no_publisher_configured_does_not_raise(key_pool, test_user, _patc
     _patch_registry(provider)
     gateway = GatewayService(key_pool, max_attempts=3)
 
-    response = await gateway.proxy_request(
+    response, answered_by = await gateway.proxy_request(
         user_id=test_user.id,
         build_request=_build_request(),
         provider_type=ProviderType.GEMINI,
     )
 
     assert response.status_code == 200
+    assert answered_by == ProviderType.GEMINI
 
 
 @pytest.mark.asyncio
@@ -374,13 +378,14 @@ async def test_missing_usage_metadata_does_not_raise(key_pool, db_session, test_
     publisher = RequestEventPublisher(session=db_session)
     gateway = GatewayService(key_pool, max_attempts=3, event_publisher=publisher)
 
-    response = await gateway.proxy_request(
+    response, answered_by = await gateway.proxy_request(
         user_id=test_user.id,
         build_request=_build_request(),
         provider_type=ProviderType.GEMINI,
     )
 
     assert response.status_code == 200
+    assert answered_by == ProviderType.GEMINI
     events = await _recent_events(db_session, test_user.id)
     assert events[0].prompt_tokens is None
     assert events[0].completion_tokens is None
@@ -428,13 +433,14 @@ async def test_cross_provider_failover_rebuilds_request_per_attempt(key_pool, te
         return UpstreamRequestSpec(path="v1/chat/completions", method="POST", payload={"openrouter": True}, headers={})
 
     gateway = GatewayService(key_pool, max_attempts=5)
-    response = await gateway.proxy_request(
+    response, answered_by = await gateway.proxy_request(
         user_id=test_user.id,
         build_request=build_request,
         provider_type=None,
     )
 
     assert response.status_code == 200
+    assert answered_by == ProviderType.OPENROUTER
     assert seen_provider_types == [ProviderType.GEMINI, ProviderType.OPENROUTER]
     assert gemini_provider.calls == ["raw-gem"]
     assert openrouter_provider.calls == ["raw-or"]
@@ -456,8 +462,9 @@ async def test_stream_success_emits_no_event_before_tokens_recorded(key_pool, db
         user_id=test_user.id,
         build_request=_build_request(),
         provider_type=ProviderType.GEMINI,
-    ) as (response, record_tokens):
+    ) as (response, record_tokens, answered_by):
         assert response.status_code == 200
+        assert answered_by == ProviderType.GEMINI
         events = await _recent_events(db_session, test_user.id)
         assert events == []
 
@@ -485,8 +492,9 @@ async def test_stream_never_records_tokens_if_caller_does_not_call_it(
         user_id=test_user.id,
         build_request=_build_request(),
         provider_type=ProviderType.GEMINI,
-    ) as (response, _record_tokens):
+    ) as (response, _record_tokens, answered_by):
         assert response.status_code == 200
+        assert answered_by == ProviderType.GEMINI
 
     events = await _recent_events(db_session, test_user.id)
     assert events == []
@@ -504,8 +512,9 @@ async def test_stream_429_triggers_failover_to_second_key(key_pool, test_user, _
         user_id=test_user.id,
         build_request=_build_request(),
         provider_type=ProviderType.GEMINI,
-    ) as (response, record_tokens):
+    ) as (response, record_tokens, answered_by):
         assert response.status_code == 200
+        assert answered_by == ProviderType.GEMINI
         await record_tokens(None, None, None)
 
     assert len(provider.calls) == 2

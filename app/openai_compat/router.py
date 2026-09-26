@@ -129,7 +129,7 @@ async def _handle_non_streaming(
     build_request,
 ):
     try:
-        upstream_response = await gateway.proxy_request(
+        upstream_response, answered_by = await gateway.proxy_request(
             user_id=user_id,
             build_request=build_request,
             provider_type=provider_type,
@@ -150,7 +150,7 @@ async def _handle_non_streaming(
         return _openai_error(upstream_response.status_code, str(detail), "upstream_error")
 
     upstream_body = upstream_response.json()
-    is_gemini_shape = "candidates" in upstream_body or "usageMetadata" in upstream_body
+    is_gemini_shape = answered_by is ProviderType.GEMINI
     if is_gemini_shape:
         openai_response = gemini_response_to_openai(
             upstream_body, model=requested_model or default_gemini_model
@@ -227,7 +227,7 @@ async def _open_and_relay_stream(
         build_request=build_request,
         provider_type=provider_type,
         model=requested_model,
-    ) as (upstream_response, record_tokens):
+    ) as (upstream_response, record_tokens, answered_by):
         if upstream_response.status_code >= 400:
             body = await upstream_response.aread()
             try:
@@ -236,7 +236,7 @@ async def _open_and_relay_stream(
                 detail = body.decode(errors="replace")
             raise _UpstreamErrorSignal(upstream_response.status_code, str(detail))
 
-        is_gemini = "streamGenerateContent" in str(upstream_response.request.url)
+        is_gemini = answered_by is ProviderType.GEMINI
         usage: dict[str, int | None] = {"prompt_tokens": None, "completion_tokens": None, "total_tokens": None}
         if is_gemini:
             relay = _relay_gemini_stream(

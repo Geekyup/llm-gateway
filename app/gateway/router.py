@@ -35,7 +35,7 @@ async def _proxy_impl(
     def build_request(_dto: APIKeyDTO) -> UpstreamRequestSpec:
         return UpstreamRequestSpec(path=path, method=method, payload=payload, headers=headers)
 
-    upstream_response = await gateway.proxy_request(
+    upstream_response, _ = await gateway.proxy_request(
         user_id=user_id,
         build_request=build_request,
         provider_type=provider_type,

@@ -18,16 +18,22 @@ def _fake_dto(provider: ProviderType, model: str | None = None) -> APIKeyDTO:
 
 
 class RecordingGateway:
-    def __init__(self, response: httpx.Response | None = None, raise_: Exception | None = None) -> None:
+    def __init__(
+        self,
+        response: httpx.Response | None = None,
+        raise_: Exception | None = None,
+        answered_by: ProviderType = ProviderType.GEMINI,
+    ) -> None:
         self.response = response
         self.raise_ = raise_
+        self.answered_by = answered_by
         self.calls: list[dict] = []
 
     async def proxy_request(self, **kwargs):
         self.calls.append(kwargs)
         if self.raise_:
             raise self.raise_
-        return self.response
+        return self.response, self.answered_by
 
 
 class RecordingStreamGateway:
@@ -38,11 +44,13 @@ class RecordingStreamGateway:
         body_lines: list[str] | None = None,
         upstream_url: str = "http://upstream/v1/chat/completions",
         raise_: Exception | None = None,
+        answered_by: ProviderType = ProviderType.OPENROUTER,
     ) -> None:
         self.status_code = status_code
         self.body_lines = body_lines or []
         self.upstream_url = upstream_url
         self.raise_ = raise_
+        self.answered_by = answered_by
         self.calls: list[dict] = []
         self.recorded_tokens: list[tuple] = []
 
@@ -68,7 +76,7 @@ class _FakeStreamCtx:
         async def record_tokens(prompt_tokens, completion_tokens, total_tokens):
             self._gateway.recorded_tokens.append((prompt_tokens, completion_tokens, total_tokens))
 
-        return response, record_tokens
+        return response, record_tokens, self._gateway.answered_by
 
     async def __aexit__(self, *exc_info) -> None:
         return None
@@ -109,7 +117,10 @@ async def test_explicit_gemini_provider_scopes_pool_search():
 
 @pytest.mark.asyncio
 async def test_explicit_openrouter_provider_passes_payload_through():
-    gateway = RecordingGateway(httpx.Response(200, json={"id": "gen-1", "choices": [], "usage": {}}))
+    gateway = RecordingGateway(
+        httpx.Response(200, json={"id": "gen-1", "choices": [], "usage": {}}),
+        answered_by=ProviderType.OPENROUTER,
+    )
     request = ChatCompletionRequest(
         model="openai/gpt-4o-mini",
         messages=[ChatMessage(role="user", content="hi")],
@@ -146,7 +157,10 @@ async def test_key_pinned_model_wins_over_request_model():
 
 @pytest.mark.asyncio
 async def test_no_model_no_provider_falls_back_to_default_model_for_openrouter_key():
-    gateway = RecordingGateway(httpx.Response(200, json={"id": "gen-1", "choices": [], "usage": {}}))
+    gateway = RecordingGateway(
+        httpx.Response(200, json={"id": "gen-1", "choices": [], "usage": {}}),
+        answered_by=ProviderType.OPENROUTER,
+    )
     request = ChatCompletionRequest(messages=[ChatMessage(role="user", content="hi")])
 
     await chat_completions(request, gateway=gateway, user_id=1)
@@ -162,7 +176,7 @@ async def test_no_model_no_provider_falls_back_to_default_model_for_openrouter_k
 @pytest.mark.asyncio
 async def test_openrouter_response_passed_through_unmodified():
     upstream_body = {"id": "gen-1", "choices": [{"message": {"role": "assistant", "content": "hey"}}], "usage": {"total_tokens": 5}}
-    gateway = RecordingGateway(httpx.Response(200, json=upstream_body))
+    gateway = RecordingGateway(httpx.Response(200, json=upstream_body), answered_by=ProviderType.OPENROUTER)
     request = ChatCompletionRequest(model="openai/gpt-4o-mini", messages=[ChatMessage(role="user", content="hi")], provider="openrouter")
 
     response = await chat_completions(request, gateway=gateway, user_id=1)
@@ -253,6 +267,7 @@ async def test_stream_gemini_records_tokens_from_usage_metadata():
         status_code=200,
         body_lines=body_lines,
         upstream_url="http://upstream/v1beta/models/gemini-1.5-flash:streamGenerateContent?alt=sse",
+        answered_by=ProviderType.GEMINI,
     )
     request = ChatCompletionRequest(
         model="gemini-1.5-flash",

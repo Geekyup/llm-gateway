@@ -227,7 +227,7 @@ class GatewayService:
         build_request: RequestSpecBuilder,
         provider_type: ProviderType | None = None,
         model: str | None = None,
-    ) -> httpx.Response:
+    ) -> tuple[httpx.Response, ProviderType]:
         request_id = uuid.uuid4().hex
         tried_key_ids: set[int] = set()
         last_response: httpx.Response | None = None
@@ -297,7 +297,7 @@ class GatewayService:
                 total_tokens=total_tokens,
                 model=effective_model,
             )
-            return response
+            return response, key_provider_type
 
         provider_label = last_provider_type.value if last_provider_type is not None else "any"
         if last_response is not None:
@@ -313,7 +313,7 @@ class GatewayService:
         build_request: RequestSpecBuilder,
         provider_type: ProviderType | None = None,
         model: str | None = None,
-    ) -> AsyncIterator[tuple[httpx.Response, TokenRecorder]]:
+    ) -> AsyncIterator[tuple[httpx.Response, TokenRecorder, ProviderType]]:
         request_id = uuid.uuid4().hex
         tried_key_ids: set[int] = set()
         last_status: int | None = None
@@ -396,7 +396,7 @@ class GatewayService:
                         model=_model,
                     )
 
-                yield response, record_tokens
+                yield response, record_tokens, key_provider_type
                 return
 
         provider_label = last_provider_type.value if last_provider_type is not None else "any"
