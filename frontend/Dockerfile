@@ -18,4 +18,4 @@ COPY --from=build /app/dist /usr/share/nginx/html
 
 COPY --from=build /app/nginx.conf.template /etc/nginx/templates/default.conf.template
 
-EXPOSE 8080
+EXPOSE 8000
