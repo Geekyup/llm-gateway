@@ -1,4 +1,4 @@
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 
 from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -28,8 +28,10 @@ class GatewayTokenRepository:
             raise GatewayTokenNotFoundError(token_id=token_id)
         return token
 
-    async def get_by_hash(self, token_hash: str) -> GatewayToken | None:
-        stmt = select(GatewayToken).where(GatewayToken.token_hash == token_hash)
+    async def get_active_by_hash(self, token_hash: str) -> GatewayToken | None:
+        stmt = select(GatewayToken).where(
+            GatewayToken.token_hash == token_hash, GatewayToken.is_active.is_(True)
+        )
         result = await self._session.execute(stmt)
         return result.scalar_one_or_none()
 
@@ -50,12 +52,16 @@ class GatewayTokenRepository:
         await self._session.delete(token)
         await self._session.commit()
 
-    async def touch_last_used(self, token_id: int) -> None:
+    async def touch_last_used(self, token_id: int, *, stale_after: timedelta) -> None:
+        now = datetime.now(UTC)
         stmt = (
             update(GatewayToken)
-            .where(GatewayToken.id == token_id)
-            .values(last_used_at=datetime.now(UTC))
-            .execution_options(synchronize_session=False)
+            .where(
+                GatewayToken.id == token_id,
+                (GatewayToken.last_used_at.is_(None)) | (GatewayToken.last_used_at <= now - stale_after),
+            )
+            .values(last_used_at=now)
+            .execution_options(synchronize_session="fetch")
         )
         await self._session.execute(stmt)
         await self._session.commit()

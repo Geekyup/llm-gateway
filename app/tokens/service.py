@@ -1,6 +1,7 @@
 import hashlib
 import logging
 import secrets
+from datetime import timedelta
 
 from app.tokens.models import GatewayToken
 from app.tokens.repository import GatewayTokenRepository
@@ -10,6 +11,7 @@ logger = logging.getLogger(__name__)
 
 _TOKEN_PREFIX = "gwk"  
 _TOKEN_NBYTES = 32  
+_LAST_USED_STALE_AFTER = timedelta(minutes=5)  
 
 
 def _hash_token(plaintext: str) -> str:
@@ -44,8 +46,8 @@ class GatewayTokenService:
         await self._repo.delete(token_id, user_id=user_id)
 
     async def authenticate(self, plaintext: str) -> int | None:
-        token = await self._repo.get_by_hash(_hash_token(plaintext))
-        if token is None or not token.is_active:
+        token = await self._repo.get_active_by_hash(_hash_token(plaintext))
+        if token is None:
             return None
-        await self._repo.touch_last_used(token.id)
+        await self._repo.touch_last_used(token.id, stale_after=_LAST_USED_STALE_AFTER)
         return token.user_id
