@@ -3,6 +3,10 @@ from typing import ClassVar
 from arq import cron
 from arq.connections import RedisSettings
 
+import app.auth.models
+import app.keys.models
+import app.monitoring.models
+import app.tokens.models  # noqa: F401
 from app.config import get_settings
 from app.core.logging import configure_logging
 from app.housekeeping.tasks import (
