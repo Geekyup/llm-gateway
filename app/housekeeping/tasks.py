@@ -7,7 +7,7 @@ from app.db.redis import get_redis
 from app.db.session import get_sessionmaker
 from app.keys.enums import KeyStatus
 from app.keys.factory import build_key_pool_service
-from app.monitoring.publisher import purge_old_request_events
+from app.monitoring.publisher import drain_event_queue, purge_old_request_events
 
 logger = logging.getLogger(__name__)
 
@@ -51,6 +51,17 @@ async def health_check_exhausted_keys(ctx: dict) -> None:
     if exhausted:
         revived = sum(1 for result in results if result.ok)
         logger.info("health_check_exhausted_keys: checked %d, revived %d", len(exhausted), revived)
+
+
+async def flush_monitoring_events(ctx: dict) -> None:
+    redis = get_redis()
+    session_factory = get_sessionmaker()
+
+    async with session_factory() as session:
+        inserted = await drain_event_queue(redis, session)
+
+    if inserted:
+        logger.info("flush_monitoring_events: inserted %d event(s)", inserted)
 
 
 async def purge_old_monitoring_events(ctx: dict) -> None:

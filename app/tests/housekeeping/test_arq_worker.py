@@ -23,13 +23,14 @@ def test_reset_daily_limits_uses_minute_from_settings(monkeypatch):
         importlib.reload(arq_worker)
 
 
-def test_all_four_housekeeping_jobs_are_registered():
+def test_all_housekeeping_jobs_are_registered():
     names = set(_cron_by_name(arq_worker.WorkerSettings))
 
     assert names == {
         "cron:clear_expired_cooldowns",
         "cron:reset_daily_limits",
         "cron:health_check_exhausted_keys",
+        "cron:flush_monitoring_events",
         "cron:purge_old_monitoring_events",
     }
 

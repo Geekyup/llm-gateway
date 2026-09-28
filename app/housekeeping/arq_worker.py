@@ -7,6 +7,7 @@ from app.config import get_settings
 from app.core.logging import configure_logging
 from app.housekeeping.tasks import (
     clear_expired_cooldowns,
+    flush_monitoring_events,
     health_check_exhausted_keys,
     purge_old_monitoring_events,
     reset_daily_limits,
@@ -40,5 +41,6 @@ class WorkerSettings:
             run_at_startup=True,
             timeout=get_settings().HOUSEKEEPING_HEALTH_CHECK_TIMEOUT_SECONDS,
         ),
+        cron(flush_monitoring_events, minute=set(range(60)), run_at_startup=True),
         cron(purge_old_monitoring_events, hour=3, minute=0),
     ]

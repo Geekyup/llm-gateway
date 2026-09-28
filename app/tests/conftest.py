@@ -9,6 +9,7 @@ os.environ.setdefault("SESSION_SECRET_KEY", "test-session-secret-key")
 
 import pytest
 import pytest_asyncio
+from sqlalchemy import event
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
 from app.auth.models import User
@@ -18,9 +19,36 @@ from app.keys.repository import APIKeyRepository
 from app.tokens.repository import GatewayTokenRepository
 
 
+def _register_date_trunc(dbapi_connection, connection_record) -> None:
+    """Make Postgres's date_trunc('day', ts) work against the SQLite test DB.
+
+    Production runs on Postgres, which has date_trunc natively (see
+    app.monitoring.publisher). SQLite doesn't, so queries that group by day
+    (daily_timeseries, tokens_by_provider_daily, latency_percentiles_daily's
+    day bucketing) would fail on every DB-backed test without this. Only
+    "day" truncation is implemented since that's the only granularity the
+    codebase currently uses.
+
+    Note: this does NOT make percentile_cont/WITHIN GROUP work — that's
+    genuine PostgreSQL syntax with no SQLite equivalent, UDF or otherwise.
+    Tests that need it are skipped with an explanation (see test_publisher.py).
+    """
+
+    def date_trunc(part: str, value: str | None) -> str | None:
+        if value is None:
+            return None
+        if part == "day":
+            return str(value)[:10] + " 00:00:00"
+        raise NotImplementedError(f"date_trunc granularity {part!r} not supported by the SQLite test shim")
+
+    dbapi_connection.create_function("date_trunc", 2, date_trunc)
+
+
 @pytest_asyncio.fixture
 async def db_session() -> AsyncSession:
     engine = create_async_engine("sqlite+aiosqlite:///:memory:")
+    event.listen(engine.sync_engine, "connect", _register_date_trunc)
+
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
 
@@ -83,6 +111,9 @@ class FakePipeline:
     def ltrim(self, key: str, start: int, end: int) -> None:
         self._ops.append(("ltrim", (key, start, end)))
 
+    def rpop(self, key: str) -> None:
+        self._ops.append(("rpop", (key,)))
+
     async def execute(self) -> list:
         results = []
         for name, args in self._ops:
@@ -131,6 +162,12 @@ class FakeRedis:
         if end == -1:
             return items[start:]
         return items[start : end + 1]
+
+    async def rpop(self, key: str) -> str | None:
+        items = self._lists.get(key)
+        if not items:
+            return None
+        return items.pop()
 
     def pipeline(self, transaction: bool = True) -> FakePipeline:
         return FakePipeline(self)

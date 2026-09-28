@@ -1,8 +1,9 @@
 import logging
 from datetime import UTC, datetime, timedelta
 
+from redis.asyncio import Redis
+from sqlalchemy import DateTime, delete, func, select
 from sqlalchemy import case as sa_case
-from sqlalchemy import delete, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.monitoring.models import RequestEventRecord
@@ -25,48 +26,55 @@ _ACTIVITY_RANGE_DAYS: dict[ActivityRange, int] = {
     "30d": 30,
 }
 
+# Outcomes that represent an actual upstream call attempt (i.e. we had a key
+# and got a response, successful or not). Excludes "no_keys"/"upstream_exhausted"
+# (rejected before ever reaching a provider) and generic "error". Used
+# consistently by every aggregation below so total counts agree with each other.
 _ATTEMPTED_OUTCOMES = ("success", "rate_limited", "exhausted")
+
+# Redis key the gateway path pushes events onto. A single list, consumed in
+# batches by the housekeeping worker (see app.housekeeping.tasks.flush_monitoring_events).
+EVENTS_QUEUE_KEY = "monitoring:events:queue"
+
+# Hard cap on how many raw events one publisher will let queue up before it
+# starts dropping the oldest ones. Protects Redis memory if the consumer job
+# falls behind or stops running; sized generously above one flush interval's
+# expected volume. Existing entries beyond this are trimmed on push.
+_MAX_QUEUE_LENGTH = 200_000
 
 
 class RequestEventPublisher:
-    def __init__(self, session: AsyncSession | None = None) -> None:
+    """Publishes gateway request events and reads back aggregated stats.
+
+    Writing and reading are split by design: `publish()` never touches
+    Postgres directly, it only pushes onto a Redis list — the actual INSERT
+    happens later, in a batch, in a background worker (see
+    `app.housekeeping.tasks.flush_monitoring_events`). This keeps the
+    request/response hot path of `GatewayService` free of a DB round-trip per
+    upstream attempt. Every read method below (`activity_summary`,
+    `daily_timeseries`, etc.) still needs a `session`, since those query the
+    already-persisted rows in `request_events`.
+    """
+
+    def __init__(self, session: AsyncSession | None = None, redis: Redis | None = None) -> None:
         self._session = session
+        self._redis = redis
 
     async def publish(self, event: RequestEvent) -> None:
-        if self._session is None:
+        if self._redis is None:
             return
         try:
-            await self._persist(event)
+            async with self._redis.pipeline(transaction=True) as pipe:
+                pipe.lpush(EVENTS_QUEUE_KEY, event.model_dump_json())
+                pipe.ltrim(EVENTS_QUEUE_KEY, 0, _MAX_QUEUE_LENGTH - 1)
+                await pipe.execute()
         except Exception:
+            # Monitoring must never take down the gateway's actual request
+            # path — losing a handful of analytics events is fine, failing
+            # the user's LLM call because Redis hiccuped is not.
             logger.warning(
-                "failed to persist monitoring event request_id=%s", event.request_id, exc_info=True
+                "failed to enqueue monitoring event request_id=%s", event.request_id, exc_info=True
             )
-
-    async def _persist(self, event: RequestEvent) -> None:
-        assert self._session is not None
-        self._session.add(
-            RequestEventRecord(
-                user_id=event.user_id,
-                key_id=event.key_id,
-                request_id=event.request_id,
-                attempt=event.attempt,
-                timestamp=event.timestamp,
-                provider=event.provider,
-                path=event.path,
-                method=event.method,
-                key_label=event.key_label,
-                model=event.model,
-                upstream_status=event.upstream_status,
-                outcome=event.outcome,
-                latency_ms=event.latency_ms,
-                is_retry=event.is_retry,
-                error_detail=event.error_detail,
-                prompt_tokens=event.prompt_tokens,
-                completion_tokens=event.completion_tokens,
-                total_tokens=event.total_tokens,
-            )
-        )
-        await self._session.commit()
 
     async def hourly_usage_for_key(self, user_id: int, key_id: int) -> list[int]:
         assert self._session is not None, "hourly aggregation requires a DB session"
@@ -77,7 +85,7 @@ class RequestEventPublisher:
             .where(
                 RequestEventRecord.user_id == user_id,
                 RequestEventRecord.key_id == key_id,
-                RequestEventRecord.outcome.in_(("success", "rate_limited", "exhausted")),
+                RequestEventRecord.outcome.in_(_ATTEMPTED_OUTCOMES),
                 RequestEventRecord.timestamp >= start,
                 RequestEventRecord.timestamp < end,
             )
@@ -88,7 +96,9 @@ class RequestEventPublisher:
             counts[int(hour)] = count
         return counts
 
-    async def hourly_token_usage_for_key(self, user_id: int, key_id: int) -> list[tuple[int, int, int]]:
+    async def hourly_token_usage_for_key(
+        self, user_id: int, key_id: int
+    ) -> list[tuple[int, int, int]]:
         assert self._session is not None, "hourly aggregation requires a DB session"
         prompt = [0] * 24
         completion = [0] * 24
@@ -147,7 +157,9 @@ class RequestEventPublisher:
 
         stmt = select(
             func.count().label("total"),
-            func.sum(sa_case((RequestEventRecord.outcome == "success", 1), else_=0)).label("success"),
+            func.sum(sa_case((RequestEventRecord.outcome == "success", 1), else_=0)).label(
+                "success"
+            ),
             func.percentile_cont(0.5)
             .within_group(RequestEventRecord.latency_ms.asc())
             .label("p50"),
@@ -180,53 +192,78 @@ class RequestEventPublisher:
             "total_tokens": int(total_tokens),
         }
 
-    async def daily_timeseries(self, user_id: int, range_: ActivityRange) -> list[DailyOutcomeBucket]:
+    async def daily_timeseries(
+        self, user_id: int, range_: ActivityRange
+    ) -> list[DailyOutcomeBucket]:
         assert self._session is not None, "activity aggregation requires a DB session"
 
         days = _ACTIVITY_RANGE_DAYS[range_]
         start_date, day_labels = _day_window_utc(days)
 
-        day_expr = func.date_trunc("day", RequestEventRecord.timestamp)
+        day_expr = func.date_trunc("day", RequestEventRecord.timestamp, type_=DateTime)
         stmt = (
             select(day_expr.label("day"), RequestEventRecord.outcome, func.count())
             .where(
                 RequestEventRecord.user_id == user_id,
+                # Same filter as activity_summary/latency_percentiles_daily: only
+                # count attempts that actually reached a provider. Previously this
+                # method counted every outcome (including no_keys/upstream_exhausted,
+                # which activity_summary's total_requests excludes), so the two
+                # endpoints' totals for the same range could disagree.
+                RequestEventRecord.outcome.in_(_ATTEMPTED_OUTCOMES),
                 RequestEventRecord.timestamp >= start_date,
             )
             .group_by("day", RequestEventRecord.outcome)
         )
         rows = await self._session.execute(stmt)
 
-        by_day: dict[str, dict[str, int]] = {label: {"success": 0, "rate_limited": 0, "error": 0} for label in day_labels}
+        # "error" (hard failures: no_keys, upstream_exhausted, provider errors) is
+        # kept as a zeroed-out field for API/schema stability rather than removed
+        # outright — the _ATTEMPTED_OUTCOMES filter above means no row can ever
+        # populate it today. If a future outcome should count as a per-day
+        # "error" bucket, add it to the query filter and this branch together.
+        by_day: dict[str, dict[str, int]] = {
+            label: {"success": 0, "rate_limited": 0, "error": 0} for label in day_labels
+        }
         for day, outcome, count in rows:
             label = day.date().isoformat()
             bucket = by_day.setdefault(label, {"success": 0, "rate_limited": 0, "error": 0})
             if outcome == "success":
                 bucket["success"] += count
-            elif outcome in ("rate_limited", "exhausted"):
-                bucket["rate_limited"] += count
             else:
-                bucket["error"] += count
+                bucket["rate_limited"] += count
 
         return [
-            DailyOutcomeBucket(date=label, success=by_day[label]["success"],
-                                rate_limited=by_day[label]["rate_limited"], error=by_day[label]["error"])
+            DailyOutcomeBucket(
+                date=label,
+                success=by_day[label]["success"],
+                rate_limited=by_day[label]["rate_limited"],
+                error=by_day[label]["error"],
+            )
             for label in day_labels
         ]
 
-    async def latency_percentiles_daily(self, user_id: int, range_: ActivityRange) -> list[LatencyPercentileBucket]:
+    async def latency_percentiles_daily(
+        self, user_id: int, range_: ActivityRange
+    ) -> list[LatencyPercentileBucket]:
         assert self._session is not None, "activity aggregation requires a DB session"
 
         days = _ACTIVITY_RANGE_DAYS[range_]
         start_date, day_labels = _day_window_utc(days)
 
-        day_expr = func.date_trunc("day", RequestEventRecord.timestamp)
+        day_expr = func.date_trunc("day", RequestEventRecord.timestamp, type_=DateTime)
         stmt = (
             select(
                 day_expr.label("day"),
-                func.percentile_cont(0.5).within_group(RequestEventRecord.latency_ms.asc()).label("p50"),
-                func.percentile_cont(0.95).within_group(RequestEventRecord.latency_ms.asc()).label("p95"),
-                func.percentile_cont(0.99).within_group(RequestEventRecord.latency_ms.asc()).label("p99"),
+                func.percentile_cont(0.5)
+                .within_group(RequestEventRecord.latency_ms.asc())
+                .label("p50"),
+                func.percentile_cont(0.95)
+                .within_group(RequestEventRecord.latency_ms.asc())
+                .label("p95"),
+                func.percentile_cont(0.99)
+                .within_group(RequestEventRecord.latency_ms.asc())
+                .label("p99"),
             )
             .where(
                 RequestEventRecord.user_id == user_id,
@@ -251,16 +288,21 @@ class RequestEventPublisher:
 
         return [by_day[label] for label in day_labels]
 
-    async def tokens_by_provider_daily(self, user_id: int, range_: ActivityRange) -> list[TokensByProviderBucket]:
+    async def tokens_by_provider_daily(
+        self, user_id: int, range_: ActivityRange
+    ) -> list[TokensByProviderBucket]:
         assert self._session is not None, "activity aggregation requires a DB session"
 
         days = _ACTIVITY_RANGE_DAYS[range_]
         start_date, day_labels = _day_window_utc(days)
 
-        day_expr = func.date_trunc("day", RequestEventRecord.timestamp)
+        day_expr = func.date_trunc("day", RequestEventRecord.timestamp, type_=DateTime)
         stmt = (
-            select(day_expr.label("day"), RequestEventRecord.provider,
-                   func.coalesce(func.sum(RequestEventRecord.total_tokens), 0))
+            select(
+                day_expr.label("day"),
+                RequestEventRecord.provider,
+                func.coalesce(func.sum(RequestEventRecord.total_tokens), 0),
+            )
             .where(
                 RequestEventRecord.user_id == user_id,
                 RequestEventRecord.outcome == "success",
@@ -277,7 +319,9 @@ class RequestEventPublisher:
 
         return [TokensByProviderBucket(date=label, providers=by_day[label]) for label in day_labels]
 
-    async def top_models(self, user_id: int, range_: ActivityRange, limit: int = 10) -> list[TopModelEntry]:
+    async def top_models(
+        self, user_id: int, range_: ActivityRange, limit: int = 10
+    ) -> list[TopModelEntry]:
         assert self._session is not None, "activity aggregation requires a DB session"
 
         days = _ACTIVITY_RANGE_DAYS[range_]
@@ -354,6 +398,63 @@ class RequestEventPublisher:
         return entries, int(total)
 
 
+async def drain_event_queue(redis: Redis, session: AsyncSession, batch_size: int = 1000) -> int:
+    """Pop up to `batch_size` queued events and bulk-insert them in one commit.
+
+    Called periodically by the housekeeping worker, not by the request path.
+    Uses RPOP (FIFO relative to the LPUSH in `RequestEventPublisher.publish`)
+    so events are inserted roughly in the order they were emitted. Returns the
+    number of rows inserted; 0 means the queue was empty.
+
+    Malformed entries (should not normally happen) are skipped and logged
+    rather than aborting the whole batch — one bad event shouldn't block the
+    rest of the batch's rows from landing.
+    """
+    async with redis.pipeline(transaction=True) as pipe:
+        for _ in range(batch_size):
+            pipe.rpop(EVENTS_QUEUE_KEY)
+        raw_items = await pipe.execute()
+
+    records: list[RequestEventRecord] = []
+    for raw in raw_items:
+        if raw is None:
+            continue
+        try:
+            event = RequestEvent.model_validate_json(raw)
+        except Exception:
+            logger.warning("dropping malformed monitoring event from queue", exc_info=True)
+            continue
+        records.append(
+            RequestEventRecord(
+                user_id=event.user_id,
+                key_id=event.key_id,
+                request_id=event.request_id,
+                attempt=event.attempt,
+                timestamp=event.timestamp,
+                provider=event.provider,
+                path=event.path,
+                method=event.method,
+                key_label=event.key_label,
+                model=event.model,
+                upstream_status=event.upstream_status,
+                outcome=event.outcome,
+                latency_ms=event.latency_ms,
+                is_retry=event.is_retry,
+                error_detail=event.error_detail,
+                prompt_tokens=event.prompt_tokens,
+                completion_tokens=event.completion_tokens,
+                total_tokens=event.total_tokens,
+            )
+        )
+
+    if not records:
+        return 0
+
+    session.add_all(records)
+    await session.commit()
+    return len(records)
+
+
 def _today_range_utc() -> tuple[datetime, datetime]:
     today = datetime.now(UTC).date()
     start = datetime(today.year, today.month, today.day, tzinfo=UTC)
@@ -371,6 +472,8 @@ def _day_window_utc(days: int) -> tuple[datetime, list[str]]:
 
 async def purge_old_request_events(session: AsyncSession, older_than: timedelta) -> int:
     cutoff = datetime.now(UTC) - older_than
-    result = await session.execute(delete(RequestEventRecord).where(RequestEventRecord.timestamp < cutoff))
+    result = await session.execute(
+        delete(RequestEventRecord).where(RequestEventRecord.timestamp < cutoff)
+    )
     await session.commit()
     return result.rowcount or 0

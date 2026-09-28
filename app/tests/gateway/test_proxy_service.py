@@ -9,10 +9,18 @@ from app.keys.enums import ProviderType
 from app.keys.selector import RoundRobinSelector
 from app.keys.service import KeyPoolService
 from app.monitoring.models import RequestEventRecord
-from app.monitoring.publisher import RequestEventPublisher
+from app.monitoring.publisher import RequestEventPublisher, drain_event_queue
 
 
-async def _recent_events(session, user_id: int, limit: int = 10) -> list[RequestEventRecord]:
+async def _recent_events(session, redis, user_id: int, limit: int = 10) -> list[RequestEventRecord]:
+    """Drain whatever GatewayService queued onto Redis into Postgres, then
+    read it back. GatewayService's event_publisher now only enqueues (see
+    RequestEventPublisher.publish) — the actual INSERT happens in
+    drain_event_queue, normally run periodically by the housekeeping worker
+    (flush_monitoring_events). Draining here exercises that same path
+    end-to-end instead of just asserting something landed in Redis.
+    """
+    await drain_event_queue(redis, session, batch_size=100)
     stmt = (
         select(RequestEventRecord)
         .where(RequestEventRecord.user_id == user_id)
@@ -236,11 +244,11 @@ async def test_user_never_draws_on_another_users_keys(key_pool, test_user, other
 
 
 @pytest.mark.asyncio
-async def test_successful_request_emits_one_event(key_pool, db_session, test_user, _patch_registry):
+async def test_successful_request_emits_one_event(key_pool, db_session, fake_redis, test_user, _patch_registry):
     await _create_active_key(key_pool, test_user.id, "k1")
     provider = ScriptedProvider([200])
     _patch_registry(provider)
-    publisher = RequestEventPublisher(session=db_session)
+    publisher = RequestEventPublisher(redis=fake_redis)
     gateway = GatewayService(key_pool, max_attempts=3, event_publisher=publisher)
 
     await gateway.proxy_request(
@@ -249,7 +257,7 @@ async def test_successful_request_emits_one_event(key_pool, db_session, test_use
         provider_type=ProviderType.GEMINI,
     )
 
-    events = await _recent_events(db_session, test_user.id)
+    events = await _recent_events(db_session, fake_redis, test_user.id)
     assert len(events) == 1
     assert events[0].outcome == "success"
     assert events[0].attempt == 1
@@ -259,12 +267,12 @@ async def test_successful_request_emits_one_event(key_pool, db_session, test_use
 
 
 @pytest.mark.asyncio
-async def test_retry_emits_one_event_per_attempt_sharing_request_id(key_pool, db_session, test_user, _patch_registry):
+async def test_retry_emits_one_event_per_attempt_sharing_request_id(key_pool, db_session, fake_redis, test_user, _patch_registry):
     await _create_active_key(key_pool, test_user.id, "k1")
     await _create_active_key(key_pool, test_user.id, "k2")
     provider = ScriptedProvider([429, 200])
     _patch_registry(provider)
-    publisher = RequestEventPublisher(session=db_session)
+    publisher = RequestEventPublisher(redis=fake_redis)
     gateway = GatewayService(key_pool, max_attempts=3, event_publisher=publisher)
 
     await gateway.proxy_request(
@@ -273,7 +281,7 @@ async def test_retry_emits_one_event_per_attempt_sharing_request_id(key_pool, db
         provider_type=ProviderType.GEMINI,
     )
 
-    events = await _recent_events(db_session, test_user.id)
+    events = await _recent_events(db_session, fake_redis, test_user.id)
     assert len(events) == 2
     assert events[0].outcome == "success"
     assert events[0].attempt == 2
@@ -285,10 +293,10 @@ async def test_retry_emits_one_event_per_attempt_sharing_request_id(key_pool, db
 
 
 @pytest.mark.asyncio
-async def test_no_keys_available_emits_no_keys_event(key_pool, db_session, test_user, _patch_registry):
+async def test_no_keys_available_emits_no_keys_event(key_pool, db_session, fake_redis, test_user, _patch_registry):
     provider = ScriptedProvider([])
     _patch_registry(provider)
-    publisher = RequestEventPublisher(session=db_session)
+    publisher = RequestEventPublisher(redis=fake_redis)
     gateway = GatewayService(key_pool, max_attempts=3, event_publisher=publisher)
 
     with pytest.raises(NoAvailableKeysError):
@@ -298,17 +306,17 @@ async def test_no_keys_available_emits_no_keys_event(key_pool, db_session, test_
             provider_type=ProviderType.GEMINI,
         )
 
-    events = await _recent_events(db_session, test_user.id)
+    events = await _recent_events(db_session, fake_redis, test_user.id)
     assert len(events) == 1
     assert events[0].outcome == "no_keys"
     assert events[0].key_id is None
 
 
 @pytest.mark.asyncio
-async def test_events_never_leak_across_users(key_pool, db_session, test_user, other_user, _patch_registry):
+async def test_events_never_leak_across_users(key_pool, db_session, fake_redis, test_user, other_user, _patch_registry):
     await _create_active_key(key_pool, test_user.id, "mine")
     await _create_active_key(key_pool, other_user.id, "theirs")
-    publisher = RequestEventPublisher(session=db_session)
+    publisher = RequestEventPublisher(redis=fake_redis)
     gateway = GatewayService(key_pool, max_attempts=3, event_publisher=publisher)
 
     _patch_registry(ScriptedProvider([200]))
@@ -324,8 +332,8 @@ async def test_events_never_leak_across_users(key_pool, db_session, test_user, o
         provider_type=ProviderType.GEMINI,
     )
 
-    my_events = await _recent_events(db_session, test_user.id)
-    their_events = await _recent_events(db_session, other_user.id)
+    my_events = await _recent_events(db_session, fake_redis, test_user.id)
+    their_events = await _recent_events(db_session, fake_redis, other_user.id)
     assert len(my_events) == 1
     assert len(their_events) == 1
     assert my_events[0].user_id == test_user.id
@@ -350,11 +358,11 @@ async def test_no_publisher_configured_does_not_raise(key_pool, test_user, _patc
 
 
 @pytest.mark.asyncio
-async def test_successful_request_captures_token_usage(key_pool, db_session, test_user, _patch_registry):
+async def test_successful_request_captures_token_usage(key_pool, db_session, fake_redis, test_user, _patch_registry):
     await _create_active_key(key_pool, test_user.id, "k1")
     provider = UsageMetadataProvider({"promptTokenCount": 120, "candidatesTokenCount": 45, "totalTokenCount": 165})
     _patch_registry(provider)
-    publisher = RequestEventPublisher(session=db_session)
+    publisher = RequestEventPublisher(redis=fake_redis)
     gateway = GatewayService(key_pool, max_attempts=3, event_publisher=publisher)
 
     await gateway.proxy_request(
@@ -363,7 +371,7 @@ async def test_successful_request_captures_token_usage(key_pool, db_session, tes
         provider_type=ProviderType.GEMINI,
     )
 
-    events = await _recent_events(db_session, test_user.id)
+    events = await _recent_events(db_session, fake_redis, test_user.id)
     assert len(events) == 1
     assert events[0].prompt_tokens == 120
     assert events[0].completion_tokens == 45
@@ -371,11 +379,11 @@ async def test_successful_request_captures_token_usage(key_pool, db_session, tes
 
 
 @pytest.mark.asyncio
-async def test_missing_usage_metadata_does_not_raise(key_pool, db_session, test_user, _patch_registry):
+async def test_missing_usage_metadata_does_not_raise(key_pool, db_session, fake_redis, test_user, _patch_registry):
     await _create_active_key(key_pool, test_user.id, "k1")
     provider = UsageMetadataProvider(usage_metadata=None)
     _patch_registry(provider)
-    publisher = RequestEventPublisher(session=db_session)
+    publisher = RequestEventPublisher(redis=fake_redis)
     gateway = GatewayService(key_pool, max_attempts=3, event_publisher=publisher)
 
     response, answered_by = await gateway.proxy_request(
@@ -386,7 +394,7 @@ async def test_missing_usage_metadata_does_not_raise(key_pool, db_session, test_
 
     assert response.status_code == 200
     assert answered_by == ProviderType.GEMINI
-    events = await _recent_events(db_session, test_user.id)
+    events = await _recent_events(db_session, fake_redis, test_user.id)
     assert events[0].prompt_tokens is None
     assert events[0].completion_tokens is None
     assert events[0].total_tokens is None
@@ -451,11 +459,11 @@ async def _async_return(value):
 
 
 @pytest.mark.asyncio
-async def test_stream_success_emits_no_event_before_tokens_recorded(key_pool, db_session, test_user, _patch_registry):
+async def test_stream_success_emits_no_event_before_tokens_recorded(key_pool, db_session, fake_redis, test_user, _patch_registry):
     await _create_active_key(key_pool, test_user.id, "k1")
     provider = ScriptedStreamProvider([200])
     _patch_registry(provider)
-    publisher = RequestEventPublisher(session=db_session)
+    publisher = RequestEventPublisher(redis=fake_redis)
     gateway = GatewayService(key_pool, max_attempts=3, event_publisher=publisher)
 
     async with gateway.proxy_stream_request(
@@ -465,12 +473,12 @@ async def test_stream_success_emits_no_event_before_tokens_recorded(key_pool, db
     ) as (response, record_tokens, answered_by):
         assert response.status_code == 200
         assert answered_by == ProviderType.GEMINI
-        events = await _recent_events(db_session, test_user.id)
+        events = await _recent_events(db_session, fake_redis, test_user.id)
         assert events == []
 
         await record_tokens(120, 45, 165)
 
-    events = await _recent_events(db_session, test_user.id)
+    events = await _recent_events(db_session, fake_redis, test_user.id)
     assert len(events) == 1
     assert events[0].outcome == "success"
     assert events[0].prompt_tokens == 120
@@ -480,12 +488,12 @@ async def test_stream_success_emits_no_event_before_tokens_recorded(key_pool, db
 
 @pytest.mark.asyncio
 async def test_stream_never_records_tokens_if_caller_does_not_call_it(
-    key_pool, db_session, test_user, _patch_registry
+    key_pool, db_session, fake_redis, test_user, _patch_registry
 ):
     await _create_active_key(key_pool, test_user.id, "k1")
     provider = ScriptedStreamProvider([200])
     _patch_registry(provider)
-    publisher = RequestEventPublisher(session=db_session)
+    publisher = RequestEventPublisher(redis=fake_redis)
     gateway = GatewayService(key_pool, max_attempts=3, event_publisher=publisher)
 
     async with gateway.proxy_stream_request(
@@ -496,7 +504,7 @@ async def test_stream_never_records_tokens_if_caller_does_not_call_it(
         assert response.status_code == 200
         assert answered_by == ProviderType.GEMINI
 
-    events = await _recent_events(db_session, test_user.id)
+    events = await _recent_events(db_session, fake_redis, test_user.id)
     assert events == []
 
 
