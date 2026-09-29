@@ -95,8 +95,53 @@ class APIKeyRepository:
         *,
         user_id: int,
         cooldown_until: datetime | None = None,
+        set_cooldown: bool = True,
     ) -> APIKey:
-        return await self.update_fields(key_id, user_id=user_id, status=status, cooldown_until=cooldown_until)
+        values: dict = {"status": status}
+        if set_cooldown:
+            values["cooldown_until"] = cooldown_until
+
+        result = await self._session.execute(
+            update(APIKey)
+            .where(APIKey.id == key_id, APIKey.user_id == user_id)
+            .values(**values)
+            .returning(APIKey)
+            .execution_options(synchronize_session="fetch")
+        )
+        key = result.scalar_one_or_none()
+        if key is None:
+            raise KeyNotFoundError(key_id=key_id)
+        await self._session.commit()
+        return key
+
+    async def compare_and_swap_status(
+        self,
+        key_id: int,
+        *,
+        user_id: int,
+        expected_status: KeyStatus,
+        new_status: KeyStatus,
+        cooldown_until: datetime | None = None,
+        set_cooldown: bool = True,
+    ) -> APIKey | None:
+        values: dict = {"status": new_status}
+        if set_cooldown:
+            values["cooldown_until"] = cooldown_until
+
+        result = await self._session.execute(
+            update(APIKey)
+            .where(
+                APIKey.id == key_id,
+                APIKey.user_id == user_id,
+                APIKey.status == expected_status,
+            )
+            .values(**values)
+            .returning(APIKey)
+            .execution_options(synchronize_session="fetch")
+        )
+        key = result.scalar_one_or_none()
+        await self._session.commit()
+        return key
 
     async def increment_usage(self, key_id: int, user_id: int) -> bool:
         result = await self._session.execute(
@@ -104,6 +149,7 @@ class APIKeyRepository:
             .where(
                 APIKey.id == key_id,
                 APIKey.user_id == user_id,
+                APIKey.status == KeyStatus.ACTIVE,
                 APIKey.requests_today < APIKey.daily_limit,
             )
             .values(

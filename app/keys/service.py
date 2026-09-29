@@ -286,12 +286,24 @@ class KeyPoolService:
     ) -> APIKeyHealthCheckResult:
         if key.status != KeyStatus.DISABLED:
             if result.ok:
-                await self._repo.mark_status(
-                    key.id, KeyStatus.ACTIVE, user_id=key.user_id, cooldown_until=None
+                updated = await self._repo.compare_and_swap_status(
+                    key.id,
+                    user_id=key.user_id,
+                    expected_status=key.status,
+                    new_status=KeyStatus.ACTIVE,
+                    cooldown_until=None,
                 )
-                await self._cache.invalidate(key.user_id, key.provider.value)
+                if updated is not None:
+                    await self._cache.invalidate(key.user_id, key.provider.value)
             elif key.status != KeyStatus.COOLDOWN:
-                await self._repo.mark_status(key.id, KeyStatus.EXHAUSTED, user_id=key.user_id)
-                await self._cache.invalidate(key.user_id, key.provider.value)
+                updated = await self._repo.compare_and_swap_status(
+                    key.id,
+                    user_id=key.user_id,
+                    expected_status=key.status,
+                    new_status=KeyStatus.EXHAUSTED,
+                    set_cooldown=False,
+                )
+                if updated is not None:
+                    await self._cache.invalidate(key.user_id, key.provider.value)
 
         return APIKeyHealthCheckResult(key_id=key.id, ok=result.ok, detail=result.detail)
