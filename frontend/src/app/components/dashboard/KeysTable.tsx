@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { KeyRound, Loader2, Stethoscope, Edit2, Power, Search, LayoutGrid } from "lucide-react";
-import { rel, cd } from "../../lib/domain";
+import { rel, cd, pingMeta } from "../../lib/domain";
 import type { AK, PF, SF } from "../../types";
 import { StatusBadge } from "../shared/StatusBadge";
 import { ProviderBadge } from "../shared/ProviderBadge";
@@ -167,7 +167,7 @@ export function KeysTable({
                   <ColumnWidths />
                   <thead>
                     <tr style={{ borderBottom: "1px solid rgba(255,255,255,0.04)" }}>
-                      {["Label", "Provider", "Status", "Usage", "Last Used", ""].map((h, i) => (
+                      {["Label", "Provider", "Status", "Usage", "Ping", "Last Used", ""].map((h, i) => (
                         <th key={i} className="px-4 py-2.5 text-left text-[10px] font-semibold text-zinc-600 uppercase tracking-widest">
                           {h}
                         </th>
@@ -192,11 +192,12 @@ export function KeysTable({
 function ColumnWidths() {
   return (
     <colgroup>
-      <col style={{ width: "30%" }} />
-      <col style={{ width: "12%" }} />
-      <col style={{ width: "14%" }} />
-      <col style={{ width: "20%" }} />
-      <col style={{ width: "12%" }} />
+      <col style={{ width: "26%" }} />
+      <col style={{ width: "11%" }} />
+      <col style={{ width: "13%" }} />
+      <col style={{ width: "18%" }} />
+      <col style={{ width: "9%" }} />
+      <col style={{ width: "11%" }} />
       <col style={{ width: "12%" }} />
     </colgroup>
   );
@@ -237,6 +238,8 @@ function MobileKeyRow({
       <UsageBar used={k.used} limit={k.limit} status={k.status} />
       <div className="flex items-center justify-between mt-2.5">
         <span className="text-[11px] text-zinc-600">
+          Ping: <span className="font-mono" style={{ color: pingMeta(k.pingMs).color }}>{pingMeta(k.pingMs).text}</span>
+          <span className="text-zinc-700"> · </span>
           Last used: <span className="font-mono text-zinc-500">{k.lastUsed ? rel(k.lastUsed, now) : "—"}</span>
         </span>
         {k.cooldownUntil ? (
@@ -269,6 +272,15 @@ function DesktopKeyRow({
         <StatusBadge status={k.status} cooldownText={k.cooldownUntil ? cd(k.cooldownUntil, now) : undefined} />
       </td>
       <td className="px-4 py-3"><UsageBar used={k.used} limit={k.limit} status={k.status} /></td>
+      <td className="px-4 py-3">
+        <span
+          className="text-xs font-mono"
+          style={{ color: pingMeta(k.pingMs).color }}
+          title={k.pingAt ? `Checked ${rel(k.pingAt, now)}` : "Not checked yet"}
+        >
+          {pingMeta(k.pingMs).text}
+        </span>
+      </td>
       <td className="px-4 py-3">
         <span className="text-xs font-mono text-zinc-500">{k.lastUsed ? rel(k.lastUsed, now) : "—"}</span>
       </td>

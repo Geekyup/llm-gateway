@@ -284,6 +284,9 @@ class KeyPoolService:
     async def _apply_health_result(
         self, key: APIKey, result: HealthCheckResult
     ) -> APIKeyHealthCheckResult:
+        if result.latency_ms is not None:
+            await self._repo.record_ping(key.id, key.user_id, result.latency_ms)
+
         if key.status != KeyStatus.DISABLED:
             if result.ok:
                 updated = await self._repo.compare_and_swap_status(
@@ -306,4 +309,6 @@ class KeyPoolService:
                 if updated is not None:
                     await self._cache.invalidate(key.user_id, key.provider.value)
 
-        return APIKeyHealthCheckResult(key_id=key.id, ok=result.ok, detail=result.detail)
+        return APIKeyHealthCheckResult(
+            key_id=key.id, ok=result.ok, detail=result.detail, latency_ms=result.latency_ms
+        )

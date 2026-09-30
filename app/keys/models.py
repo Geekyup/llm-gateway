@@ -33,6 +33,8 @@ class APIKey(TimestampMixin, Base):
     daily_limit: Mapped[int] = mapped_column(Integer, nullable=False)
     cooldown_until: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     last_used_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    last_ping_ms: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    last_ping_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
     __table_args__ = (
         Index("ix_api_keys_user_provider_status", "user_id", "provider", "status"),

@@ -39,6 +39,8 @@ export interface ApiKeyRead {
   model: string | null;
   cooldown_until: string | null;
   last_used_at: string | null;
+  last_ping_ms: number | null;
+  last_ping_at: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -86,6 +88,7 @@ export interface ApiKeyHealthCheckResult {
   key_id: number;
   ok: boolean;
   detail: string | null;
+  latency_ms: number | null;
 }
 
 export interface HourlyUsagePoint {

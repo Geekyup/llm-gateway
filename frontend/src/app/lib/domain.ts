@@ -13,6 +13,8 @@ export function toAK(k: ApiKeyRead): AK {
     model: k.model,
     cooldownUntil: k.cooldown_until ? new Date(k.cooldown_until).getTime() : undefined,
     lastUsed: k.last_used_at ? new Date(k.last_used_at).getTime() : undefined,
+    pingMs: k.last_ping_ms ?? undefined,
+    pingAt: k.last_ping_at ? new Date(k.last_ping_at).getTime() : undefined,
     created: new Date(k.created_at).getTime(),
     updated: new Date(k.updated_at).getTime(),
   };
@@ -24,6 +26,14 @@ export const STATUS_META: Record<Status, { text: string; color: string; bg: stri
   exhausted: { text: "Exhausted", color: "#EF4444", bg: "rgba(239,68,68,0.08)",  bd: "rgba(239,68,68,0.22)"  },
   disabled:  { text: "Disabled",  color: "#52525B", bg: "rgba(82,82,91,0.08)",   bd: "rgba(82,82,91,0.18)"   },
 };
+
+export function pingMeta(ms: number | undefined): { text: string; color: string } {
+  if (ms === undefined) return { text: "—", color: "#52525B" };
+  const text = `${ms} ms`;
+  if (ms < 300) return { text, color: "#00D68F" };
+  if (ms < 1000) return { text, color: "#F59E0B" };
+  return { text, color: "#EF4444" };
+}
 
 export const PROVIDER_META: Record<string, { name: string; color: string; bg: string }> = {
   gemini:     { name: "Gemini",     color: "#4F8EF7", bg: "rgba(79,142,247,0.1)"  },

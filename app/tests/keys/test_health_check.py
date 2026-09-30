@@ -459,3 +459,58 @@ async def test_check_keys_keeps_applied_results_when_run_is_cancelled(
 
     assert (await key_repo.get(finished.id, user_id=test_user.id)).status == KeyStatus.ACTIVE
     assert (await key_repo.get(stuck.id, user_id=test_user.id)).status == KeyStatus.EXHAUSTED
+
+
+@pytest.mark.asyncio
+async def test_check_key_health_records_ping(key_repo, key_pool_service, test_user):
+    key = await key_repo.create(
+        user_id=test_user.id, label="k1", provider=ProviderType.GEMINI, key_encrypted="ciphertext", daily_limit=100
+    )
+
+    fake_provider = AsyncMock()
+    fake_provider.health_check.return_value = HealthCheckResult(ok=True, latency_ms=142)
+
+    with patch("app.keys.service.get_provider", return_value=fake_provider), \
+         patch("app.keys.service.decrypt_key", return_value="plaintext-key"):
+        result = await key_pool_service.check_key_health(key.id, test_user.id)
+
+    assert result.latency_ms == 142
+    refreshed = await key_repo.get(key.id, user_id=test_user.id)
+    assert refreshed.last_ping_ms == 142
+    assert refreshed.last_ping_at is not None
+
+
+@pytest.mark.asyncio
+async def test_check_key_health_records_ping_on_upstream_error(key_repo, key_pool_service, test_user):
+    key = await key_repo.create(
+        user_id=test_user.id, label="k1", provider=ProviderType.GEMINI, key_encrypted="ciphertext", daily_limit=100
+    )
+
+    fake_provider = AsyncMock()
+    fake_provider.health_check.return_value = HealthCheckResult(ok=False, detail="HTTP 429", latency_ms=87)
+
+    with patch("app.keys.service.get_provider", return_value=fake_provider), \
+         patch("app.keys.service.decrypt_key", return_value="plaintext-key"):
+        await key_pool_service.check_key_health(key.id, test_user.id)
+
+    refreshed = await key_repo.get(key.id, user_id=test_user.id)
+    assert refreshed.last_ping_ms == 87
+
+
+@pytest.mark.asyncio
+async def test_check_key_health_keeps_previous_ping_on_network_error(key_repo, key_pool_service, test_user):
+    key = await key_repo.create(
+        user_id=test_user.id, label="k1", provider=ProviderType.GEMINI, key_encrypted="ciphertext", daily_limit=100
+    )
+    await key_repo.record_ping(key.id, test_user.id, 120)
+
+    fake_provider = AsyncMock()
+    fake_provider.health_check.return_value = HealthCheckResult(ok=False, detail="Network error: boom")
+
+    with patch("app.keys.service.get_provider", return_value=fake_provider), \
+         patch("app.keys.service.decrypt_key", return_value="plaintext-key"):
+        result = await key_pool_service.check_key_health(key.id, test_user.id)
+
+    assert result.latency_ms is None
+    refreshed = await key_repo.get(key.id, user_id=test_user.id)
+    assert refreshed.last_ping_ms == 120

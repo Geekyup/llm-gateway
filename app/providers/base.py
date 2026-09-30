@@ -1,4 +1,5 @@
 import logging
+import time
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from dataclasses import dataclass
@@ -15,6 +16,7 @@ logger = logging.getLogger(__name__)
 class HealthCheckResult:
     ok: bool
     detail: str | None = None
+    latency_ms: int | None = None
 
 
 class ModelInfo:
@@ -26,15 +28,6 @@ class ModelInfo:
 
 
 class Provider:
-    """Описывает, что должен уметь любой провайдер LLM в этом проекте.
-
-    Это не строгий контракт, проверяемый Python — просто общий вид,
-    на который ориентируются HTTPProvider и его наследники (Gemini,
-    Groq, OpenRouter). У проекта всего три провайдера, все они на виду
-    в одной папке, поэтому принудительная проверка через ABC добавляла
-    сложность, не принося реальной пользы.
-    """
-
     name: ClassVar[str]
 
     async def forward(
@@ -56,10 +49,6 @@ class Provider:
         raise NotImplementedError
 
     def is_key_invalid(self, response: httpx.Response) -> bool:
-        """Ключ навсегда невалиден (например, отозван) — в отличие от
-        is_key_exhausted, которое означает временное исчерпание квоты.
-        По умолчанию False: большинство провайдеров в этом проекте не
-        разделяют эти два случая."""
         return False
 
     async def health_check(self, key: str) -> HealthCheckResult:
@@ -83,7 +72,6 @@ class HTTPProvider(Provider):
         return {"authorization": f"Bearer {key}"}
 
     def _build_request(self, key: str, path: str, headers: dict[str, str]) -> tuple[str, dict[str, str]]:
-        """Собирает полный URL и итоговые заголовки — общая часть для forward и forward_stream."""
         url = f"{self._base_url}/{path.lstrip('/')}"
         forward_headers = {
             k: v for k, v in headers.items()
@@ -143,14 +131,16 @@ class HTTPProvider(Provider):
 
     async def health_check(self, key: str) -> HealthCheckResult:
         path = self._HEALTH_CHECK_PATH or self._MODELS_PATH
+        started = time.monotonic()
         try:
             response = await self.forward(key=key, path=path, method="GET", payload=None, headers={})
         except httpx.HTTPError as exc:
             return HealthCheckResult(ok=False, detail=f"Network error: {exc}")
+        latency_ms = int((time.monotonic() - started) * 1000)
 
         if response.status_code == 200:
-            return HealthCheckResult(ok=True)
-        return HealthCheckResult(ok=False, detail=self._error_detail(response))
+            return HealthCheckResult(ok=True, latency_ms=latency_ms)
+        return HealthCheckResult(ok=False, detail=self._error_detail(response), latency_ms=latency_ms)
 
     async def list_models(self, key: str) -> list[ModelInfo]:
         try:

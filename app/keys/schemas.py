@@ -57,6 +57,8 @@ class APIKeyRead(BaseModel):
     model: str | None
     cooldown_until: datetime | None
     last_used_at: datetime | None
+    last_ping_ms: int | None
+    last_ping_at: datetime | None
     created_at: datetime
     updated_at: datetime
 
@@ -66,6 +68,7 @@ class APIKeyHealthCheckResult(BaseModel):
     key_id: int
     ok: bool
     detail: str | None = Field(default=None, description="Reason for failure; never set when ok=True")
+    latency_ms: int | None = Field(default=None, description="Round-trip time of the probe; unset on network errors")
 
 
 class APIKeyDTO(BaseModel):

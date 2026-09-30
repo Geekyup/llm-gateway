@@ -161,6 +161,17 @@ class APIKeyRepository:
         await self._session.commit()
         return result.rowcount > 0
 
+    async def record_ping(
+        self, key_id: int, user_id: int, latency_ms: int, at: datetime | None = None
+    ) -> None:
+        await self._session.execute(
+            update(APIKey)
+            .where(APIKey.id == key_id, APIKey.user_id == user_id)
+            .values(last_ping_ms=latency_ms, last_ping_at=at or datetime.now(UTC))
+            .execution_options(synchronize_session="fetch")
+        )
+        await self._session.commit()
+
     async def reset_daily_counters(self, provider: ProviderType | None = None) -> list[APIKey]:
         statement = (
             update(APIKey)

@@ -52,8 +52,6 @@ async def test_forward_strips_inbound_authorization_header_and_keeps_others():
     )
 
     sent = captured["request"]
-    # The gateway's own inbound Authorization header (the gwk_ token) must
-    # never leak upstream — only the decrypted provider key should appear.
     assert sent.headers["authorization"] == "Bearer sk-or-real-key"
     assert sent.headers["x-custom"] == "keep-me"
 
@@ -66,8 +64,6 @@ def test_is_rate_limited_on_429():
 
 def test_is_key_exhausted_on_402_not_429():
     provider = OpenRouterProvider()
-    # 402 Payment Required = out of credits (park the key); 429 is a
-    # temporary throttle and must NOT be treated as exhausted.
     assert provider.is_key_exhausted(httpx.Response(402)) is True
     assert provider.is_key_exhausted(httpx.Response(429)) is False
     assert provider.is_key_exhausted(httpx.Response(200)) is False
@@ -84,6 +80,8 @@ async def test_health_check_ok_on_200():
     result = await provider.health_check("sk-or-real-key")
 
     assert result.ok is True
+    assert result.latency_ms is not None
+    assert result.latency_ms >= 0
 
 
 @pytest.mark.asyncio
@@ -97,6 +95,7 @@ async def test_health_check_surfaces_upstream_error_message():
 
     assert result.ok is False
     assert "No auth credentials found" in result.detail
+    assert result.latency_ms is not None
 
 
 @pytest.mark.asyncio
@@ -110,6 +109,7 @@ async def test_health_check_handles_network_error():
 
     assert result.ok is False
     assert "Network error" in result.detail
+    assert result.latency_ms is None
 
 
 @pytest.mark.asyncio

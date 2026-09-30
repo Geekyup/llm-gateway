@@ -100,6 +100,7 @@ export function KeyDetailDrawer({
     { label: "Masked Key", val: keyData.masked, mono: true },
     { label: "Created",    val: new Date(keyData.created).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }), mono: false },
     { label: "Updated",    val: new Date(keyData.updated).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }), mono: false },
+    { label: "Ping",       val: keyData.pingMs !== undefined ? `${keyData.pingMs} ms${keyData.pingAt ? ` · ${rel(keyData.pingAt, now)}` : ""}` : "—", mono: true },
     { label: "Last Used",  val: keyData.lastUsed ? rel(keyData.lastUsed, now) : "—", mono: false },
     { label: "Cooldown",   val: keyData.cooldownUntil ? cd(keyData.cooldownUntil, now) : "—", mono: true },
   ];

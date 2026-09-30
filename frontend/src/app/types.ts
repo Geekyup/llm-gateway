@@ -15,6 +15,8 @@ export interface AK {
   model: string | null;
   cooldownUntil?: number;
   lastUsed?: number;
+  pingMs?: number;
+  pingAt?: number;
   created: number;
   updated: number;
 }

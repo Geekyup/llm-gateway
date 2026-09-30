@@ -26,36 +26,14 @@ _ACTIVITY_RANGE_DAYS: dict[ActivityRange, int] = {
     "30d": 30,
 }
 
-# Outcomes that represent an actual upstream call attempt (i.e. we had a key
-# and got a response, successful or not). Excludes "no_keys"/"upstream_exhausted"
-# (rejected before ever reaching a provider) and generic "error". Used
-# consistently by every aggregation below so total counts agree with each other.
 _ATTEMPTED_OUTCOMES = ("success", "rate_limited", "exhausted")
 
-# Redis key the gateway path pushes events onto. A single list, consumed in
-# batches by the housekeeping worker (see app.housekeeping.tasks.flush_monitoring_events).
 EVENTS_QUEUE_KEY = "monitoring:events:queue"
 
-# Hard cap on how many raw events one publisher will let queue up before it
-# starts dropping the oldest ones. Protects Redis memory if the consumer job
-# falls behind or stops running; sized generously above one flush interval's
-# expected volume. Existing entries beyond this are trimmed on push.
 _MAX_QUEUE_LENGTH = 200_000
 
 
 class RequestEventPublisher:
-    """Publishes gateway request events and reads back aggregated stats.
-
-    Writing and reading are split by design: `publish()` never touches
-    Postgres directly, it only pushes onto a Redis list — the actual INSERT
-    happens later, in a batch, in a background worker (see
-    `app.housekeeping.tasks.flush_monitoring_events`). This keeps the
-    request/response hot path of `GatewayService` free of a DB round-trip per
-    upstream attempt. Every read method below (`activity_summary`,
-    `daily_timeseries`, etc.) still needs a `session`, since those query the
-    already-persisted rows in `request_events`.
-    """
-
     def __init__(self, session: AsyncSession | None = None, redis: Redis | None = None) -> None:
         self._session = session
         self._redis = redis
@@ -69,9 +47,6 @@ class RequestEventPublisher:
                 pipe.ltrim(EVENTS_QUEUE_KEY, 0, _MAX_QUEUE_LENGTH - 1)
                 await pipe.execute()
         except Exception:
-            # Monitoring must never take down the gateway's actual request
-            # path — losing a handful of analytics events is fine, failing
-            # the user's LLM call because Redis hiccuped is not.
             logger.warning(
                 "failed to enqueue monitoring event request_id=%s", event.request_id, exc_info=True
             )
@@ -205,11 +180,6 @@ class RequestEventPublisher:
             select(day_expr.label("day"), RequestEventRecord.outcome, func.count())
             .where(
                 RequestEventRecord.user_id == user_id,
-                # Same filter as activity_summary/latency_percentiles_daily: only
-                # count attempts that actually reached a provider. Previously this
-                # method counted every outcome (including no_keys/upstream_exhausted,
-                # which activity_summary's total_requests excludes), so the two
-                # endpoints' totals for the same range could disagree.
                 RequestEventRecord.outcome.in_(_ATTEMPTED_OUTCOMES),
                 RequestEventRecord.timestamp >= start_date,
             )
@@ -217,11 +187,6 @@ class RequestEventPublisher:
         )
         rows = await self._session.execute(stmt)
 
-        # "error" (hard failures: no_keys, upstream_exhausted, provider errors) is
-        # kept as a zeroed-out field for API/schema stability rather than removed
-        # outright — the _ATTEMPTED_OUTCOMES filter above means no row can ever
-        # populate it today. If a future outcome should count as a per-day
-        # "error" bucket, add it to the query filter and this branch together.
         by_day: dict[str, dict[str, int]] = {
             label: {"success": 0, "rate_limited": 0, "error": 0} for label in day_labels
         }
@@ -399,17 +364,6 @@ class RequestEventPublisher:
 
 
 async def drain_event_queue(redis: Redis, session: AsyncSession, batch_size: int = 1000) -> int:
-    """Pop up to `batch_size` queued events and bulk-insert them in one commit.
-
-    Called periodically by the housekeeping worker, not by the request path.
-    Uses RPOP (FIFO relative to the LPUSH in `RequestEventPublisher.publish`)
-    so events are inserted roughly in the order they were emitted. Returns the
-    number of rows inserted; 0 means the queue was empty.
-
-    Malformed entries (should not normally happen) are skipped and logged
-    rather than aborting the whole batch — one bad event shouldn't block the
-    rest of the batch's rows from landing.
-    """
     async with redis.pipeline(transaction=True) as pipe:
         for _ in range(batch_size):
             pipe.rpop(EVENTS_QUEUE_KEY)
