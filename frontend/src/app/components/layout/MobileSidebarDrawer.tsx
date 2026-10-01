@@ -16,13 +16,13 @@ export function MobileSidebarDrawer({
       <div
         className="fixed inset-0 z-40 duration-200"
         onClick={onClose}
-        style={{ background: "rgba(26,26,24,0.3)", backdropFilter: "blur(2px)" }}
+        style={{ background: "rgba(0,0,0,0.6)", backdropFilter: "blur(2px)" }}
       />
       <aside
         className="fixed left-0 top-0 bottom-0 z-50 w-64 flex flex-col duration-250 ease-out"
-        style={{ background: "var(--background)", borderRight: "1px solid color-mix(in srgb, var(--ink) 10%, transparent)" }}
+        style={{ background: "var(--background)", borderRight: "1px solid color-mix(in srgb, var(--ink) 6%, transparent)" }}
       >
-        <div className="flex items-center justify-between px-5 h-14 shrink-0" style={{ borderBottom: "1px solid color-mix(in srgb, var(--ink) 10%, transparent)" }}>
+        <div className="flex items-center justify-between px-5 h-14 shrink-0" style={{ borderBottom: "1px solid color-mix(in srgb, var(--ink) 6%, transparent)" }}>
           <span className="font-mono font-semibold" style={{ fontSize: "20px", letterSpacing: "0.01em", lineHeight: 1 }}>
             <span className="text-ink">key</span>
             <span style={{ color: "var(--accent)" }}>pool</span>

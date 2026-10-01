@@ -1,14 +1,14 @@
 import { BarChart3, Loader2 } from "lucide-react";
 
 export const CHART_MUTED = "var(--ink-4)";
-export const CHART_GRID = "color-mix(in srgb, var(--ink) 7%, transparent)";
+export const CHART_GRID = "color-mix(in srgb, var(--ink) 4.2%, transparent)";
 export const CHART_ACCENT = "var(--accent)";
 export const CHART_Y_AXIS_WIDTH = 30;
 
 export function tooltipStyle() {
   return {
     background: "var(--card)",
-    border: "1px solid color-mix(in srgb, var(--ink) 14%, transparent)",
+    border: "1px solid color-mix(in srgb, var(--ink) 8.4%, transparent)",
     borderRadius: 6,
     padding: "8px 10px",
     fontSize: 11,

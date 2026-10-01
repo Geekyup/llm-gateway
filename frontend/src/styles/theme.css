@@ -3,55 +3,56 @@
 :root {
   --font-size: 15px;
   --font-sans: "Geist", ui-sans-serif, system-ui, sans-serif;
-  --font-display: "Instrument Serif", ui-serif, Georgia, serif;
-  --font-mono: "IBM Plex Mono", ui-monospace, SFMono-Regular, monospace;
-  --background: #F3F0E8;
-  --foreground: #1A1A18;
-  --card: #FBF9F4;
-  --card-foreground: #1A1A18;
-  --popover: #FBF9F4;
-  --popover-foreground: #1A1A18;
-  --primary: #2B3FE0;
+  --font-display: "Geist", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "Geist Mono", ui-monospace, SFMono-Regular, monospace;
+  --background: #131311;
+  --foreground: #ECE9E1;
+  --card: #1A1A17;
+  --card-foreground: #ECE9E1;
+  --popover: #1F1F1B;
+  --popover-foreground: #ECE9E1;
+  --primary: #5468FF;
   --primary-foreground: #FFFFFF;
-  --secondary: #E9E5DA;
-  --secondary-foreground: #1A1A18;
-  --muted: #E9E5DA;
-  --muted-foreground: #6B6860;
-  --accent: #2B3FE0;
-  --accent-hover: #1F31C2;
+  --secondary: #24241F;
+  --secondary-foreground: #ECE9E1;
+  --muted: #24241F;
+  --muted-foreground: #8D8A80;
+  --accent: #5468FF;
+  --accent-hover: #7A8AFF;
   --accent-foreground: #FFFFFF;
   --on-accent: #FFFFFF;
-  --destructive: #C2331A;
+  --destructive: #EF6B55;
   --destructive-foreground: #FFFFFF;
-  --ink: #1A1A18;
-  --ink-2: #3B3A35;
-  --ink-3: #6B6860;
-  --ink-4: #9A968B;
-  --field: #E9E5DA;
-  --ok: #1F8A5B;
-  --warn: #B25E09;
-  --bad: #C2331A;
-  --border: rgba(26, 26, 24, 0.13);
-  --input: rgba(26, 26, 24, 0.06);
-  --input-background: #EFEBE0;
-  --switch-background: #9A968B;
+  --ink: #ECE9E1;
+  --ink-2: #C2BFB5;
+  --ink-3: #8D8A80;
+  --ink-4: #5F5D55;
+  --field: #24241F;
+  --ok: #3DBE84;
+  --warn: #E0A04A;
+  --bad: #EF6B55;
+  --border: rgba(236, 233, 225, 0.12);
+  --input: rgba(236, 233, 225, 0.06);
+  --input-background: #1F1F1B;
+  --switch-background: #5F5D55;
   --font-weight-medium: 500;
   --font-weight-normal: 400;
-  --ring: rgba(43, 63, 224, 0.4);
-  --chart-1: #2B3FE0;
-  --chart-2: #2F6FD6;
-  --chart-3: #B25E09;
-  --chart-4: #C2331A;
-  --chart-5: #7C5CD6;
+  --ring: rgba(84, 104, 255, 0.5);
+  --chart-1: #5468FF;
+  --chart-2: #5B9BFF;
+  --chart-3: #E0A04A;
+  --chart-4: #EF6B55;
+  --chart-5: #A78BFA;
   --radius: 0.25rem;
-  --sidebar: #ECE8DD;
-  --sidebar-foreground: #1A1A18;
-  --sidebar-primary: #2B3FE0;
+  --sidebar: #181816;
+  --sidebar-foreground: #ECE9E1;
+  --sidebar-primary: #5468FF;
   --sidebar-primary-foreground: #FFFFFF;
-  --sidebar-accent: #E2DDCF;
-  --sidebar-accent-foreground: #1A1A18;
-  --sidebar-border: rgba(26, 26, 24, 0.13);
-  --sidebar-ring: rgba(43, 63, 224, 0.4);
+  --sidebar-accent: #24241F;
+  --sidebar-accent-foreground: #ECE9E1;
+  --sidebar-border: rgba(236, 233, 225, 0.12);
+  --sidebar-ring: rgba(84, 104, 255, 0.5);
+  color-scheme: dark;
 }
 
 
@@ -115,7 +116,7 @@
   body {
     @apply bg-background text-foreground;
     font-family: var(--font-sans);
-    font-feature-settings: "ss01", "cv11";
+    
   }
 
   html {
@@ -126,7 +127,7 @@
   h1 {
     font-family: var(--font-display);
     font-size: var(--text-2xl);
-    font-weight: 400;
+    font-weight: 600;
     line-height: 1.5;
   }
 
@@ -169,7 +170,7 @@
 
 .thin-scrollbar {
   scrollbar-width: thin;
-  scrollbar-color: color-mix(in srgb, var(--ink) 16.0%, transparent) transparent;
+  scrollbar-color: color-mix(in srgb, var(--ink) 9.6%, transparent) transparent;
 }
 
 .thin-scrollbar::-webkit-scrollbar {
@@ -182,14 +183,14 @@
 }
 
 .thin-scrollbar::-webkit-scrollbar-thumb {
-  background-color: color-mix(in srgb, var(--ink) 16.0%, transparent);
+  background-color: color-mix(in srgb, var(--ink) 9.6%, transparent);
   border-radius: 9999px;
   border: 2px solid transparent;
   background-clip: padding-box;
 }
 
 .thin-scrollbar::-webkit-scrollbar-thumb:hover {
-  background-color: color-mix(in srgb, var(--ink) 28.0%, transparent);
+  background-color: color-mix(in srgb, var(--ink) 16.8%, transparent);
 }
 
 .thin-scrollbar::-webkit-scrollbar-corner {
@@ -260,14 +261,14 @@
 .markdown-body blockquote {
   margin: 0.6em 0;
   padding: 0.1em 0 0.1em 0.9em;
-  border-left: 2px solid color-mix(in srgb, var(--ink) 15.0%, transparent);
+  border-left: 2px solid color-mix(in srgb, var(--ink) 9%, transparent);
   color: var(--ink-2);
 }
 
 .markdown-body hr {
   margin: 1em 0;
   border: none;
-  border-top: 1px solid color-mix(in srgb, var(--ink) 14%, transparent);
+  border-top: 1px solid color-mix(in srgb, var(--ink) 8.4%, transparent);
 }
 
 .markdown-body table {
@@ -279,7 +280,7 @@
 
 .markdown-body th,
 .markdown-body td {
-  border: 1px solid color-mix(in srgb, var(--ink) 14%, transparent);
+  border: 1px solid color-mix(in srgb, var(--ink) 8.4%, transparent);
   padding: 0.4em 0.6em;
   text-align: left;
 }
@@ -287,17 +288,17 @@
 .markdown-body th {
   color: var(--ink);
   font-weight: 600;
-  background: color-mix(in srgb, var(--ink) 5%, transparent);
+  background: color-mix(in srgb, var(--ink) 3%, transparent);
 }
 
 .markdown-body code {
   font-family: var(--font-mono);
   font-size: 0.8125rem;
-  background: color-mix(in srgb, var(--ink) 10%, transparent);
-  border: 1px solid color-mix(in srgb, var(--ink) 12%, transparent);
+  background: color-mix(in srgb, var(--ink) 6%, transparent);
+  border: 1px solid color-mix(in srgb, var(--ink) 7.2%, transparent);
   border-radius: 4px;
   padding: 0.1em 0.35em;
-  color: #9B3A6B;
+  color: #E58FBF;
 }
 
 .markdown-body pre {
@@ -305,7 +306,7 @@
   padding: 0.85em 1em;
   border-radius: 4px;
   background: var(--field);
-  border: 1px solid color-mix(in srgb, var(--ink) 14%, transparent);
+  border: 1px solid color-mix(in srgb, var(--ink) 8.4%, transparent);
   overflow-x: auto;
 }
 
@@ -321,7 +322,7 @@
 .markdown-body .hljs-keyword,
 .markdown-body .hljs-selector-tag,
 .markdown-body .hljs-literal,
-.markdown-body .hljs-title.function_ { color: #2F6FD6; }
+.markdown-body .hljs-title.function_ { color: #5B9BFF; }
 .markdown-body .hljs-string,
 .markdown-body .hljs-attr { color: var(--accent); }
 .markdown-body .hljs-number,
@@ -329,9 +330,9 @@
 .markdown-body .hljs-comment { color: var(--ink-3); font-style: italic; }
 .markdown-body .hljs-title,
 .markdown-body .hljs-title.class_,
-.markdown-body .hljs-name { color: #7C5CD6; }
+.markdown-body .hljs-name { color: #A78BFA; }
 .markdown-body .hljs-variable,
-.markdown-body .hljs-template-variable { color: #9B3A6B; }
+.markdown-body .hljs-template-variable { color: #E58FBF; }
 
 .no-scrollbar {
   scrollbar-width: none;
@@ -431,7 +432,7 @@
 }
 
 .message-action-btn:hover {
-  background: color-mix(in srgb, var(--ink) 10%, transparent);
+  background: color-mix(in srgb, var(--ink) 6%, transparent);
   color: var(--ink-2);
 }
 
@@ -444,7 +445,7 @@
 .code-block {
   margin: 0.6em 0;
   border-radius: 10px;
-  border: 1px solid color-mix(in srgb, var(--ink) 14%, transparent);
+  border: 1px solid color-mix(in srgb, var(--ink) 8.4%, transparent);
   overflow: hidden;
   background: var(--field);
 }
@@ -454,8 +455,8 @@
   align-items: center;
   justify-content: space-between;
   padding: 0.45em 0.5em 0.45em 0.9em;
-  background: color-mix(in srgb, var(--ink) 5%, transparent);
-  border-bottom: 1px solid color-mix(in srgb, var(--ink) 12%, transparent);
+  background: color-mix(in srgb, var(--ink) 3%, transparent);
+  border-bottom: 1px solid color-mix(in srgb, var(--ink) 7.2%, transparent);
   font-size: 0.6875rem;
 }
 
@@ -477,7 +478,7 @@
 }
 
 .code-block-copy:hover {
-  background: color-mix(in srgb, var(--ink) 10%, transparent);
+  background: color-mix(in srgb, var(--ink) 6%, transparent);
   color: var(--ink);
 }
 
@@ -501,8 +502,8 @@
 
 .hero-grid {
   background-image:
-    linear-gradient(to right, color-mix(in srgb, var(--ink) 12%, transparent) 1px, transparent 1px),
-    linear-gradient(to bottom, color-mix(in srgb, var(--ink) 12%, transparent) 1px, transparent 1px);
+    linear-gradient(to right, color-mix(in srgb, var(--ink) 7.2%, transparent) 1px, transparent 1px),
+    linear-gradient(to bottom, color-mix(in srgb, var(--ink) 7.2%, transparent) 1px, transparent 1px);
   background-size: 40px 40px;
   -webkit-mask-image: linear-gradient(to bottom, black 0%, black 55%, transparent 100%);
   mask-image: linear-gradient(to bottom, black 0%, black 55%, transparent 100%);

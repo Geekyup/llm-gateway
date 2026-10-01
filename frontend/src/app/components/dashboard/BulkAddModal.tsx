@@ -42,19 +42,19 @@ export function BulkAddModal({
 
   const baseInp: React.CSSProperties = {
     background: "var(--field)",
-    border: "1px solid color-mix(in srgb, var(--ink) 17%, transparent)",
-    boxShadow: "inset 0 1px 0 rgba(26,26,24,0.15)",
+    border: "1px solid color-mix(in srgb, var(--ink) 10.2%, transparent)",
+    boxShadow: "inset 0 1px 0 rgba(0,0,0,0.3)",
     color: "var(--ink)",
   };
 
   function focus(e: React.FocusEvent<HTMLElement>) {
     e.currentTarget.style.borderColor = "color-mix(in srgb, var(--accent) 40%, transparent)";
-    e.currentTarget.style.boxShadow = "inset 0 1px 0 rgba(26,26,24,0.15), 0 0 0 3px color-mix(in srgb, var(--accent) 7%, transparent)";
+    e.currentTarget.style.boxShadow = "inset 0 1px 0 rgba(0,0,0,0.3), 0 0 0 3px color-mix(in srgb, var(--accent) 7%, transparent)";
   }
 
   function blur(e: React.FocusEvent<HTMLElement>) {
-    e.currentTarget.style.borderColor = "color-mix(in srgb, var(--ink) 17%, transparent)";
-    e.currentTarget.style.boxShadow = "inset 0 1px 0 rgba(26,26,24,0.15)";
+    e.currentTarget.style.borderColor = "color-mix(in srgb, var(--ink) 10.2%, transparent)";
+    e.currentTarget.style.boxShadow = "inset 0 1px 0 rgba(0,0,0,0.3)";
   }
 
   const keyCount = rawKeys.split(/[\s,]+/).map((s) => s.trim()).filter(Boolean).length;
@@ -88,7 +88,7 @@ export function BulkAddModal({
   return (
     <div
       className="fixed inset-0 z-50 flex items-center justify-center p-4 duration-200"
-      style={{ background: "rgba(26,26,24,0.43)", backdropFilter: "blur(4px)" }}
+      style={{ background: "rgba(0,0,0,0.86)", backdropFilter: "blur(4px)" }}
       onMouseDown={(e) => { overlayMouseDownOnSelf.current = e.target === e.currentTarget; }}
       onMouseUp={(e) => {
         if (overlayMouseDownOnSelf.current && e.target === e.currentTarget) onClose();
@@ -97,7 +97,7 @@ export function BulkAddModal({
     >
       <div
         className="w-full sm:max-w-lg rounded-lg p-5 sm:p-6 max-h-[92vh] overflow-y-auto duration-200 ease-out"
-        style={{ background: "var(--card)", border: "1px solid color-mix(in srgb, var(--ink) 15%, transparent)", boxShadow: "0 32px 80px rgba(26,26,24,0.36)" }}
+        style={{ background: "var(--card)", border: "1px solid color-mix(in srgb, var(--ink) 9%, transparent)", boxShadow: "0 32px 80px rgba(0,0,0,0.72)" }}
       >
         <div className="flex items-center justify-between mb-6">
           <h2 className="text-sm font-semibold text-ink">Bulk Add Keys</h2>
@@ -164,7 +164,7 @@ export function BulkAddModal({
                   {providerPickerOpen && (
                     <div
                       className="absolute z-10 mt-1.5 w-full rounded-lg shadow-lg duration-150 overflow-hidden"
-                      style={{ background: "var(--field)", border: "1px solid color-mix(in srgb, var(--ink) 20%, transparent)", boxShadow: "0 12px 32px rgba(26,26,24,0.3)" }}
+                      style={{ background: "var(--field)", border: "1px solid color-mix(in srgb, var(--ink) 12%, transparent)", boxShadow: "0 12px 32px rgba(0,0,0,0.6)" }}
                     >
                       {(Object.keys(PROVIDER_NAMES) as Provider[]).map((p) => {
                         const meta = PROVIDER_NAMES[p];
@@ -265,7 +265,7 @@ export function BulkAddModal({
               <button
                 onClick={onClose}
                 className="flex-1 py-2 rounded-lg text-sm font-medium transition-colors active:scale-95"
-                style={{ background: "color-mix(in srgb, var(--ink) 7%, transparent)", color: "var(--ink-3)", border: "1px solid color-mix(in srgb, var(--ink) 10%, transparent)" }}
+                style={{ background: "color-mix(in srgb, var(--ink) 4.2%, transparent)", color: "var(--ink-3)", border: "1px solid color-mix(in srgb, var(--ink) 6%, transparent)" }}
               >
                 Cancel
               </button>

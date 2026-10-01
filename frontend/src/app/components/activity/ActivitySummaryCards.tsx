@@ -78,7 +78,7 @@ export function ActivitySummaryCards({ summary }: { summary: ActivitySummary | n
         <div
           key={c.label}
           className="rounded-lg p-4"
-          style={{ background: "var(--card)", border: "1px solid color-mix(in srgb, var(--ink) 10%, transparent)" }}
+          style={{ background: "var(--card)", border: "1px solid color-mix(in srgb, var(--ink) 6%, transparent)" }}
         >
           <div className="text-[12px] text-ink-3 font-medium mb-2">{c.label}</div>
           <div className="text-2xl font-mono font-medium text-ink mb-1.5">{c.value}</div>

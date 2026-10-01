@@ -45,8 +45,8 @@ export function ActivityOutcomeFilterDropdown({
         className="flex items-center gap-1.5 text-[12px] rounded-md px-2 py-1 outline-none transition-colors hover:brightness-125"
         style={{
           color: "var(--ink)",
-          background: active ? meta!.bg : "color-mix(in srgb, var(--ink) 10%, transparent)",
-          border: `1px solid ${active ? alpha(meta!.color, 22) : "color-mix(in srgb, var(--ink) 14%, transparent)"}`,
+          background: active ? meta!.bg : "color-mix(in srgb, var(--ink) 6%, transparent)",
+          border: `1px solid ${active ? alpha(meta!.color, 22) : "color-mix(in srgb, var(--ink) 8.4%, transparent)"}`,
         }}
       >
         {active ? (
@@ -67,12 +67,12 @@ export function ActivityOutcomeFilterDropdown({
         <div
           ref={menuRef}
           className="min-w-[150px] rounded-lg shadow-lg duration-150 overflow-hidden"
-          style={{ background: "var(--field)", border: "1px solid color-mix(in srgb, var(--ink) 17%, transparent)" }}
+          style={{ background: "var(--field)", border: "1px solid color-mix(in srgb, var(--ink) 10.2%, transparent)" }}
         >
           <button
             onClick={() => { onChange(""); setOpen(false); }}
             className="group w-full flex items-center justify-between gap-2 text-left px-3 py-2 text-xs transition-colors hover:bg-ink/10"
-            style={{ background: !active ? "color-mix(in srgb, var(--ink) 7%, transparent)" : "transparent" }}
+            style={{ background: !active ? "color-mix(in srgb, var(--ink) 4.2%, transparent)" : "transparent" }}
           >
             <span
               className="transition-colors group-hover:!text-[var(--ink)]"
@@ -90,7 +90,7 @@ export function ActivityOutcomeFilterDropdown({
                 key={o.value}
                 onClick={() => { onChange(o.value); setOpen(false); }}
                 className="group w-full flex items-center justify-between gap-2 text-left px-3 py-2 text-xs transition-colors hover:bg-ink/10"
-                style={{ background: isSelected ? "color-mix(in srgb, var(--ink) 7%, transparent)" : "transparent" }}
+                style={{ background: isSelected ? "color-mix(in srgb, var(--ink) 4.2%, transparent)" : "transparent" }}
               >
                 <span className="flex items-center gap-1.5">
                   <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ background: m.color }} />

@@ -107,12 +107,12 @@ export function KeyDetailDrawer({
 
   return (
     <>
-      <div className="fixed inset-0 z-40 duration-200" onClick={onClose} style={{ background: "rgba(26,26,24,0.3)", backdropFilter: "blur(2px)" }} />
+      <div className="fixed inset-0 z-40 duration-200" onClick={onClose} style={{ background: "rgba(0,0,0,0.6)", backdropFilter: "blur(2px)" }} />
       <aside
         className="fixed right-0 top-0 bottom-0 z-50 w-full sm:w-96 flex flex-col overflow-y-auto thin-scrollbar duration-300 ease-out"
-        style={{ background: "var(--card)", borderLeft: "1px solid color-mix(in srgb, var(--ink) 12%, transparent)", boxShadow: "-24px 0 60px rgba(26,26,24,0.24)" }}
+        style={{ background: "var(--card)", borderLeft: "1px solid color-mix(in srgb, var(--ink) 7.2%, transparent)", boxShadow: "-24px 0 60px rgba(0,0,0,0.48)" }}
       >
-        <div className="flex items-start justify-between p-5" style={{ borderBottom: "1px solid color-mix(in srgb, var(--ink) 8%, transparent)" }}>
+        <div className="flex items-start justify-between p-5" style={{ borderBottom: "1px solid color-mix(in srgb, var(--ink) 4.8%, transparent)" }}>
           <div>
             <h2 className="text-sm font-semibold text-ink">{keyData.label}</h2>
             <div className="flex items-center gap-2 mt-1">
@@ -148,13 +148,13 @@ export function KeyDetailDrawer({
               <p className="text-[12px] text-ink-3 font-semibold">
                 {chartMode === "requests" ? "Hourly Usage Today" : "Hourly Tokens Today"}
               </p>
-              <div className="flex gap-0.5 rounded-md p-0.5" style={{ background: "color-mix(in srgb, var(--ink) 5%, transparent)" }}>
+              <div className="flex gap-0.5 rounded-md p-0.5" style={{ background: "color-mix(in srgb, var(--ink) 3%, transparent)" }}>
                 {(["requests", "tokens"] as const).map((m) => (
                   <button
                     key={m}
                     onClick={() => setChartMode(m)}
                     className="px-2 py-0.5 rounded text-[12px] font-medium transition-all"
-                    style={{ color: chartMode === m ? "var(--ink)" : "var(--ink-4)", background: chartMode === m ? "color-mix(in srgb, var(--ink) 12%, transparent)" : "transparent" }}
+                    style={{ color: chartMode === m ? "var(--ink)" : "var(--ink-4)", background: chartMode === m ? "color-mix(in srgb, var(--ink) 7.2%, transparent)" : "transparent" }}
                   >
                     {m === "requests" ? "Requests" : "Tokens"}
                   </button>
@@ -187,7 +187,7 @@ export function KeyDetailDrawer({
                         interval={3}
                       />
                       <Tooltip
-                        contentStyle={{ background: "var(--field)", border: "1px solid color-mix(in srgb, var(--ink) 14%, transparent)", borderRadius: 8, fontSize: 11, fontFamily: "JetBrains Mono, monospace" }}
+                        contentStyle={{ background: "var(--field)", border: "1px solid color-mix(in srgb, var(--ink) 8.4%, transparent)", borderRadius: 8, fontSize: 11, fontFamily: "JetBrains Mono, monospace" }}
                         labelStyle={{ color: "var(--ink-3)" }}
                         itemStyle={{ color: s.color }}
                         formatter={(v: number) => [v.toLocaleString(), "req"]}
@@ -207,8 +207,8 @@ export function KeyDetailDrawer({
                   <AreaChart data={tokenData} margin={{ top: 4, right: 0, left: -32, bottom: 0 }}>
                     <defs>
                       <linearGradient id="tgrad" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="5%" stopColor="#7C5CD6" stopOpacity={0.22} />
-                        <stop offset="95%" stopColor="#7C5CD6" stopOpacity={0} />
+                        <stop offset="5%" stopColor="#A78BFA" stopOpacity={0.22} />
+                        <stop offset="95%" stopColor="#A78BFA" stopOpacity={0} />
                       </linearGradient>
                     </defs>
                     <XAxis
@@ -220,7 +220,7 @@ export function KeyDetailDrawer({
                       interval={3}
                     />
                     <Tooltip
-                      contentStyle={{ background: "var(--field)", border: "1px solid color-mix(in srgb, var(--ink) 14%, transparent)", borderRadius: 8, fontSize: 11, fontFamily: "JetBrains Mono, monospace" }}
+                      contentStyle={{ background: "var(--field)", border: "1px solid color-mix(in srgb, var(--ink) 8.4%, transparent)", borderRadius: 8, fontSize: 11, fontFamily: "JetBrains Mono, monospace" }}
                       labelStyle={{ color: "var(--ink-3)" }}
                       formatter={(v: number, name: string, p: { payload?: { prompt: number; completion: number } }) => {
                         if (name !== "r") return [v, name];
@@ -231,21 +231,21 @@ export function KeyDetailDrawer({
                         ];
                       }}
                     />
-                    <Area type="monotone" dataKey="r" stroke="#7C5CD6" strokeWidth={1.5} fill="url(#tgrad)" dot={false} />
+                    <Area type="monotone" dataKey="r" stroke="#A78BFA" strokeWidth={1.5} fill="url(#tgrad)" dot={false} />
                   </AreaChart>
                 </ResponsiveContainer>
               )}
             </div>
           </div>
 
-          <div className="rounded-lg overflow-hidden" style={{ border: "1px solid color-mix(in srgb, var(--ink) 10%, transparent)" }}>
+          <div className="rounded-lg overflow-hidden" style={{ border: "1px solid color-mix(in srgb, var(--ink) 6%, transparent)" }}>
             {meta.map((m, i) => (
               <div
                 key={m.label}
                 className="flex items-center justify-between px-3.5 py-2.5"
                 style={{
-                  borderBottom: i < meta.length - 1 ? "1px solid color-mix(in srgb, var(--ink) 7%, transparent)" : "none",
-                  background: i % 2 === 0 ? "transparent" : "color-mix(in srgb, var(--ink) 2%, transparent)",
+                  borderBottom: i < meta.length - 1 ? "1px solid color-mix(in srgb, var(--ink) 4.2%, transparent)" : "none",
+                  background: i % 2 === 0 ? "transparent" : "color-mix(in srgb, var(--ink) 1.2%, transparent)",
                 }}
               >
                 <span className="text-[12px] text-ink-3">{m.label}</span>
@@ -268,7 +268,7 @@ export function KeyDetailDrawer({
               onClick={onReset}
               disabled={resetting}
               className="w-full flex items-center justify-center gap-2 py-2 rounded-lg text-xs font-medium transition-all active:scale-[0.97] disabled:active:scale-100 disabled:opacity-50"
-              style={{ background: "rgba(79,142,247,0.08)", color: "#2F6FD6", border: "1px solid rgba(79,142,247,0.16)" }}
+              style={{ background: "rgba(91,155,255,0.1)", color: "#5B9BFF", border: "1px solid rgba(91,155,255,0.2)" }}
             >
               {resetting ? <Loader2 size={12} className="animate-spin" /> : <RefreshCw size={12} />}
               {resetting ? "Resetting..." : "Reset Cooldown"}
@@ -276,7 +276,7 @@ export function KeyDetailDrawer({
             <button
               onClick={onDisable}
               className="w-full flex items-center justify-center gap-2 py-2 rounded-lg text-xs font-medium transition-all active:scale-[0.97]"
-              style={{ background: "color-mix(in srgb, var(--ink) 7%, transparent)", color: "var(--ink-3)", border: "1px solid color-mix(in srgb, var(--ink) 12%, transparent)" }}
+              style={{ background: "color-mix(in srgb, var(--ink) 4.2%, transparent)", color: "var(--ink-3)", border: "1px solid color-mix(in srgb, var(--ink) 7.2%, transparent)" }}
             >
               <Power size={12} />
               {keyData.status === "disabled" ? "Enable Key" : "Disable Key"}

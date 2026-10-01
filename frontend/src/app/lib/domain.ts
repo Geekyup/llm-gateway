@@ -40,9 +40,9 @@ export function pingMeta(ms: number | undefined): { text: string; color: string 
 }
 
 export const PROVIDER_META: Record<string, { name: string; color: string; bg: string }> = {
-  gemini:     { name: "Gemini",     color: "#2F6FD6", bg: "rgba(79,142,247,0.1)"  },
-  openrouter: { name: "OpenRouter", color: "#7C5CD6", bg: "rgba(167,139,250,0.1)" },
-  groq:       { name: "Groq",       color: "#D9611A", bg: "rgba(249,115,22,0.1)"  },
+  gemini:     { name: "Gemini",     color: "#5B9BFF", bg: "rgba(91,155,255,0.12)"  },
+  openrouter: { name: "OpenRouter", color: "#A78BFA", bg: "rgba(167,139,250,0.12)" },
+  groq:       { name: "Groq",       color: "#F58B4C", bg: "rgba(245,139,76,0.12)"  },
 };
 
 export function providerMeta(provider: string) {

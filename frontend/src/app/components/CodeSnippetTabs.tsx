@@ -32,7 +32,7 @@ function CodeToken({
   return (
     <span
       className="relative inline-block underline decoration-dotted cursor-help"
-      style={{ color: "var(--ok)", textDecorationColor: "color-mix(in srgb, var(--ink) 35.0%, transparent)" }}
+      style={{ color: "var(--ok)", textDecorationColor: "color-mix(in srgb, var(--ink) 21%, transparent)" }}
       onMouseEnter={() => setShow(true)}
       onMouseLeave={() => setShow(false)}
     >
@@ -42,7 +42,7 @@ function CodeToken({
           className={`absolute bottom-full mb-2 z-20 max-w-[min(280px,80vw)] whitespace-normal px-2.5 py-1.5 rounded-md text-[12px] font-mono normal-case ${
             align === "right" ? "right-0" : "left-0"
           }`}
-          style={{ background: "var(--background)", border: "1px solid color-mix(in srgb, var(--ink) 17%, transparent)", color: "var(--ink)", boxShadow: "0 4px 16px rgba(26,26,24,0.24)" }}
+          style={{ background: "var(--background)", border: "1px solid color-mix(in srgb, var(--ink) 10.2%, transparent)", color: "var(--ink)", boxShadow: "0 4px 16px rgba(0,0,0,0.48)" }}
         >
           {tip}
         </span>
@@ -139,10 +139,10 @@ export function CodeSnippetTabs({
   }
 
   return (
-    <div className="mt-3 rounded-lg overflow-hidden" style={{ background: "var(--sidebar)", border: "1px solid color-mix(in srgb, var(--ink) 20%, transparent)" }}>
+    <div className="mt-3 rounded-lg overflow-hidden" style={{ background: "var(--sidebar)", border: "1px solid color-mix(in srgb, var(--ink) 12%, transparent)" }}>
       <div
         className="flex flex-col gap-2 px-3 py-2.5 sm:flex-row sm:items-center"
-        style={{ background: "var(--card)", borderBottom: "1px solid color-mix(in srgb, var(--ink) 17%, transparent)" }}
+        style={{ background: "var(--card)", borderBottom: "1px solid color-mix(in srgb, var(--ink) 10.2%, transparent)" }}
       >
         <div className="flex items-center gap-2 shrink-0">
           <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ background: "var(--bad)" }} />
@@ -157,7 +157,7 @@ export function CodeSnippetTabs({
               key={lang}
               onClick={() => setActive(lang)}
               className="relative px-2.5 py-1 text-[12px] font-medium rounded-md transition-colors whitespace-nowrap shrink-0"
-              style={{ color: active === lang ? "var(--background)" : "var(--ink-2)", background: active === lang ? "var(--ink)" : "color-mix(in srgb, var(--ink) 10%, transparent)" }}
+              style={{ color: active === lang ? "var(--background)" : "var(--ink-2)", background: active === lang ? "var(--ink)" : "color-mix(in srgb, var(--ink) 6%, transparent)" }}
             >
               {LANG_LABELS[lang]}
             </button>
@@ -167,7 +167,7 @@ export function CodeSnippetTabs({
         <button
           onClick={copy}
           className="flex items-center justify-center gap-1.5 px-2.5 py-1.5 rounded-md text-[12px] font-medium transition-colors shrink-0 sm:ml-auto"
-          style={{ background: copied ? "color-mix(in srgb, var(--ok) 15%, transparent)" : "color-mix(in srgb, var(--ink) 14%, transparent)", color: copied ? "var(--ok)" : "var(--ink-2)" }}
+          style={{ background: copied ? "color-mix(in srgb, var(--ok) 15%, transparent)" : "color-mix(in srgb, var(--ink) 8.4%, transparent)", color: copied ? "var(--ok)" : "var(--ink-2)" }}
         >
           {copied ? <Check size={12} /> : <Copy size={12} />}
           {copied ? "Copied" : "Copy"}

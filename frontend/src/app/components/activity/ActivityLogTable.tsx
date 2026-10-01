@@ -99,10 +99,10 @@ export function ActivityLogTable({ range, refreshSignal = 0 }: { range: Activity
   }
 
   return (
-    <div className="rounded-lg overflow-hidden" style={{ border: "1px solid color-mix(in srgb, var(--ink) 10%, transparent)" }}>
+    <div className="rounded-lg overflow-hidden" style={{ border: "1px solid color-mix(in srgb, var(--ink) 6%, transparent)" }}>
       <div
         className="flex flex-wrap items-center justify-between gap-x-2 gap-y-2 px-4 py-2.5"
-        style={{ borderBottom: "1px solid color-mix(in srgb, var(--ink) 8%, transparent)", background: "var(--sidebar)" }}
+        style={{ borderBottom: "1px solid color-mix(in srgb, var(--ink) 4.8%, transparent)", background: "var(--sidebar)" }}
       >
         <span className="text-xs font-medium text-ink-2 shrink-0">Request log</span>
         <div className="flex items-center gap-2 flex-wrap">
@@ -112,7 +112,7 @@ export function ActivityLogTable({ range, refreshSignal = 0 }: { range: Activity
             onClick={handleExport}
             disabled={exporting || total === 0}
             className="flex items-center gap-1.5 text-[12px] rounded-md px-2.5 py-1 outline-none disabled:opacity-40 transition-colors"
-            style={{ color: "var(--ink)", background: "color-mix(in srgb, var(--ink) 10%, transparent)", border: "1px solid color-mix(in srgb, var(--ink) 14%, transparent)" }}
+            style={{ color: "var(--ink)", background: "color-mix(in srgb, var(--ink) 6%, transparent)", border: "1px solid color-mix(in srgb, var(--ink) 8.4%, transparent)" }}
           >
             {exporting ? <Loader2 size={11} className="animate-spin" /> : <Download size={11} />}
             Export CSV
@@ -133,7 +133,7 @@ export function ActivityLogTable({ range, refreshSignal = 0 }: { range: Activity
       ) : entries.length === 0 ? (
         <div className="px-4 py-16 text-center" style={{ background: "var(--card)" }}>
           <div className="flex flex-col items-center gap-3">
-            <div className="w-10 h-10 rounded-lg flex items-center justify-center" style={{ background: "color-mix(in srgb, var(--ink) 5%, transparent)", border: "1px solid color-mix(in srgb, var(--ink) 10%, transparent)" }}>
+            <div className="w-10 h-10 rounded-lg flex items-center justify-center" style={{ background: "color-mix(in srgb, var(--ink) 3%, transparent)", border: "1px solid color-mix(in srgb, var(--ink) 6%, transparent)" }}>
               <ListX size={18} color="var(--ink-4)" />
             </div>
             <p className="text-sm text-ink-3">No requests found</p>
@@ -153,7 +153,7 @@ export function ActivityLogTable({ range, refreshSignal = 0 }: { range: Activity
               <col style={{ width: "10%" }} />
             </colgroup>
             <thead>
-              <tr style={{ borderBottom: "1px solid color-mix(in srgb, var(--ink) 7%, transparent)" }}>
+              <tr style={{ borderBottom: "1px solid color-mix(in srgb, var(--ink) 4.2%, transparent)" }}>
                 {["Time", "Provider", "Model", "Key", "Outcome", "Latency", "Tokens"].map((h, i) => (
                   <th
                     key={h}
@@ -197,7 +197,7 @@ export function ActivityLogTable({ range, refreshSignal = 0 }: { range: Activity
 
       <div
         className="flex items-center justify-center gap-3 px-4 py-2.5"
-        style={{ borderTop: "1px solid color-mix(in srgb, var(--ink) 8%, transparent)", background: "var(--sidebar)" }}
+        style={{ borderTop: "1px solid color-mix(in srgb, var(--ink) 4.8%, transparent)", background: "var(--sidebar)" }}
       >
         <button
           onClick={() => setPage((p) => Math.max(1, p - 1))}

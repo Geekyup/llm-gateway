@@ -8,7 +8,7 @@ export function ProviderGroupHeader({ provider, keys }: { provider: string; keys
   const allHealthy = activeCount === total;
 
   return (
-    <div className="flex items-center justify-between gap-2 px-3 py-2" style={{ background: "color-mix(in srgb, var(--ink) 3%, transparent)" }}>
+    <div className="flex items-center justify-between gap-2 px-3 py-2" style={{ background: "color-mix(in srgb, var(--ink) 1.8%, transparent)" }}>
       <div className="flex items-center gap-1.5">
         <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ background: meta.color }} />
         <span className="text-xs font-medium" style={{ color: "var(--ink-2)" }}>{meta.name}</span>

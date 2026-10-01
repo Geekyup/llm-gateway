@@ -39,14 +39,14 @@ export function TopBar({
         <button
           onClick={onBulkAdd}
           className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all active:scale-95"
-          style={{ background: "color-mix(in srgb, var(--ink) 7%, transparent)", color: "var(--ink)", border: "1px solid color-mix(in srgb, var(--ink) 14%, transparent)" }}
+          style={{ background: "color-mix(in srgb, var(--ink) 4.2%, transparent)", color: "var(--ink)", border: "1px solid color-mix(in srgb, var(--ink) 8.4%, transparent)" }}
           onMouseEnter={(e) => {
-            e.currentTarget.style.background = "color-mix(in srgb, var(--ink) 14%, transparent)";
-            e.currentTarget.style.borderColor = "color-mix(in srgb, var(--ink) 16.0%, transparent)";
+            e.currentTarget.style.background = "color-mix(in srgb, var(--ink) 8.4%, transparent)";
+            e.currentTarget.style.borderColor = "color-mix(in srgb, var(--ink) 9.6%, transparent)";
           }}
           onMouseLeave={(e) => {
-            e.currentTarget.style.background = "color-mix(in srgb, var(--ink) 7%, transparent)";
-            e.currentTarget.style.borderColor = "color-mix(in srgb, var(--ink) 14%, transparent)";
+            e.currentTarget.style.background = "color-mix(in srgb, var(--ink) 4.2%, transparent)";
+            e.currentTarget.style.borderColor = "color-mix(in srgb, var(--ink) 8.4%, transparent)";
           }}
         >
           <Layers size={13} /> Bulk Add

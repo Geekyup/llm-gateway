@@ -29,7 +29,7 @@ import {
 const SUCCESS_COLOR = "var(--ok)";
 const RATE_LIMITED_COLOR = "var(--warn)";
 const ERROR_COLOR = "var(--bad)";
-const P50_COLOR = "#2F6FD6";
+const P50_COLOR = "#5B9BFF";
 const P95_COLOR = "var(--warn)";
 const P99_COLOR = "var(--bad)";
 
@@ -57,7 +57,7 @@ export function RequestsByOutcomeChart({ buckets, loading }: { buckets: DailyOut
               contentStyle={tooltipStyle()}
               labelStyle={{ color: MUTED, marginBottom: 2 }}
               itemStyle={{ color: "var(--ink)" }}
-              cursor={{ fill: "color-mix(in srgb, var(--ink) 5%, transparent)" }}
+              cursor={{ fill: "color-mix(in srgb, var(--ink) 3%, transparent)" }}
             />
             <Bar dataKey="success" stackId="o" fill={SUCCESS_COLOR} name="Success" maxBarSize={28} />
             <Bar dataKey="rate_limited" stackId="o" fill={RATE_LIMITED_COLOR} name="Rate limited" maxBarSize={28} />
@@ -91,7 +91,7 @@ export function LatencyPercentilesChart({ buckets, loading }: { buckets: Latency
               labelStyle={{ color: MUTED, marginBottom: 2 }}
               itemStyle={{ color: "var(--ink)" }}
               formatter={(v: number) => [`${Math.round(v)} ms`, ""]}
-              cursor={{ stroke: "color-mix(in srgb, var(--ink) 17%, transparent)" }}
+              cursor={{ stroke: "color-mix(in srgb, var(--ink) 10.2%, transparent)" }}
             />
             <Line type="monotone" dataKey="p50" stroke={P50_COLOR} strokeWidth={1.5} dot={false} name="p50" connectNulls />
             <Line type="monotone" dataKey="p95" stroke={P95_COLOR} strokeWidth={1.5} dot={false} name="p95" connectNulls />
@@ -105,7 +105,7 @@ export function LatencyPercentilesChart({ buckets, loading }: { buckets: Latency
   );
 }
 
-const PROVIDER_COLORS = ["#2F6FD6", "var(--ok)", "#7C5CD6", "#D9611A", "var(--ink-3)"];
+const PROVIDER_COLORS = ["#5B9BFF", "var(--ok)", "#A78BFA", "#F58B4C", "var(--ink-3)"];
 
 export function TokensByProviderChart({ buckets, loading }: { buckets: TokensByProviderBucket[]; loading: boolean }) {
   const providers = Array.from(new Set(buckets.flatMap((b) => Object.keys(b.providers))));
@@ -131,7 +131,7 @@ export function TokensByProviderChart({ buckets, loading }: { buckets: TokensByP
               contentStyle={tooltipStyle()}
               labelStyle={{ color: MUTED, marginBottom: 2 }}
               itemStyle={{ color: "var(--ink)" }}
-              cursor={{ fill: "color-mix(in srgb, var(--ink) 5%, transparent)" }}
+              cursor={{ fill: "color-mix(in srgb, var(--ink) 3%, transparent)" }}
             />
             {providers.map((p, i) => (
               <Bar
@@ -179,9 +179,9 @@ export function TopModelsChart({ models, loading }: { models: TopModelEntry[]; l
               labelStyle={{ color: MUTED, marginBottom: 2 }}
               itemStyle={{ color: "var(--ink)" }}
               formatter={(v: number) => [`${v} req`, ""]}
-              cursor={{ fill: "color-mix(in srgb, var(--ink) 5%, transparent)" }}
+              cursor={{ fill: "color-mix(in srgb, var(--ink) 3%, transparent)" }}
             />
-            <Bar dataKey="requests" fill="#2F6FD6" radius={[0, 2, 2, 0]} maxBarSize={16} />
+            <Bar dataKey="requests" fill="#5B9BFF" radius={[0, 2, 2, 0]} maxBarSize={16} />
           </BarChart>
         </ResponsiveContainer>
       ) : (

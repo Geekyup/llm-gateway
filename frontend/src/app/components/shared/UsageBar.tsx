@@ -25,7 +25,7 @@ export function UsageBar({ used, limit, status }: { used: number; limit: number;
           <span
             key={i}
             className="flex-1"
-            style={{ background: i < filled ? color : "color-mix(in srgb, var(--ink) 20%, transparent)" }}
+            style={{ background: i < filled ? color : "color-mix(in srgb, var(--ink) 12%, transparent)" }}
           />
         ))}
       </div>

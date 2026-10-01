@@ -72,8 +72,8 @@ export function KeysTable({
   const desktopFlipRef = useFlipAnimation<HTMLDivElement>(grouped);
 
   return (
-    <div className="rounded-lg overflow-hidden" style={{ border: "1px solid color-mix(in srgb, var(--ink) 10%, transparent)" }}>
-      <div className="flex flex-wrap items-center justify-between gap-x-2 gap-y-2 px-4 py-2.5" style={{ borderBottom: "1px solid color-mix(in srgb, var(--ink) 8%, transparent)", background: "var(--sidebar)" }}>
+    <div className="rounded-lg overflow-hidden" style={{ border: "1px solid color-mix(in srgb, var(--ink) 6%, transparent)" }}>
+      <div className="flex flex-wrap items-center justify-between gap-x-2 gap-y-2 px-4 py-2.5" style={{ borderBottom: "1px solid color-mix(in srgb, var(--ink) 4.8%, transparent)", background: "var(--sidebar)" }}>
         <span className="text-xs font-medium text-ink-2 shrink-0">API Keys</span>
         <div className="flex items-end gap-2 sm:gap-3 min-w-0 flex-wrap sm:flex-nowrap">
           <div className="relative hidden sm:block mb-[1px]">
@@ -83,7 +83,7 @@ export function KeysTable({
               onChange={(e) => setQuery(e.target.value)}
               placeholder="Search keys..."
               className="text-[12px] rounded-md pl-7 pr-2.5 py-1 outline-none w-[150px] focus:w-[190px] transition-all"
-              style={{ color: "var(--ink)", background: "color-mix(in srgb, var(--ink) 10%, transparent)", border: "1px solid color-mix(in srgb, var(--ink) 14%, transparent)" }}
+              style={{ color: "var(--ink)", background: "color-mix(in srgb, var(--ink) 6%, transparent)", border: "1px solid color-mix(in srgb, var(--ink) 8.4%, transparent)" }}
             />
           </div>
           <ProviderFilterDropdown filter={filter} onFilter={onFilter} />
@@ -92,8 +92,8 @@ export function KeysTable({
             onClick={() => setGrouped((g) => !g)}
             className="flex items-center justify-center w-[26px] h-[26px] rounded-md transition-all mb-[1px]"
             style={{
-              background: grouped ? "color-mix(in srgb, var(--accent) 12%, transparent)" : "color-mix(in srgb, var(--ink) 10%, transparent)",
-              border: `1px solid ${grouped ? "color-mix(in srgb, var(--accent) 28%, transparent)" : "color-mix(in srgb, var(--ink) 14%, transparent)"}`,
+              background: grouped ? "color-mix(in srgb, var(--accent) 12%, transparent)" : "color-mix(in srgb, var(--ink) 6%, transparent)",
+              border: `1px solid ${grouped ? "color-mix(in srgb, var(--accent) 28%, transparent)" : "color-mix(in srgb, var(--ink) 8.4%, transparent)"}`,
             }}
             title={grouped ? "Show flat list" : "Group by provider"}
             aria-label={grouped ? "Show flat list" : "Group by provider"}
@@ -106,7 +106,7 @@ export function KeysTable({
       {filtered.length === 0 ? (
         <div className="px-4 py-16 text-center" style={{ background: "var(--card)" }}>
           <div className="flex flex-col items-center gap-3">
-            <div className="w-10 h-10 rounded-lg flex items-center justify-center" style={{ background: "color-mix(in srgb, var(--ink) 5%, transparent)", border: "1px solid color-mix(in srgb, var(--ink) 10%, transparent)" }}>
+            <div className="w-10 h-10 rounded-lg flex items-center justify-center" style={{ background: "color-mix(in srgb, var(--ink) 3%, transparent)", border: "1px solid color-mix(in srgb, var(--ink) 6%, transparent)" }}>
               <KeyRound size={18} color="var(--ink-4)" />
             </div>
             <p className="text-sm text-ink-3">No keys found</p>
@@ -122,9 +122,9 @@ export function KeysTable({
               ? (
                 <div className="flex flex-col gap-2 p-2.5">
                   {groups.map((g) => (
-                    <div key={g.provider} className="rounded-lg overflow-hidden" style={{ border: "1px solid color-mix(in srgb, var(--ink) 12%, transparent)", background: "var(--sidebar)" }}>
+                    <div key={g.provider} className="rounded-lg overflow-hidden" style={{ border: "1px solid color-mix(in srgb, var(--ink) 7.2%, transparent)", background: "var(--sidebar)" }}>
                       <ProviderGroupHeader provider={g.provider} keys={g.items} />
-                      <div className="divide-y divide-ink/[0.03]" style={{ borderTop: "1px solid color-mix(in srgb, var(--ink) 8%, transparent)" }}>
+                      <div className="divide-y divide-ink/[0.03]" style={{ borderTop: "1px solid color-mix(in srgb, var(--ink) 4.8%, transparent)" }}>
                         {g.items.map((k) => (
                           <MobileKeyRow key={k.id} k={k} now={now} checkingIds={checkingIds} onSelect={onSelect} onEdit={onEdit} onToggle={onToggle} onCheck={onCheck} />
                         ))}
@@ -146,9 +146,9 @@ export function KeysTable({
             {grouped ? (
               <div className="flex flex-col gap-2.5 p-2.5">
                 {groups.map((g) => (
-                  <div key={g.provider} className="rounded-lg overflow-hidden" style={{ border: "1px solid color-mix(in srgb, var(--ink) 12%, transparent)", background: "var(--sidebar)" }}>
+                  <div key={g.provider} className="rounded-lg overflow-hidden" style={{ border: "1px solid color-mix(in srgb, var(--ink) 7.2%, transparent)", background: "var(--sidebar)" }}>
                     <ProviderGroupHeader provider={g.provider} keys={g.items} />
-                    <div className="overflow-x-auto" style={{ borderTop: "1px solid color-mix(in srgb, var(--ink) 8%, transparent)" }}>
+                    <div className="overflow-x-auto" style={{ borderTop: "1px solid color-mix(in srgb, var(--ink) 4.8%, transparent)" }}>
                       <table className="w-full min-w-[760px]" style={{ tableLayout: "fixed" }}>
                         <ColumnWidths />
                         <tbody className="divide-y divide-ink/[0.03]">
@@ -166,7 +166,7 @@ export function KeysTable({
                 <table className="w-full min-w-[760px]" style={{ tableLayout: "fixed" }}>
                   <ColumnWidths />
                   <thead>
-                    <tr style={{ borderBottom: "1px solid color-mix(in srgb, var(--ink) 7%, transparent)" }}>
+                    <tr style={{ borderBottom: "1px solid color-mix(in srgb, var(--ink) 4.2%, transparent)" }}>
                       {["Label", "Provider", "Status", "Usage", "Ping", "Last Used", ""].map((h, i) => (
                         <th key={i} className="px-4 py-2.5 text-left text-[12px] font-semibold text-ink-3">
                           {h}

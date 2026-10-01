@@ -20,7 +20,7 @@ export function MetricCards({ keys }: { keys: AK[] }) {
     <div className="grid grid-cols-1 sm:grid-cols-[1.6fr_1fr_1fr] gap-3">
       <div
         className="rounded-lg p-4 duration-300"
-        style={{ background: "var(--card)", border: "1px solid color-mix(in srgb, var(--ink) 10%, transparent)" }}
+        style={{ background: "var(--card)", border: "1px solid color-mix(in srgb, var(--ink) 6%, transparent)" }}
       >
         <div className="flex items-center justify-between mb-3">
           <span className="text-[12px] text-ink-3 font-medium">Today's Usage</span>
@@ -32,7 +32,7 @@ export function MetricCards({ keys }: { keys: AK[] }) {
           <span className="text-2xl font-mono font-medium" style={{ color: usageColor }}>{req.toLocaleString()}</span>
           <span className="text-xs font-mono text-ink-3">/ {capacity.toLocaleString()} requests</span>
         </div>
-        <div className="h-[3px] rounded-full overflow-hidden" style={{ background: "color-mix(in srgb, var(--ink) 10%, transparent)" }}>
+        <div className="h-[3px] rounded-full overflow-hidden" style={{ background: "color-mix(in srgb, var(--ink) 6%, transparent)" }}>
           <div className="h-full rounded-full transition-all duration-500" style={{ width: `${pct}%`, background: usageColor }} />
         </div>
       </div>
@@ -43,7 +43,7 @@ export function MetricCards({ keys }: { keys: AK[] }) {
           className="rounded-lg p-4 transition-transform duration-200"
           style={{
             background: "var(--card)",
-            border: "1px solid color-mix(in srgb, var(--ink) 10%, transparent)",
+            border: "1px solid color-mix(in srgb, var(--ink) 6%, transparent)",
             animationDuration: "300ms",
             animationDelay: `${(i + 1) * 40}ms`,
             animationFillMode: "backwards",

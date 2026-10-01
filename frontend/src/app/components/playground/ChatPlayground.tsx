@@ -156,8 +156,8 @@ export function ChatPlayground({ keys, active, onAddKey }: { keys: AK[]; active:
                   <div
                     className="w-7 h-7 rounded-full flex items-center justify-center shrink-0"
                     style={{
-                      background: m.role === "user" ? "color-mix(in srgb, var(--ink) 10%, transparent)" : "color-mix(in srgb, var(--accent) 12%, transparent)",
-                      border: m.role === "user" ? "1px solid color-mix(in srgb, var(--ink) 14%, transparent)" : "1px solid color-mix(in srgb, var(--accent) 20%, transparent)",
+                      background: m.role === "user" ? "color-mix(in srgb, var(--ink) 6%, transparent)" : "color-mix(in srgb, var(--accent) 12%, transparent)",
+                      border: m.role === "user" ? "1px solid color-mix(in srgb, var(--ink) 8.4%, transparent)" : "1px solid color-mix(in srgb, var(--accent) 20%, transparent)",
                     }}
                   >
                     {m.role === "user" ? <User size={13} color="var(--ink-2)" /> : <Bot size={13} color="var(--accent)" />}
@@ -221,8 +221,8 @@ export function ChatPlayground({ keys, active, onAddKey }: { keys: AK[]; active:
           className="rounded-lg overflow-visible transition-shadow duration-150"
           style={{
             background: "var(--field)",
-            border: focused ? "1px solid color-mix(in srgb, var(--accent) 35%, transparent)" : "1px solid color-mix(in srgb, var(--ink) 15%, transparent)",
-            boxShadow: focused ? "0 0 0 3px color-mix(in srgb, var(--accent) 8%, transparent), 0 8px 24px rgba(26,26,24,0.17)" : "0 4px 16px rgba(26,26,24,0.11)",
+            border: focused ? "1px solid color-mix(in srgb, var(--accent) 35%, transparent)" : "1px solid color-mix(in srgb, var(--ink) 9%, transparent)",
+            boxShadow: focused ? "0 0 0 3px color-mix(in srgb, var(--accent) 8%, transparent), 0 8px 24px rgba(0,0,0,0.34)" : "0 4px 16px rgba(0,0,0,0.22)",
           }}
         >
           <textarea
@@ -272,7 +272,7 @@ export function ChatPlayground({ keys, active, onAddKey }: { keys: AK[]; active:
                   type="button"
                   className="playground-icon-btn playground-send-btn rounded-full shrink-0 transition-all active:scale-95 disabled:scale-100"
                   style={{
-                    background: input.trim() ? "var(--accent)" : "color-mix(in srgb, var(--ink) 14%, transparent)",
+                    background: input.trim() ? "var(--accent)" : "color-mix(in srgb, var(--ink) 8.4%, transparent)",
                     boxShadow: input.trim() ? "0 2px 10px color-mix(in srgb, var(--accent) 35%, transparent)" : "none",
                   }}
                 >

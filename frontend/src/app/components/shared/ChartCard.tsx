@@ -16,7 +16,7 @@ export function ChartCard({
   return (
     <div
       className="rounded-[10px] p-3.5"
-      style={{ background: "var(--card)", border: "1px solid color-mix(in srgb, var(--ink) 10%, transparent)" }}
+      style={{ background: "var(--card)", border: "1px solid color-mix(in srgb, var(--ink) 6%, transparent)" }}
     >
       <div className="flex items-baseline justify-between mb-2.5">
         <span className="text-[12px] text-ink-3">{title}</span>

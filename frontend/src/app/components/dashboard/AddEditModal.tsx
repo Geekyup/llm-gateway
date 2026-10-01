@@ -75,19 +75,19 @@ export function AddEditModal({
 
   const baseInp: React.CSSProperties = {
     background: "var(--field)",
-    border: "1px solid color-mix(in srgb, var(--ink) 17%, transparent)",
-    boxShadow: "inset 0 1px 0 rgba(26,26,24,0.15)",
+    border: "1px solid color-mix(in srgb, var(--ink) 10.2%, transparent)",
+    boxShadow: "inset 0 1px 0 rgba(0,0,0,0.3)",
     color: "var(--ink)",
   };
 
   function focus(e: React.FocusEvent<HTMLInputElement>) {
     e.target.style.borderColor = "color-mix(in srgb, var(--accent) 40%, transparent)";
-    e.target.style.boxShadow = "inset 0 1px 0 rgba(26,26,24,0.15), 0 0 0 3px color-mix(in srgb, var(--accent) 7%, transparent)";
+    e.target.style.boxShadow = "inset 0 1px 0 rgba(0,0,0,0.3), 0 0 0 3px color-mix(in srgb, var(--accent) 7%, transparent)";
   }
 
   function blur(e: React.FocusEvent<HTMLInputElement>) {
-    e.target.style.borderColor = "color-mix(in srgb, var(--ink) 17%, transparent)";
-    e.target.style.boxShadow = "inset 0 1px 0 rgba(26,26,24,0.15)";
+    e.target.style.borderColor = "color-mix(in srgb, var(--ink) 10.2%, transparent)";
+    e.target.style.boxShadow = "inset 0 1px 0 rgba(0,0,0,0.3)";
   }
 
   const overlayMouseDownOnSelf = useRef(false);
@@ -95,7 +95,7 @@ export function AddEditModal({
   return (
     <div
       className="fixed inset-0 z-50 flex items-center justify-center p-4 duration-200"
-      style={{ background: "rgba(26,26,24,0.43)", backdropFilter: "blur(4px)" }}
+      style={{ background: "rgba(0,0,0,0.86)", backdropFilter: "blur(4px)" }}
       onMouseDown={(e) => { overlayMouseDownOnSelf.current = e.target === e.currentTarget; }}
       onMouseUp={(e) => {
         if (overlayMouseDownOnSelf.current && e.target === e.currentTarget) onClose();
@@ -104,7 +104,7 @@ export function AddEditModal({
     >
       <div
         className="w-full sm:max-w-md rounded-lg p-5 sm:p-6 max-h-[92vh] overflow-y-auto duration-200 ease-out"
-        style={{ background: "var(--card)", border: "1px solid color-mix(in srgb, var(--ink) 15%, transparent)", boxShadow: "0 32px 80px rgba(26,26,24,0.36)" }}
+        style={{ background: "var(--card)", border: "1px solid color-mix(in srgb, var(--ink) 9%, transparent)", boxShadow: "0 32px 80px rgba(0,0,0,0.72)" }}
       >
         <div className="flex items-center justify-between mb-6">
           <h2 className="text-sm font-semibold text-ink">{editKey ? "Edit Key" : "Add API Key"}</h2>
@@ -148,7 +148,7 @@ export function AddEditModal({
               {providerPickerOpen && (
                 <div
                   className="absolute z-10 mt-1.5 w-full rounded-lg shadow-lg duration-150 overflow-hidden"
-                  style={{ background: "var(--field)", border: "1px solid color-mix(in srgb, var(--ink) 20%, transparent)", boxShadow: "0 12px 32px rgba(26,26,24,0.3)" }}
+                  style={{ background: "var(--field)", border: "1px solid color-mix(in srgb, var(--ink) 12%, transparent)", boxShadow: "0 12px 32px rgba(0,0,0,0.6)" }}
                 >
                   {(Object.keys(PROVIDER_NAMES) as Provider[]).map((p) => {
                     const meta = PROVIDER_NAMES[p];
@@ -226,7 +226,7 @@ export function AddEditModal({
                   onClick={() => { fetchModels(); setModelSearch(""); }}
                   disabled={modelLoading}
                   className="w-full flex items-center justify-center gap-2 py-2 rounded-lg text-xs font-medium transition-all active:scale-[0.98] disabled:active:scale-100 disabled:opacity-60"
-                  style={{ background: "var(--field)", color: "var(--ink-2)", border: "1px solid color-mix(in srgb, var(--ink) 17%, transparent)", boxShadow: "inset 0 1px 0 rgba(26,26,24,0.15)" }}
+                  style={{ background: "var(--field)", color: "var(--ink-2)", border: "1px solid color-mix(in srgb, var(--ink) 10.2%, transparent)", boxShadow: "inset 0 1px 0 rgba(0,0,0,0.3)" }}
                 >
                   {modelLoading ? <Loader2 size={13} className="animate-spin" /> : <ChevronDown size={13} />}
                   {modelLoading ? "Loading models…" : editKey ? "Select Model (uses saved key)" : "Select Model"}
@@ -235,10 +235,10 @@ export function AddEditModal({
                 {modelPickerOpen && modelOptions && (
                   <div
                     className="relative z-10 mt-1.5 w-full rounded-lg shadow-lg duration-150 overflow-hidden"
-                    style={{ background: "var(--field)", border: "1px solid color-mix(in srgb, var(--ink) 20%, transparent)", boxShadow: "0 12px 32px rgba(26,26,24,0.3)" }}
+                    style={{ background: "var(--field)", border: "1px solid color-mix(in srgb, var(--ink) 12%, transparent)", boxShadow: "0 12px 32px rgba(0,0,0,0.6)" }}
                   >
                     {modelOptions.length > 5 && (
-                      <div className="p-1.5 sticky top-0" style={{ background: "var(--field)", borderBottom: "1px solid color-mix(in srgb, var(--ink) 14%, transparent)" }}>
+                      <div className="p-1.5 sticky top-0" style={{ background: "var(--field)", borderBottom: "1px solid color-mix(in srgb, var(--ink) 8.4%, transparent)" }}>
                         <div className="relative">
                           <Search size={12} color="var(--ink-4)" className="absolute left-2 top-1/2 -translate-y-1/2" />
                           <input
@@ -247,7 +247,7 @@ export function AddEditModal({
                             onChange={(e) => setModelSearch(e.target.value)}
                             placeholder="Search models…"
                             className="w-full pl-6.5 pr-2 py-1.5 rounded-md text-xs outline-none"
-                            style={{ background: "color-mix(in srgb, var(--ink) 8%, transparent)", color: "var(--ink)", border: "1px solid transparent" }}
+                            style={{ background: "color-mix(in srgb, var(--ink) 4.8%, transparent)", color: "var(--ink)", border: "1px solid transparent" }}
                           />
                         </div>
                       </div>
@@ -309,7 +309,7 @@ export function AddEditModal({
           <button
             onClick={onClose}
             className="flex-1 py-2 rounded-lg text-sm font-medium transition-colors active:scale-95"
-            style={{ background: "color-mix(in srgb, var(--ink) 7%, transparent)", color: "var(--ink-3)", border: "1px solid color-mix(in srgb, var(--ink) 10%, transparent)" }}
+            style={{ background: "color-mix(in srgb, var(--ink) 4.2%, transparent)", color: "var(--ink-3)", border: "1px solid color-mix(in srgb, var(--ink) 6%, transparent)" }}
           >
             Cancel
           </button>

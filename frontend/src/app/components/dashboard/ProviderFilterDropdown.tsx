@@ -35,8 +35,8 @@ export function ProviderFilterDropdown({ filter, onFilter }: { filter: PF; onFil
         className="flex items-center gap-1 sm:gap-1.5 px-2 sm:px-2.5 py-1 rounded-md text-[12px] font-medium transition-all whitespace-nowrap hover:brightness-125"
         style={{
           color: "var(--ink)",
-          background: active ? PROVIDER_META[filter].bg : "color-mix(in srgb, var(--ink) 10%, transparent)",
-          border: `1px solid ${active ? alpha(PROVIDER_META[filter].color, 22) : "color-mix(in srgb, var(--ink) 14%, transparent)"}`,
+          background: active ? PROVIDER_META[filter].bg : "color-mix(in srgb, var(--ink) 6%, transparent)",
+          border: `1px solid ${active ? alpha(PROVIDER_META[filter].color, 22) : "color-mix(in srgb, var(--ink) 8.4%, transparent)"}`,
         }}
       >
         {active ? <ProviderIcon provider={filter} size={12} className="shrink-0" /> : <Plug size={12} color="var(--ink-3)" className="shrink-0" />}
@@ -49,7 +49,7 @@ export function ProviderFilterDropdown({ filter, onFilter }: { filter: PF; onFil
         <div
           ref={menuRef}
           className="min-w-[140px] rounded-lg shadow-lg duration-150 overflow-hidden"
-          style={{ background: "var(--field)", border: "1px solid color-mix(in srgb, var(--ink) 17%, transparent)" }}
+          style={{ background: "var(--field)", border: "1px solid color-mix(in srgb, var(--ink) 10.2%, transparent)" }}
         >
           {options.map((f) => {
             const isSelected = filter === f;
@@ -59,7 +59,7 @@ export function ProviderFilterDropdown({ filter, onFilter }: { filter: PF; onFil
                 key={f}
                 onClick={() => { onFilter(f); setOpen(false); }}
                 className="group w-full flex items-center justify-between gap-2 text-left px-3 py-2 text-xs transition-colors hover:bg-ink/10"
-                style={{ background: isSelected ? "color-mix(in srgb, var(--ink) 7%, transparent)" : "transparent" }}
+                style={{ background: isSelected ? "color-mix(in srgb, var(--ink) 4.2%, transparent)" : "transparent" }}
               >
                 <span className="flex items-center gap-1.5">
                   {f === "all" ? <Plug size={12} color="var(--ink-3)" className="shrink-0" /> : <ProviderIcon provider={f} size={12} className="shrink-0" />}

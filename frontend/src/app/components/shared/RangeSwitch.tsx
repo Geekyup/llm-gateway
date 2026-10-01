@@ -12,7 +12,7 @@ export function RangeSwitch<T extends string>({
   return (
     <div
       className="inline-flex items-center rounded-lg p-0.5"
-      style={{ background: "var(--background)", border: "1px solid color-mix(in srgb, var(--ink) 14%, transparent)" }}
+      style={{ background: "var(--background)", border: "1px solid color-mix(in srgb, var(--ink) 8.4%, transparent)" }}
       role="group"
       aria-label={label}
     >

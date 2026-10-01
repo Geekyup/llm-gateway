@@ -6,7 +6,7 @@ export function UsageCircle({ used, limit, color }: { used: number; limit: numbe
   return (
     <div className="relative inline-flex items-center justify-center shrink-0">
       <svg width={120} height={120} style={{ transform: "rotate(-90deg)" }}>
-        <circle cx={60} cy={60} r={r} fill="none" strokeWidth={7} stroke="color-mix(in srgb, var(--ink) 8%, transparent)" />
+        <circle cx={60} cy={60} r={r} fill="none" strokeWidth={7} stroke="color-mix(in srgb, var(--ink) 4.8%, transparent)" />
         <circle
           cx={60}
           cy={60}

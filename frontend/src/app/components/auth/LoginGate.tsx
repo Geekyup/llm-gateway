@@ -9,7 +9,7 @@ export function LoginGate({ error }: { error?: string | null }) {
     <div className="min-h-screen flex items-center justify-center px-4" style={{ background: "var(--background)", fontFamily: "var(--font-sans)" }}>
       <div
         className="w-full max-w-sm rounded-lg p-6"
-        style={{ background: "var(--card)", border: "1px solid color-mix(in srgb, var(--ink) 15%, transparent)", boxShadow: "0 32px 80px rgba(26,26,24,0.36)" }}
+        style={{ background: "var(--card)", border: "1px solid color-mix(in srgb, var(--ink) 9%, transparent)", boxShadow: "0 32px 80px rgba(0,0,0,0.72)" }}
       >
         <div className="mb-6">
           <p className="font-mono text-sm font-semibold tracking-tight" style={{ letterSpacing: "0.01em" }}>

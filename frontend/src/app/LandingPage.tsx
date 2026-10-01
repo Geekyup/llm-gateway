@@ -96,7 +96,7 @@ function PoolLedger() {
                             : isLimited
                               ? "var(--bad)"
                               : "var(--ink)"
-                          : "color-mix(in srgb, var(--ink) 12%, transparent)",
+                          : "color-mix(in srgb, var(--ink) 7.2%, transparent)",
                     }}
                   />
                 ))}
@@ -139,7 +139,7 @@ function CodeToken({
   return (
     <span
       className="relative inline-block underline decoration-dotted cursor-help"
-      style={{ color: accent ? "#9FB0FF" : "inherit", textDecorationColor: "rgba(243,240,232,0.45)" }}
+      style={{ color: accent ? "var(--accent-hover)" : "inherit", textDecorationColor: "var(--ink-4)" }}
       onMouseEnter={() => setShow(true)}
       onMouseLeave={() => setShow(false)}
       onFocus={() => setShow(true)}
@@ -162,10 +162,10 @@ function CodeToken({
 
 function RequestSnippet() {
   return (
-    <div style={{ background: "#1A1A18", color: "#F3F0E8" }}>
-      <div className="flex items-center justify-between px-4 py-2.5" style={{ borderBottom: "1px solid rgba(243,240,232,0.14)" }}>
-        <span className="font-mono text-[12px]" style={{ color: "rgba(243,240,232,0.6)" }}>request.sh</span>
-        <span className="font-mono text-[12px] hidden sm:inline" style={{ color: "rgba(243,240,232,0.45)" }}>
+    <div className="bg-card border border-border text-ink">
+      <div className="flex items-center justify-between px-4 py-2.5 border-b border-border">
+        <span className="font-mono text-[12px] text-ink-3">request.sh</span>
+        <span className="font-mono text-[12px] hidden sm:inline text-ink-4">
           hover the underlined parts
         </span>
       </div>
@@ -296,11 +296,11 @@ export default function LandingPage({ onSignIn }: { onSignIn: () => void }) {
             <p className="font-mono text-[13px] text-ink-3 mb-6">self-hosted LLM key pool</p>
             <h1
               className="font-display text-ink"
-              style={{ fontSize: "clamp(48px, 7.4vw, 92px)", lineHeight: 0.98, letterSpacing: "-0.02em" }}
+              style={{ fontSize: "clamp(38px, 5.6vw, 68px)", lineHeight: 1.05, letterSpacing: "-0.035em", fontWeight: 600 }}
             >
               Keys run out.
               <br />
-              <em style={{ color: "var(--accent)" }}>Requests shouldn’t fail.</em>
+              <span style={{ color: "var(--accent-hover)" }}>Requests shouldn’t fail.</span>
             </h1>
             <p className="mt-8 max-w-xl text-[17px] leading-relaxed text-ink-2">
               Round-robin across your Gemini, Groq and OpenRouter keys. When one hits a rate limit it cools down and the same
@@ -326,13 +326,13 @@ export default function LandingPage({ onSignIn }: { onSignIn: () => void }) {
 
       <section className="border-t-2 border-ink">
         <div className="max-w-6xl mx-auto px-6 py-16">
-          <h2 className="font-display text-[40px] md:text-[52px] leading-[1.05] tracking-tight mb-12" style={{ fontWeight: 400 }}>
+          <h2 className="font-display text-[30px] md:text-[38px] leading-[1.1] mb-12" style={{ fontWeight: 600, letterSpacing: "-0.03em" }}>
             Three steps, no SDK.
           </h2>
           <ol className="grid md:grid-cols-3 gap-x-10 gap-y-10">
             {STEPS.map((s) => (
               <li key={s.n} className="border-t border-ink pt-4">
-                <span className="font-display text-[44px] leading-none text-ink-4">{s.n}</span>
+                <span className="font-mono text-[14px] text-ink-3">0{s.n}</span>
                 <h3 className="mt-3 mb-2 text-[17px] font-medium text-ink">{s.title}</h3>
                 <p className="text-[15px] leading-relaxed text-ink-2">{s.body}</p>
               </li>
@@ -344,7 +344,7 @@ export default function LandingPage({ onSignIn }: { onSignIn: () => void }) {
       <section className="border-t border-border">
         <div className="max-w-6xl mx-auto px-6 py-16 grid md:grid-cols-2 gap-12 items-start">
           <div>
-            <h2 className="font-display text-[36px] md:text-[44px] leading-[1.08] mb-5" style={{ fontWeight: 400 }}>
+            <h2 className="font-display text-[28px] md:text-[34px] leading-[1.15] mb-5" style={{ fontWeight: 600, letterSpacing: "-0.03em" }}>
               The request you already write.
             </h2>
             <p className="text-[15px] leading-relaxed text-ink-2 mb-5 max-w-md">

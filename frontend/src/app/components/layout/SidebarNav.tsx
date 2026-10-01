@@ -20,7 +20,7 @@ function NavButton({ v, label, Icon, view, onView }: { v: View; label: string; I
         color: view === v ? "var(--ink)" : "var(--ink-3)",
         background: view === v ? "color-mix(in srgb, var(--accent) 10%, transparent)" : "transparent",
       }}
-      onMouseEnter={(e) => { if (view !== v) e.currentTarget.style.background = "color-mix(in srgb, var(--ink) 7%, transparent)"; }}
+      onMouseEnter={(e) => { if (view !== v) e.currentTarget.style.background = "color-mix(in srgb, var(--ink) 4.2%, transparent)"; }}
       onMouseLeave={(e) => { if (view !== v) e.currentTarget.style.background = "transparent"; }}
     >
       <Icon size={15} color={view === v ? "var(--accent)" : "var(--ink-4)"} />
@@ -38,7 +38,7 @@ export function SidebarNav({ view, onView }: { view: View; onView: (v: View) => 
         ))}
       </div>
 
-      <div className="my-3 mx-3" style={{ borderTop: "1px solid color-mix(in srgb, var(--ink) 10%, transparent)" }} />
+      <div className="my-3 mx-3" style={{ borderTop: "1px solid color-mix(in srgb, var(--ink) 6%, transparent)" }} />
       <div className="px-3 mb-1.5 text-[12px] font-semibold text-ink-4">Settings</div>
 
       <div className="flex flex-col gap-0.5">
