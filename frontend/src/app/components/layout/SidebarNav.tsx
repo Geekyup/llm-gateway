@@ -17,13 +17,13 @@ function NavButton({ v, label, Icon, view, onView }: { v: View; label: string; I
       onClick={() => onView(v)}
       className="flex items-center gap-2.5 px-3 py-2 rounded-lg text-[13px] font-medium transition-all"
       style={{
-        color: view === v ? "#ECECF0" : "#71717A",
-        background: view === v ? "rgba(0,214,143,0.10)" : "transparent",
+        color: view === v ? "var(--ink)" : "var(--ink-3)",
+        background: view === v ? "color-mix(in srgb, var(--accent) 10%, transparent)" : "transparent",
       }}
-      onMouseEnter={(e) => { if (view !== v) e.currentTarget.style.background = "rgba(255,255,255,0.04)"; }}
+      onMouseEnter={(e) => { if (view !== v) e.currentTarget.style.background = "color-mix(in srgb, var(--ink) 7%, transparent)"; }}
       onMouseLeave={(e) => { if (view !== v) e.currentTarget.style.background = "transparent"; }}
     >
-      <Icon size={15} color={view === v ? "#00D68F" : "#52525B"} />
+      <Icon size={15} color={view === v ? "var(--accent)" : "var(--ink-4)"} />
       {label}
     </button>
   );
@@ -38,8 +38,8 @@ export function SidebarNav({ view, onView }: { view: View; onView: (v: View) => 
         ))}
       </div>
 
-      <div className="my-3 mx-3" style={{ borderTop: "1px solid rgba(255,255,255,0.06)" }} />
-      <div className="px-3 mb-1.5 text-[10px] font-semibold uppercase tracking-widest text-zinc-700">Settings</div>
+      <div className="my-3 mx-3" style={{ borderTop: "1px solid color-mix(in srgb, var(--ink) 10%, transparent)" }} />
+      <div className="px-3 mb-1.5 text-[12px] font-semibold text-ink-4">Settings</div>
 
       <div className="flex flex-col gap-0.5">
         {SETTINGS_ITEMS.map((item) => (

@@ -4,14 +4,14 @@ import type { ActivitySummary } from "../../lib/api";
 function Delta({ curr, prev, invert = false }: { curr: number; prev: number; invert?: boolean }) {
   if (prev === 0 && curr === 0) {
     return (
-      <span className="flex items-center gap-1 text-[11px] text-zinc-600">
+      <span className="flex items-center gap-1 text-[12px] text-ink-3">
         <Minus size={10} /> flat
       </span>
     );
   }
   if (prev === 0) {
     return (
-      <span className="flex items-center gap-1 text-[11px]" style={{ color: "#00D68F" }}>
+      <span className="flex items-center gap-1 text-[12px]" style={{ color: "var(--ok)" }}>
         <ArrowUp size={10} /> new
       </span>
     );
@@ -20,16 +20,16 @@ function Delta({ curr, prev, invert = false }: { curr: number; prev: number; inv
   const rounded = Math.round(pct);
   if (rounded === 0) {
     return (
-      <span className="flex items-center gap-1 text-[11px] text-zinc-600">
+      <span className="flex items-center gap-1 text-[12px] text-ink-3">
         <Minus size={10} /> flat
       </span>
     );
   }
   const good = invert ? rounded < 0 : rounded > 0;
-  const color = good ? "#00D68F" : "#EF4444";
+  const color = good ? "var(--ok)" : "var(--bad)";
   const Icon = rounded > 0 ? ArrowUp : ArrowDown;
   return (
-    <span className="flex items-center gap-1 text-[11px]" style={{ color }}>
+    <span className="flex items-center gap-1 text-[12px]" style={{ color }}>
       <Icon size={10} /> {Math.abs(rounded)}% vs prev
     </span>
   );
@@ -67,7 +67,7 @@ export function ActivitySummaryCards({ summary }: { summary: ActivitySummary | n
       label: "Tokens used",
       value: summary ? formatCompact(summary.total_tokens) : "—",
       delta: summary ? (
-        <span className="text-[11px] text-zinc-600">~${estimateCostUsd(summary.total_tokens).toFixed(2)} est.</span>
+        <span className="text-[12px] text-ink-3">~${estimateCostUsd(summary.total_tokens).toFixed(2)} est.</span>
       ) : null,
     },
   ];
@@ -77,11 +77,11 @@ export function ActivitySummaryCards({ summary }: { summary: ActivitySummary | n
       {cards.map((c) => (
         <div
           key={c.label}
-          className="rounded-xl p-4"
-          style={{ background: "#111113", border: "1px solid rgba(255,255,255,0.06)" }}
+          className="rounded-lg p-4"
+          style={{ background: "var(--card)", border: "1px solid color-mix(in srgb, var(--ink) 10%, transparent)" }}
         >
-          <div className="text-[11px] text-zinc-500 uppercase tracking-wider font-medium mb-2">{c.label}</div>
-          <div className="text-2xl font-mono font-medium text-zinc-100 mb-1.5">{c.value}</div>
+          <div className="text-[12px] text-ink-3 font-medium mb-2">{c.label}</div>
+          <div className="text-2xl font-mono font-medium text-ink mb-1.5">{c.value}</div>
           {c.delta}
         </div>
       ))}

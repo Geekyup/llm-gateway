@@ -25,18 +25,18 @@ export function StatusFilterDropdown({ filter, onFilter }: { filter: SF; onFilte
   const active = filter !== "all";
   const fullLabel = active ? STATUS_META[filter].text : "All statuses";
   const shortLabel = active ? STATUS_META[filter].text : "All";
-  const dotColor = active ? STATUS_META[filter].color : "#71717A";
+  const dotColor = active ? STATUS_META[filter].color : "var(--ink-3)";
 
   return (
     <div className="relative" ref={ref}>
-      <div className="text-[10px] text-zinc-600 mb-1">Status</div>
+      <div className="text-[12px] text-ink-3 mb-1">Status</div>
       <button
         onClick={() => setOpen((o) => !o)}
-        className="flex items-center gap-1 sm:gap-1.5 px-2 sm:px-2.5 py-1 rounded-md text-[11px] font-medium transition-all whitespace-nowrap hover:brightness-125"
+        className="flex items-center gap-1 sm:gap-1.5 px-2 sm:px-2.5 py-1 rounded-md text-[12px] font-medium transition-all whitespace-nowrap hover:brightness-125"
         style={{
-          color: "#ECECF0",
-          background: active ? STATUS_META[filter].bg : "rgba(255,255,255,0.06)",
-          border: `1px solid ${active ? STATUS_META[filter].bd : "rgba(255,255,255,0.08)"}`,
+          color: "var(--ink)",
+          background: active ? STATUS_META[filter].bg : "color-mix(in srgb, var(--ink) 10%, transparent)",
+          border: `1px solid ${active ? STATUS_META[filter].bd : "color-mix(in srgb, var(--ink) 14%, transparent)"}`,
         }}
       >
         {active ? (
@@ -46,14 +46,14 @@ export function StatusFilterDropdown({ filter, onFilter }: { filter: SF; onFilte
         )}
         <span className="sm:hidden">{shortLabel}</span>
         <span className="hidden sm:inline">{fullLabel}</span>
-        <ChevronDown size={11} color="#71717A" className="shrink-0" style={{ transform: open ? "rotate(180deg)" : "none", transition: "transform 0.15s ease" }} />
+        <ChevronDown size={11} color="var(--ink-3)" className="shrink-0" style={{ transform: open ? "rotate(180deg)" : "none", transition: "transform 0.15s ease" }} />
       </button>
 
       <DropdownPortal anchorRef={ref} open={open} align="right">
         <div
           ref={menuRef}
-          className="min-w-[140px] rounded-lg shadow-lg animate-in fade-in slide-in-from-top-1 duration-150 overflow-hidden"
-          style={{ background: "#1C1C1E", border: "1px solid rgba(255,255,255,0.1)" }}
+          className="min-w-[140px] rounded-lg shadow-lg duration-150 overflow-hidden"
+          style={{ background: "var(--field)", border: "1px solid color-mix(in srgb, var(--ink) 17%, transparent)" }}
         >
           {options.map((f) => {
             const isSelected = filter === f;
@@ -62,16 +62,16 @@ export function StatusFilterDropdown({ filter, onFilter }: { filter: SF; onFilte
               <button
                 key={f}
                 onClick={() => { onFilter(f); setOpen(false); }}
-                className="group w-full flex items-center justify-between gap-2 text-left px-3 py-2 text-xs transition-colors hover:bg-white/10"
-                style={{ background: isSelected ? "rgba(255,255,255,0.04)" : "transparent" }}
+                className="group w-full flex items-center justify-between gap-2 text-left px-3 py-2 text-xs transition-colors hover:bg-ink/10"
+                style={{ background: isSelected ? "color-mix(in srgb, var(--ink) 7%, transparent)" : "transparent" }}
               >
                 <span
-                  className="transition-colors group-hover:!text-[#ECECF0]"
-                  style={{ color: isSelected ? "#ECECF0" : "#A1A1AA" }}
+                  className="transition-colors group-hover:!text-[var(--ink)]"
+                  style={{ color: isSelected ? "var(--ink)" : "var(--ink-2)" }}
                 >
                   {f === "all" ? "All" : meta!.text}
                 </span>
-                {isSelected && <CheckCircle2 size={13} color="#ECECF0" className="shrink-0" />}
+                {isSelected && <CheckCircle2 size={13} color="var(--ink)" className="shrink-0" />}
               </button>
             );
           })}

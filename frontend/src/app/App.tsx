@@ -48,8 +48,8 @@ export default function App() {
 
   if (checkingAuth) {
     return (
-      <div className="min-h-screen flex items-center justify-center" style={{ background: "#0A0A0B" }}>
-        <Loader2 size={20} className="animate-spin" color="#52525B" />
+      <div className="min-h-screen flex items-center justify-center" style={{ background: "var(--background)" }}>
+        <Loader2 size={20} className="animate-spin" color="var(--ink-4)" />
       </div>
     );
   }

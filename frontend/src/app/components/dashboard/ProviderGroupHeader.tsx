@@ -8,13 +8,13 @@ export function ProviderGroupHeader({ provider, keys }: { provider: string; keys
   const allHealthy = activeCount === total;
 
   return (
-    <div className="flex items-center justify-between gap-2 px-3 py-2" style={{ background: "rgba(255,255,255,0.02)" }}>
+    <div className="flex items-center justify-between gap-2 px-3 py-2" style={{ background: "color-mix(in srgb, var(--ink) 3%, transparent)" }}>
       <div className="flex items-center gap-1.5">
         <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ background: meta.color }} />
-        <span className="text-xs font-medium" style={{ color: "#D4D4D8" }}>{meta.name}</span>
-        <span className="text-[11px] text-zinc-600">{total}</span>
+        <span className="text-xs font-medium" style={{ color: "var(--ink-2)" }}>{meta.name}</span>
+        <span className="text-[12px] text-ink-3">{total}</span>
       </div>
-      <span className="text-[11px] font-mono" style={{ color: allHealthy ? "#00D68F" : "#F59E0B" }}>
+      <span className="text-[12px] font-mono" style={{ color: allHealthy ? "var(--accent)" : "var(--warn)" }}>
         {activeCount}/{total}
       </span>
     </div>

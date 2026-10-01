@@ -1,22 +1,24 @@
 import { useEffect, useRef, useState } from "react";
-import { KeyRound, ArrowRight, ShieldCheck, Github } from "lucide-react";
+import { ArrowRight, Github } from "lucide-react";
 
 const REPO_URL = "https://github.com/Geekyup/llm-gateway";
 
-const AMBER = "#F59E0B";
-const PROVIDERS = [
-  { key: "gemini", name: "Gemini", color: "#4F8EF7" },
-  { key: "groq", name: "Groq", color: "#F97316" },
-  { key: "openrouter", name: "OpenRouter", color: "#A78BFA" },
+type PoolKey = { name: string; provider: string; fill: number };
+
+const POOL: PoolKey[] = [
+  { name: "key_01", provider: "gemini", fill: 11 },
+  { name: "key_02", provider: "gemini", fill: 14 },
+  { name: "key_03", provider: "groq", fill: 6 },
+  { name: "key_04", provider: "openrouter", fill: 9 },
+  { name: "key_05", provider: "groq", fill: 3 },
 ];
 
-type KeyState = "active" | "exhausting" | "idle" | "cooldown";
+const SLOTS = 16;
 
-function FailoverChain() {
-  const KEYS = 5;
+function PoolLedger() {
   const [active, setActive] = useState(0);
-  const [exhausting, setExhausting] = useState<number | null>(null);
-  const [cooldown, setCooldown] = useState<Set<number>>(new Set());
+  const [limited, setLimited] = useState<number | null>(null);
+  const [cooling, setCooling] = useState<Set<number>>(new Set());
   const activeRef = useRef(0);
 
   useEffect(() => {
@@ -25,22 +27,20 @@ function FailoverChain() {
 
     async function cycle() {
       while (!cancelled) {
-        await sleep(2200);
+        await sleep(2400);
         if (cancelled) return;
         const current = activeRef.current;
-        setExhausting(current);
-        await sleep(420);
+        setLimited(current);
+        await sleep(700);
         if (cancelled) return;
-
-        const next = (current + 1) % KEYS;
-        setCooldown((prev) => new Set(prev).add(current));
+        const next = (current + 1) % POOL.length;
+        setCooling((prev) => new Set(prev).add(current));
         setActive(next);
         activeRef.current = next;
-        setExhausting(null);
-
-        await sleep(4400);
+        setLimited(null);
+        await sleep(5200);
         if (cancelled) return;
-        setCooldown((prev) => {
+        setCooling((prev) => {
           const copy = new Set(prev);
           copy.delete(current);
           return copy;
@@ -54,100 +54,73 @@ function FailoverChain() {
     };
   }, []);
 
-  function stateFor(i: number): KeyState {
-    if (exhausting === i) return "exhausting";
-    if (i === active) return "active";
-    if (cooldown.has(i)) return "cooldown";
+  function stateOf(i: number) {
+    if (limited === i) return "429";
+    if (i === active) return "serving";
+    if (cooling.has(i)) return "cooldown";
     return "idle";
   }
 
   return (
-    <div className="rounded-xl p-5 bg-card border border-border">
-      <div className="flex items-center justify-between mb-4">
-        <span className="text-[11px] font-mono uppercase tracking-wider text-muted-foreground">
-          key pool · any provider
-        </span>
-        <span
-          className="text-[11px] font-mono flex items-center gap-1.5 text-primary"
-          role="status"
-        >
-          <span className="w-1.5 h-1.5 rounded-full animate-pulse bg-primary" aria-hidden="true" />
-          routing live
-        </span>
+    <div className="border-y-2 border-ink">
+      <div className="flex items-baseline justify-between py-2 border-b border-border">
+        <span className="font-mono text-[12px] text-ink-3">pool / 5 keys / 3 providers</span>
+        <span className="font-mono text-[12px] text-ink-3">requests today</span>
       </div>
-
-      <div className="flex items-center gap-1.5" role="img" aria-label={`Key pool status: key_0${active + 1} is currently active`}>
-        {Array.from({ length: KEYS }).map((_, i) => {
-          const state = stateFor(i);
-          const color =
-            state === "active"
-              ? "var(--primary)"
-              : state === "exhausting"
-              ? "var(--destructive)"
-              : state === "cooldown"
-              ? AMBER
-              : "#3F3F46";
+      <ul role="img" aria-label={`Key pool: ${POOL[active].name} is serving requests`}>
+        {POOL.map((k, i) => {
+          const state = stateOf(i);
+          const isActive = state === "serving";
+          const isLimited = state === "429";
+          const color = isLimited ? "var(--bad)" : state === "cooldown" ? "var(--warn)" : isActive ? "var(--accent)" : "var(--ink-4)";
           return (
-            <div key={i} className="flex-1 flex flex-col items-center gap-2">
-              <div
-                className="w-9 h-9 rounded-lg flex items-center justify-center transition-all duration-300"
-                style={{
-                  background: `${color}14`,
-                  border: `1px solid ${color}`,
-                  transform: state === "active" ? "scale(1.08)" : "scale(1)",
-                  boxShadow:
-                    state === "active"
-                      ? `0 0 14px ${color}70`
-                      : state === "exhausting"
-                      ? `0 0 14px ${color}80`
-                      : "0 0 0px transparent",
-                }}
-              >
-                <KeyRound
-                  size={14}
-                  style={{ color }}
-                  className={state === "active" ? "animate-pulse" : ""}
-                />
-              </div>
-              <span
-                className="text-[10px] font-mono"
-                style={{ color: state === "idle" ? "var(--muted-foreground)" : color }}
-              >
-                key_0{i + 1}
+            <li
+              key={k.name}
+              className="grid grid-cols-[18px_64px_1fr_74px] items-center gap-3 py-3 border-b border-border transition-colors duration-200"
+              style={{ background: isActive ? "color-mix(in srgb, var(--accent) 6%, transparent)" : "transparent" }}
+            >
+              <span className="font-mono text-[13px]" style={{ color }}>
+                {isActive ? "→" : isLimited ? "×" : ""}
               </span>
-            </div>
+              <span className="font-mono text-[13px] text-ink">{k.name}</span>
+              <div className="flex gap-[2px] h-[10px]">
+                {Array.from({ length: SLOTS }).map((_, s) => (
+                  <span
+                    key={s}
+                    className="flex-1"
+                    style={{
+                      background:
+                        s < k.fill
+                          ? state === "cooldown"
+                            ? "var(--warn)"
+                            : isLimited
+                              ? "var(--bad)"
+                              : "var(--ink)"
+                          : "color-mix(in srgb, var(--ink) 12%, transparent)",
+                    }}
+                  />
+                ))}
+              </div>
+              <span className="font-mono text-[12px] text-right" style={{ color }}>
+                {state}
+              </span>
+            </li>
           );
         })}
-      </div>
-
-      <div className="mt-4 pt-4 border-t border-border">
-        <p className="text-[12px] font-mono text-muted-foreground" role="status" aria-live="polite">
-          {exhausting !== null ? (
-            <>
-              <span style={{ color: "var(--destructive)" }}>key_0{exhausting + 1}</span>{" "}
-              hit its rate limit — failing over
-            </>
-          ) : (
-            <>
-              request routed to{" "}
-              <span className="text-primary">key_0{active + 1}</span>
-            </>
-          )}
-        </p>
-      </div>
+      </ul>
+      <p className="pt-3 font-mono text-[13px] text-ink-2 min-h-[2.4em]" role="status" aria-live="polite">
+        {limited !== null ? (
+          <>
+            <span style={{ color: "var(--bad)" }}>{POOL[limited].name}</span> returned 429. Retrying the same request on{" "}
+            {POOL[(limited + 1) % POOL.length].name}.
+          </>
+        ) : (
+          <>
+            POST /v1/chat/completions → <span style={{ color: "var(--accent)" }}>{POOL[active].name}</span> ({POOL[active].provider})
+          </>
+        )}
+      </p>
     </div>
-  );
-}
-
-function ProviderPill({ name, color }: { name: string; color: string }) {
-  return (
-    <span
-      className="inline-flex items-center gap-2 px-3 py-1.5 rounded-md text-[13px] font-medium"
-      style={{ color, background: `${color}14`, border: `1px solid ${color}33` }}
-    >
-      <span className="w-1.5 h-1.5 rounded-full" style={{ background: color }} aria-hidden="true" />
-      {name}
-    </span>
   );
 }
 
@@ -165,8 +138,8 @@ function CodeToken({
   const [show, setShow] = useState(false);
   return (
     <span
-      className="relative inline-block underline decoration-dotted cursor-help decoration-muted-foreground/50"
-      style={{ color: accent ? "var(--primary)" : "inherit" }}
+      className="relative inline-block underline decoration-dotted cursor-help"
+      style={{ color: accent ? "#9FB0FF" : "inherit", textDecorationColor: "rgba(243,240,232,0.45)" }}
       onMouseEnter={() => setShow(true)}
       onMouseLeave={() => setShow(false)}
       onFocus={() => setShow(true)}
@@ -176,10 +149,9 @@ function CodeToken({
       {children}
       {show && (
         <span
-          className={`absolute bottom-full mb-2.5 z-30 w-[240px] max-w-[80vw] whitespace-normal px-2.5 py-1.5 rounded-md text-[11px] font-mono normal-case bg-popover border border-border text-foreground ${
+          className={`absolute bottom-full mb-2 z-30 w-[240px] max-w-[80vw] whitespace-normal px-2.5 py-1.5 text-[12px] font-mono normal-case bg-card border border-ink text-ink ${
             align === "right" ? "right-0" : "left-0"
           }`}
-          style={{ boxShadow: "0 4px 16px rgba(0,0,0,0.4)" }}
         >
           {tip}
         </span>
@@ -188,32 +160,23 @@ function CodeToken({
   );
 }
 
-function CodeBlock() {
+function RequestSnippet() {
   return (
-    <div className="rounded-xl overflow-hidden bg-popover border border-border">
-      <div className="flex items-center gap-2 px-4 py-2.5 border-b border-border">
-        <span className="w-2.5 h-2.5 rounded-full" style={{ background: "var(--destructive)" }} />
-        <span className="w-2.5 h-2.5 rounded-full" style={{ background: AMBER }} />
-        <span className="w-2.5 h-2.5 rounded-full" style={{ background: "var(--primary)" }} />
-        <span className="ml-2 text-[11px] font-mono text-muted-foreground">request.sh</span>
-        <span className="ml-auto text-[10px] font-mono text-muted-foreground hidden sm:inline">
-          hover the underlined bits
+    <div style={{ background: "#1A1A18", color: "#F3F0E8" }}>
+      <div className="flex items-center justify-between px-4 py-2.5" style={{ borderBottom: "1px solid rgba(243,240,232,0.14)" }}>
+        <span className="font-mono text-[12px]" style={{ color: "rgba(243,240,232,0.6)" }}>request.sh</span>
+        <span className="font-mono text-[12px] hidden sm:inline" style={{ color: "rgba(243,240,232,0.45)" }}>
+          hover the underlined parts
         </span>
       </div>
       <div className="overflow-x-auto">
-        <pre className="px-4 pt-10 pb-4 text-[12.5px] font-mono leading-relaxed text-foreground w-max min-w-full">
+        <pre className="px-4 pt-10 pb-5 text-[13px] font-mono leading-relaxed w-max min-w-full">
           {"curl https://api.your-gateway.dev/v1/chat/completions \\\n  -H \""}
-          <CodeToken
-            tip="Bearer + your gateway token, from Account -> Gateway tokens"
-            accent
-          >
+          <CodeToken tip="Bearer plus a gateway token. Create one under Account → Gateway tokens." accent>
             Authorization: Bearer $GATEWAY_TOKEN
           </CodeToken>
           {'" \\\n  -d \'{\n    "model": "'}
-          <CodeToken
-            tip="Any model any of your pooled providers serves. Omit it and Keypool picks from whatever's active."
-            align="right"
-          >
+          <CodeToken tip="Any model served by one of your pooled providers. Omit it and the gateway picks from active keys." align="right">
             gemini-2.0-flash
           </CodeToken>
           {'",\n    "messages": [{ "role": "user", "content": "hi" }]\n  }\''}
@@ -223,19 +186,19 @@ function CodeBlock() {
   );
 }
 
-type FeedRow = { provider: string; color: string; model: string; ms: number; status: string };
+type FeedRow = { provider: string; model: string; ms: number; status: string };
 
 const FEED_POOL: FeedRow[] = [
-  { provider: "gemini", color: "#4F8EF7", model: "gemini-2.0-flash", ms: 412, status: "ok" },
-  { provider: "groq", color: "#F97316", model: "llama-3.3-70b", ms: 189, status: "ok" },
-  { provider: "gemini", color: "#4F8EF7", model: "gemini-2.0-flash", ms: 3, status: "429 → retry" },
-  { provider: "openrouter", color: "#A78BFA", model: "claude-3-5-haiku", ms: 731, status: "ok" },
-  { provider: "groq", color: "#F97316", model: "llama-3.1-8b", ms: 94, status: "ok" },
-  { provider: "openrouter", color: "#A78BFA", model: "gpt-4o-mini", ms: 512, status: "ok" },
-  { provider: "gemini", color: "#4F8EF7", model: "gemini-1.5-pro", ms: 288, status: "ok" },
+  { provider: "gemini", model: "gemini-2.0-flash", ms: 412, status: "200" },
+  { provider: "groq", model: "llama-3.3-70b", ms: 189, status: "200" },
+  { provider: "gemini", model: "gemini-2.0-flash", ms: 3, status: "429 → retry" },
+  { provider: "openrouter", model: "claude-3-5-haiku", ms: 731, status: "200" },
+  { provider: "groq", model: "llama-3.1-8b", ms: 94, status: "200" },
+  { provider: "openrouter", model: "gpt-4o-mini", ms: 512, status: "200" },
+  { provider: "gemini", model: "gemini-1.5-pro", ms: 288, status: "200" },
 ];
 
-function useLiveFeed(size = 4, intervalMs = 2600) {
+function useLiveFeed(size = 5, intervalMs = 2800) {
   const [rows, setRows] = useState<FeedRow[]>(() => FEED_POOL.slice(0, size));
   const cursor = useRef(size % FEED_POOL.length);
 
@@ -261,7 +224,7 @@ function SignInButton({
   showArrow?: boolean;
 }) {
   const [pending, setPending] = useState(false);
-  const padding = size === "sm" ? "px-3.5 py-1.5 text-[13px]" : "px-5 py-2.5 text-[14px]";
+  const padding = size === "sm" ? "px-3.5 py-1.5 text-[13px]" : "px-5 py-3 text-[15px]";
 
   function handleClick() {
     if (pending) return;
@@ -274,188 +237,149 @@ function SignInButton({
       onClick={handleClick}
       disabled={pending}
       aria-busy={pending}
-      className={`group font-medium rounded-md flex items-center gap-2 transition-all active:scale-[0.97] disabled:opacity-70 disabled:cursor-not-allowed ${padding}`}
-      style={{ background: "var(--primary)", color: "var(--primary-foreground)" }}
+      className={`group font-medium rounded-[2px] flex items-center gap-2 transition-colors disabled:opacity-70 disabled:cursor-not-allowed hover:brightness-90 ${padding}`}
+      style={{ background: "var(--accent)", color: "var(--on-accent)" }}
     >
       {pending ? "Redirecting…" : "Sign in with Google"}
-      {showArrow && !pending && (
-        <ArrowRight
-          size={15}
-          className="transition-transform duration-200 group-hover:translate-x-0.5"
-        />
-      )}
+      {showArrow && !pending && <ArrowRight size={16} className="transition-transform duration-200 group-hover:translate-x-0.5" />}
     </button>
   );
 }
+
+const STEPS = [
+  {
+    n: "1",
+    title: "Add keys",
+    body: "Paste every Gemini, Groq and OpenRouter key you own. Set a daily cap per key, or pin a key to one model.",
+  },
+  {
+    n: "2",
+    title: "Point your client at one URL",
+    body: "Same /v1/chat/completions body and response fields as the OpenAI API. Change the base URL and the token.",
+  },
+  {
+    n: "3",
+    title: "Stop handling 429s",
+    body: "A rate-limited key goes into cooldown and the same request retries on the next one. Your app sees a normal response.",
+  },
+];
 
 export default function LandingPage({ onSignIn }: { onSignIn: () => void }) {
   const feedRows = useLiveFeed();
 
   return (
     <div className="min-h-screen w-full bg-background text-foreground">
-      <div className="relative">
-        <div className="absolute inset-0 hero-grid pointer-events-none" />
+      <header className="border-b border-border">
+        <div className="max-w-6xl mx-auto px-6 h-14 flex items-center justify-between">
+          <span className="font-mono font-medium text-[18px]">
+            key<span style={{ color: "var(--accent)" }}>pool</span>
+          </span>
+          <div className="flex items-center gap-4">
+            <a
+              href={REPO_URL}
+              target="_blank"
+              rel="noreferrer noopener"
+              aria-label="View source on GitHub"
+              className="flex items-center gap-1.5 text-[13px] text-ink-3 hover:text-ink transition-colors"
+            >
+              <Github size={15} />
+              <span className="hidden sm:inline">Source</span>
+            </a>
+            <SignInButton onClick={onSignIn} size="sm" />
+          </div>
+        </div>
+      </header>
 
-        <header className="sticky top-0 z-10 backdrop-blur-sm border-b border-border" style={{ background: "rgba(10,10,11,0.8)" }}>
-          <div className="max-w-5xl mx-auto px-6 h-14 flex items-center justify-between">
-            <div className="flex items-center">
-              <span className="font-mono font-semibold tracking-tight" style={{ fontSize: "22px" }}>
-                <span>key</span>
-                <span className="text-primary">pool</span>
-              </span>
-            </div>
-            <div className="flex items-center gap-3">
+      <section className="max-w-6xl mx-auto px-6 pt-16 md:pt-24 pb-16 md:pb-24">
+        <div className="grid md:grid-cols-12 gap-12 md:gap-10 items-end">
+          <div className="md:col-span-7">
+            <p className="font-mono text-[13px] text-ink-3 mb-6">self-hosted LLM key pool</p>
+            <h1
+              className="font-display text-ink"
+              style={{ fontSize: "clamp(48px, 7.4vw, 92px)", lineHeight: 0.98, letterSpacing: "-0.02em" }}
+            >
+              Keys run out.
+              <br />
+              <em style={{ color: "var(--accent)" }}>Requests shouldn’t fail.</em>
+            </h1>
+            <p className="mt-8 max-w-xl text-[17px] leading-relaxed text-ink-2">
+              Round-robin across your Gemini, Groq and OpenRouter keys. When one hits a rate limit it cools down and the same
+              request goes out on the next key. OpenAI-compatible, so you change a base URL and nothing else.
+            </p>
+            <div className="mt-9 flex flex-wrap items-center gap-x-5 gap-y-3">
+              <SignInButton onClick={onSignIn} showArrow />
               <a
                 href={REPO_URL}
                 target="_blank"
                 rel="noreferrer noopener"
-                aria-label="View source on GitHub"
-                className="flex items-center gap-1.5 text-[13px] text-muted-foreground hover:text-foreground transition-colors"
+                className="text-[14px] text-ink underline underline-offset-4 decoration-ink-4 hover:decoration-ink"
               >
-                <Github size={15} />
-                <span className="hidden sm:inline">Source</span>
+                Read the source
               </a>
-              <SignInButton onClick={onSignIn} size="sm" />
             </div>
           </div>
-        </header>
-
-        <section className="relative max-w-5xl mx-auto px-6 pt-20 pb-16">
-          <div className="grid md:grid-cols-2 gap-12 items-center">
-            <div>
-              <p className="text-[11px] font-mono uppercase tracking-wider mb-4 text-muted-foreground">
-                self-hosted / v0.4
-              </p>
-              <h1 className="text-[34px] md:text-[42px] leading-[1.1] font-semibold tracking-tight mb-5">
-                One endpoint. Many keys.{" "}
-                <span className="sm:block">Zero 429s reaching your app.</span>
-              </h1>
-              <p className="text-[15px] leading-relaxed mb-8 max-w-md text-muted-foreground">
-                Keypool sits between your app and Gemini, Groq, or OpenRouter.
-                It holds your keys, rotates them per request, and retries on a
-                different key the moment one gets rate limited — same request
-                and response shape as the OpenAI API.
-              </p>
-              <div className="flex items-center gap-3">
-                <SignInButton onClick={onSignIn} showArrow />
-                <span className="text-[12px] font-mono text-muted-foreground">
-                  self-serve, no sales call
-                </span>
-              </div>
-            </div>
-            <FailoverChain />
-          </div>
-        </section>
-      </div>
-
-      <section className="max-w-5xl mx-auto px-6 py-10 border-t border-border">
-        <p className="text-[11px] font-mono uppercase tracking-wider mb-4 text-muted-foreground">
-          Supported providers
-        </p>
-        <div className="flex flex-wrap gap-3">
-          {PROVIDERS.map((p) => (
-            <ProviderPill key={p.key} name={p.name} color={p.color} />
-          ))}
-        </div>
-      </section>
-
-      <section className="max-w-5xl mx-auto px-6 pb-16">
-        <div className="grid md:grid-cols-[1.1fr_0.9fr] gap-8 items-start">
-          <div className="rounded-xl overflow-hidden bg-card border border-border">
-            <div className="flex items-center justify-between px-4 py-2.5 border-b border-border">
-              <span className="text-[11px] font-mono text-muted-foreground">live request feed</span>
-              <span
-                className="text-[10px] font-mono flex items-center gap-1.5 text-primary"
-                role="status"
-                aria-live="polite"
-              >
-                <span className="w-1 h-1 rounded-full animate-pulse bg-primary" />
-                sse
-              </span>
-            </div>
-            <div className="divide-y divide-border">
-              {feedRows.map((r, i) => (
-                <div key={i} className="px-4 py-2.5 flex items-center gap-3 text-[12px] font-mono">
-                  <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ background: r.color }} />
-                  <span className="w-20 shrink-0" style={{ color: r.color }}>
-                    {r.provider}
-                  </span>
-                  <span className="flex-1 truncate text-muted-foreground">{r.model}</span>
-                  <span className="w-14 text-right text-muted-foreground">{r.ms}ms</span>
-                  <span
-                    className="w-16 text-right"
-                    style={{ color: r.status === "ok" ? "var(--muted-foreground)" : AMBER }}
-                  >
-                    {r.status}
-                  </span>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          <div>
-            <h2 className="text-[18px] font-medium tracking-tight mb-4">What it actually does</h2>
-            <ul className="space-y-3.5 text-[13px] leading-relaxed text-muted-foreground">
-              <li>
-                <span className="text-foreground">Key pooling.</span> Add every key
-                you have per provider — Keypool round-robins across them
-                instead of one key eating the whole rate limit.
-              </li>
-              <li>
-                <span className="text-foreground">Failover mid-request.</span> A
-                429 or exhausted key doesn't reach your app; the request
-                retries on the next available key.
-              </li>
-              <li>
-                <span className="text-foreground">OpenAI request shape.</span>{" "}
-                Same <code className="font-mono text-[12px]">/v1/chat/completions</code> body
-                and response fields — change the base URL, not your code.
-              </li>
-              <li>
-                <span className="text-foreground">Per-key limits and pinning.</span>{" "}
-                Cap daily usage per key, or pin a key to a specific model.
-              </li>
-            </ul>
+          <div className="md:col-span-5">
+            <PoolLedger />
           </div>
         </div>
       </section>
 
-      <section className="max-w-5xl mx-auto px-6 pb-20">
-        <div className="grid md:grid-cols-2 gap-10 items-center">
+      <section className="border-t-2 border-ink">
+        <div className="max-w-6xl mx-auto px-6 py-16">
+          <h2 className="font-display text-[40px] md:text-[52px] leading-[1.05] tracking-tight mb-12" style={{ fontWeight: 400 }}>
+            Three steps, no SDK.
+          </h2>
+          <ol className="grid md:grid-cols-3 gap-x-10 gap-y-10">
+            {STEPS.map((s) => (
+              <li key={s.n} className="border-t border-ink pt-4">
+                <span className="font-display text-[44px] leading-none text-ink-4">{s.n}</span>
+                <h3 className="mt-3 mb-2 text-[17px] font-medium text-ink">{s.title}</h3>
+                <p className="text-[15px] leading-relaxed text-ink-2">{s.body}</p>
+              </li>
+            ))}
+          </ol>
+        </div>
+      </section>
+
+      <section className="border-t border-border">
+        <div className="max-w-6xl mx-auto px-6 py-16 grid md:grid-cols-2 gap-12 items-start">
           <div>
-            <h2 className="text-[18px] font-medium tracking-tight mb-3">
-              Same request you already write
+            <h2 className="font-display text-[36px] md:text-[44px] leading-[1.08] mb-5" style={{ fontWeight: 400 }}>
+              The request you already write.
             </h2>
-            <p className="text-[13px] leading-relaxed mb-4 text-muted-foreground">
-              Point your existing OpenAI client at your gateway URL and a
-              gateway token. Nothing else in your integration changes.
+            <p className="text-[15px] leading-relaxed text-ink-2 mb-5 max-w-md">
+              Point your existing OpenAI client at the gateway URL with a gateway token. Provider keys are encrypted at rest and
+              never leave the server.
             </p>
-            <div className="flex items-center gap-2 text-[12px] font-mono text-muted-foreground">
-              <ShieldCheck size={13} className="text-primary" />
-              Provider keys are encrypted at rest, never sent to the client
+            <div className="mt-8">
+              <p className="font-mono text-[13px] text-ink-3 mb-2">recent requests</p>
+              <table className="w-full text-[13px] font-mono border-t-2 border-ink">
+                <tbody>
+                  {feedRows.map((r, i) => (
+                    <tr key={i} className="border-b border-border">
+                      <td className="py-2 pr-3 text-ink">{r.provider}</td>
+                      <td className="py-2 pr-3 text-ink-3 truncate max-w-[140px]">{r.model}</td>
+                      <td className="py-2 pr-3 text-right text-ink-3">{r.ms} ms</td>
+                      <td className="py-2 text-right" style={{ color: r.status === "200" ? "var(--ink-3)" : "var(--warn)" }}>
+                        {r.status}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
           </div>
-          <CodeBlock />
+          <RequestSnippet />
         </div>
       </section>
 
-      <footer className="max-w-5xl mx-auto px-6 py-6 text-[12px] font-mono flex flex-col sm:flex-row gap-2 sm:items-center sm:justify-between text-muted-foreground border-t border-border">
-        <div className="flex items-center gap-4">
-          <span className="font-semibold">
-            <span>key</span>
-            <span className="text-primary">pool</span>
+      <footer className="border-t border-border">
+        <div className="max-w-6xl mx-auto px-6 py-6 text-[13px] flex flex-col sm:flex-row gap-2 sm:items-center sm:justify-between text-ink-3">
+          <span className="font-mono">
+            key<span style={{ color: "var(--accent)" }}>pool</span>
           </span>
-          <a
-            href={REPO_URL}
-            target="_blank"
-            rel="noreferrer noopener"
-            className="flex items-center gap-1.5 hover:text-foreground transition-colors"
-          >
-            <Github size={13} />
-            source
-          </a>
+          <span>Each account manages its own keys, tokens and request history.</span>
         </div>
-        <span>each account manages its own keys, tokens, and request history</span>
       </footer>
     </div>
   );

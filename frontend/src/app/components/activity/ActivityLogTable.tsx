@@ -99,20 +99,20 @@ export function ActivityLogTable({ range, refreshSignal = 0 }: { range: Activity
   }
 
   return (
-    <div className="rounded-xl overflow-hidden" style={{ border: "1px solid rgba(255,255,255,0.06)" }}>
+    <div className="rounded-lg overflow-hidden" style={{ border: "1px solid color-mix(in srgb, var(--ink) 10%, transparent)" }}>
       <div
         className="flex flex-wrap items-center justify-between gap-x-2 gap-y-2 px-4 py-2.5"
-        style={{ borderBottom: "1px solid rgba(255,255,255,0.05)", background: "#0F0F11" }}
+        style={{ borderBottom: "1px solid color-mix(in srgb, var(--ink) 8%, transparent)", background: "var(--sidebar)" }}
       >
-        <span className="text-xs font-medium text-zinc-400 shrink-0">Request log</span>
+        <span className="text-xs font-medium text-ink-2 shrink-0">Request log</span>
         <div className="flex items-center gap-2 flex-wrap">
           <ActivityProviderFilterDropdown value={provider} onChange={setProvider} />
           <ActivityOutcomeFilterDropdown value={outcome} onChange={setOutcome} />
           <button
             onClick={handleExport}
             disabled={exporting || total === 0}
-            className="flex items-center gap-1.5 text-[11px] rounded-md px-2.5 py-1 outline-none disabled:opacity-40 transition-colors"
-            style={{ color: "#ECECF0", background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.08)" }}
+            className="flex items-center gap-1.5 text-[12px] rounded-md px-2.5 py-1 outline-none disabled:opacity-40 transition-colors"
+            style={{ color: "var(--ink)", background: "color-mix(in srgb, var(--ink) 10%, transparent)", border: "1px solid color-mix(in srgb, var(--ink) 14%, transparent)" }}
           >
             {exporting ? <Loader2 size={11} className="animate-spin" /> : <Download size={11} />}
             Export CSV
@@ -121,27 +121,27 @@ export function ActivityLogTable({ range, refreshSignal = 0 }: { range: Activity
       </div>
 
       {error && (
-        <div className="px-4 py-3 text-xs" style={{ color: "#EF4444", background: "rgba(239,68,68,0.06)" }}>
+        <div className="px-4 py-3 text-xs" style={{ color: "var(--bad)", background: "color-mix(in srgb, var(--bad) 6%, transparent)" }}>
           {error}
         </div>
       )}
 
       {loading ? (
-        <div className="flex items-center justify-center py-16" style={{ background: "#111113" }}>
-          <Loader2 size={18} className="animate-spin text-zinc-700" />
+        <div className="flex items-center justify-center py-16" style={{ background: "var(--card)" }}>
+          <Loader2 size={18} className="animate-spin text-ink-4" />
         </div>
       ) : entries.length === 0 ? (
-        <div className="px-4 py-16 text-center" style={{ background: "#111113" }}>
+        <div className="px-4 py-16 text-center" style={{ background: "var(--card)" }}>
           <div className="flex flex-col items-center gap-3">
-            <div className="w-10 h-10 rounded-xl flex items-center justify-center" style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.06)" }}>
-              <ListX size={18} color="#3F3F46" />
+            <div className="w-10 h-10 rounded-lg flex items-center justify-center" style={{ background: "color-mix(in srgb, var(--ink) 5%, transparent)", border: "1px solid color-mix(in srgb, var(--ink) 10%, transparent)" }}>
+              <ListX size={18} color="var(--ink-4)" />
             </div>
-            <p className="text-sm text-zinc-500">No requests found</p>
-            <p className="text-xs text-zinc-600">Try a different filter or time range</p>
+            <p className="text-sm text-ink-3">No requests found</p>
+            <p className="text-xs text-ink-3">Try a different filter or time range</p>
           </div>
         </div>
       ) : (
-        <div className="overflow-x-auto" style={{ background: "#111113" }}>
+        <div className="overflow-x-auto" style={{ background: "var(--card)" }}>
           <table className="w-full min-w-[720px]" style={{ tableLayout: "fixed" }}>
             <colgroup>
               <col style={{ width: "16%" }} />
@@ -153,38 +153,38 @@ export function ActivityLogTable({ range, refreshSignal = 0 }: { range: Activity
               <col style={{ width: "10%" }} />
             </colgroup>
             <thead>
-              <tr style={{ borderBottom: "1px solid rgba(255,255,255,0.04)" }}>
+              <tr style={{ borderBottom: "1px solid color-mix(in srgb, var(--ink) 7%, transparent)" }}>
                 {["Time", "Provider", "Model", "Key", "Outcome", "Latency", "Tokens"].map((h, i) => (
                   <th
                     key={h}
-                    className={`px-4 py-2.5 text-[10px] font-semibold text-zinc-600 uppercase tracking-widest ${i >= 5 ? "text-right" : "text-left"}`}
+                    className={`px-4 py-2.5 text-[12px] font-semibold text-ink-3 ${i >= 5 ? "text-right" : "text-left"}`}
                   >
                     {h}
                   </th>
                 ))}
               </tr>
             </thead>
-            <tbody className="divide-y divide-white/[0.03]">
+            <tbody className="divide-y divide-ink/[0.03]">
               {entries.map((e) => {
                 const om = outcomeMeta(e.outcome);
                 const pm = providerMeta(e.provider);
                 return (
-                  <tr key={e.id} className="transition-colors hover:bg-white/[0.02]">
-                    <td className="px-4 py-2.5 text-xs font-mono text-zinc-500">{fmtTime(e.timestamp)}</td>
+                  <tr key={e.id} className="transition-colors hover:bg-ink/[0.02]">
+                    <td className="px-4 py-2.5 text-xs font-mono text-ink-3">{fmtTime(e.timestamp)}</td>
                     <td className="px-4 py-2.5">
                       <span className="text-xs" style={{ color: pm.color }}>{pm.name}</span>
                     </td>
-                    <td className="px-4 py-2.5 text-xs text-zinc-400 truncate" title={e.model ?? undefined}>
+                    <td className="px-4 py-2.5 text-xs text-ink-2 truncate" title={e.model ?? undefined}>
                       {e.model ?? "—"}
                     </td>
-                    <td className="px-4 py-2.5 text-xs font-mono text-zinc-600 truncate">{e.key_label ?? "—"}</td>
+                    <td className="px-4 py-2.5 text-xs font-mono text-ink-3 truncate">{e.key_label ?? "—"}</td>
                     <td className="px-4 py-2.5">
                       <span className="text-xs" style={{ color: om.color }}>{om.text}</span>
                     </td>
-                    <td className="px-4 py-2.5 text-xs font-mono text-zinc-500 text-right">
+                    <td className="px-4 py-2.5 text-xs font-mono text-ink-3 text-right">
                       {e.latency_ms != null ? `${e.latency_ms}ms` : "—"}
                     </td>
-                    <td className="px-4 py-2.5 text-xs font-mono text-zinc-500 text-right">
+                    <td className="px-4 py-2.5 text-xs font-mono text-ink-3 text-right">
                       {e.total_tokens != null ? e.total_tokens.toLocaleString() : "—"}
                     </td>
                   </tr>
@@ -197,26 +197,26 @@ export function ActivityLogTable({ range, refreshSignal = 0 }: { range: Activity
 
       <div
         className="flex items-center justify-center gap-3 px-4 py-2.5"
-        style={{ borderTop: "1px solid rgba(255,255,255,0.05)", background: "#0F0F11" }}
+        style={{ borderTop: "1px solid color-mix(in srgb, var(--ink) 8%, transparent)", background: "var(--sidebar)" }}
       >
         <button
           onClick={() => setPage((p) => Math.max(1, p - 1))}
           disabled={page <= 1 || loading}
-          className="p-1 rounded-md transition-colors hover:bg-white/5 disabled:opacity-30"
+          className="p-1 rounded-md transition-colors hover:bg-ink/5 disabled:opacity-30"
           aria-label="Previous page"
         >
-          <ChevronLeft size={14} color="#71717A" />
+          <ChevronLeft size={14} color="var(--ink-3)" />
         </button>
-        <span className="text-[11px] font-mono text-zinc-600">
+        <span className="text-[12px] font-mono text-ink-3">
           Page {page} of {totalPages}
         </span>
         <button
           onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
           disabled={page >= totalPages || loading}
-          className="p-1 rounded-md transition-colors hover:bg-white/5 disabled:opacity-30"
+          className="p-1 rounded-md transition-colors hover:bg-ink/5 disabled:opacity-30"
           aria-label="Next page"
         >
-          <ChevronRight size={14} color="#71717A" />
+          <ChevronRight size={14} color="var(--ink-3)" />
         </button>
       </div>
     </div>

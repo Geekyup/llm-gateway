@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Check, Copy } from "lucide-react";
 
-const AMBER = "#F59E0B";
+const AMBER = "var(--warn)";
 
 type Lang = "python" | "node" | "curl" | "fetch";
 
@@ -32,17 +32,17 @@ function CodeToken({
   return (
     <span
       className="relative inline-block underline decoration-dotted cursor-help"
-      style={{ color: "#22E3A8", textDecorationColor: "rgba(255,255,255,0.35)" }}
+      style={{ color: "var(--ok)", textDecorationColor: "color-mix(in srgb, var(--ink) 35.0%, transparent)" }}
       onMouseEnter={() => setShow(true)}
       onMouseLeave={() => setShow(false)}
     >
       {children}
       {show && (
         <span
-          className={`absolute bottom-full mb-2 z-20 max-w-[min(280px,80vw)] whitespace-normal px-2.5 py-1.5 rounded-md text-[11px] font-mono normal-case ${
+          className={`absolute bottom-full mb-2 z-20 max-w-[min(280px,80vw)] whitespace-normal px-2.5 py-1.5 rounded-md text-[12px] font-mono normal-case ${
             align === "right" ? "right-0" : "left-0"
           }`}
-          style={{ background: "#0A0A0B", border: "1px solid rgba(255,255,255,0.1)", color: "#ECECF0", boxShadow: "0 4px 16px rgba(0,0,0,0.4)" }}
+          style={{ background: "var(--background)", border: "1px solid color-mix(in srgb, var(--ink) 17%, transparent)", color: "var(--ink)", boxShadow: "0 4px 16px rgba(26,26,24,0.24)" }}
         >
           {tip}
         </span>
@@ -139,16 +139,16 @@ export function CodeSnippetTabs({
   }
 
   return (
-    <div className="mt-3 rounded-xl overflow-hidden" style={{ background: "#0F0F11", border: "1px solid rgba(255,255,255,0.12)" }}>
+    <div className="mt-3 rounded-lg overflow-hidden" style={{ background: "var(--sidebar)", border: "1px solid color-mix(in srgb, var(--ink) 20%, transparent)" }}>
       <div
         className="flex flex-col gap-2 px-3 py-2.5 sm:flex-row sm:items-center"
-        style={{ background: "#17171A", borderBottom: "1px solid rgba(255,255,255,0.1)" }}
+        style={{ background: "var(--card)", borderBottom: "1px solid color-mix(in srgb, var(--ink) 17%, transparent)" }}
       >
         <div className="flex items-center gap-2 shrink-0">
-          <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ background: "#EF4444" }} />
+          <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ background: "var(--bad)" }} />
           <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ background: AMBER }} />
-          <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ background: "#00D68F" }} />
-          <span className="text-[11px] font-mono text-zinc-500 ml-1">{FILENAMES[active]}</span>
+          <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ background: "var(--ok)" }} />
+          <span className="text-[12px] font-mono text-ink-3 ml-1">{FILENAMES[active]}</span>
         </div>
 
         <div className="flex items-center gap-1 overflow-x-auto sm:ml-3 -mx-1 px-1 sm:mx-0 sm:px-0 no-scrollbar">
@@ -156,8 +156,8 @@ export function CodeSnippetTabs({
             <button
               key={lang}
               onClick={() => setActive(lang)}
-              className="relative px-2.5 py-1 text-[11px] font-medium rounded-md transition-colors whitespace-nowrap shrink-0"
-              style={{ color: active === lang ? "#0A0A0B" : "#A1A1AA", background: active === lang ? "#ECECF0" : "rgba(255,255,255,0.06)" }}
+              className="relative px-2.5 py-1 text-[12px] font-medium rounded-md transition-colors whitespace-nowrap shrink-0"
+              style={{ color: active === lang ? "var(--background)" : "var(--ink-2)", background: active === lang ? "var(--ink)" : "color-mix(in srgb, var(--ink) 10%, transparent)" }}
             >
               {LANG_LABELS[lang]}
             </button>
@@ -166,15 +166,15 @@ export function CodeSnippetTabs({
 
         <button
           onClick={copy}
-          className="flex items-center justify-center gap-1.5 px-2.5 py-1.5 rounded-md text-[11px] font-medium transition-colors shrink-0 sm:ml-auto"
-          style={{ background: copied ? "rgba(0,214,143,0.15)" : "rgba(255,255,255,0.08)", color: copied ? "#22E3A8" : "#D4D4D8" }}
+          className="flex items-center justify-center gap-1.5 px-2.5 py-1.5 rounded-md text-[12px] font-medium transition-colors shrink-0 sm:ml-auto"
+          style={{ background: copied ? "color-mix(in srgb, var(--ok) 15%, transparent)" : "color-mix(in srgb, var(--ink) 14%, transparent)", color: copied ? "var(--ok)" : "var(--ink-2)" }}
         >
           {copied ? <Check size={12} /> : <Copy size={12} />}
           {copied ? "Copied" : "Copy"}
         </button>
       </div>
 
-      <pre className="px-4 py-3.5 text-[12.5px] leading-relaxed font-mono overflow-x-auto whitespace-pre" style={{ color: "#D4D4D8" }}>
+      <pre className="px-4 py-3.5 text-[12.5px] leading-relaxed font-mono overflow-x-auto whitespace-pre" style={{ color: "var(--ink-2)" }}>
         {pre}
         <CodeToken tip="Your gateway token — keep it secret, it grants access to your whole key pool." align="left">
           {token}

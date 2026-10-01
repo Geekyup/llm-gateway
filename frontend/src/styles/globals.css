@@ -1,6 +1,6 @@
 .dark-scrollbar {
   scrollbar-width: thin;
-  scrollbar-color: rgba(255, 255, 255, 0.16) transparent;
+  scrollbar-color: color-mix(in srgb, var(--ink) 16.0%, transparent) transparent;
 }
 .dark-scrollbar::-webkit-scrollbar {
   width: 8px;
@@ -10,10 +10,10 @@
   background: transparent;
 }
 .dark-scrollbar::-webkit-scrollbar-thumb {
-  background-color: rgba(255, 255, 255, 0.16);
+  background-color: color-mix(in srgb, var(--ink) 16.0%, transparent);
   border-radius: 8px;
-  border: 2px solid #141416;
+  border: 2px solid var(--card);
 }
 .dark-scrollbar::-webkit-scrollbar-thumb:hover {
-  background-color: rgba(255, 255, 255, 0.28);
+  background-color: color-mix(in srgb, var(--ink) 28.0%, transparent);
 }

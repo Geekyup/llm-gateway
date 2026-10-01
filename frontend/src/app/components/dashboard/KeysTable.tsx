@@ -72,18 +72,18 @@ export function KeysTable({
   const desktopFlipRef = useFlipAnimation<HTMLDivElement>(grouped);
 
   return (
-    <div className="rounded-xl overflow-hidden" style={{ border: "1px solid rgba(255,255,255,0.06)" }}>
-      <div className="flex flex-wrap items-center justify-between gap-x-2 gap-y-2 px-4 py-2.5" style={{ borderBottom: "1px solid rgba(255,255,255,0.05)", background: "#0F0F11" }}>
-        <span className="text-xs font-medium text-zinc-400 shrink-0">API Keys</span>
+    <div className="rounded-lg overflow-hidden" style={{ border: "1px solid color-mix(in srgb, var(--ink) 10%, transparent)" }}>
+      <div className="flex flex-wrap items-center justify-between gap-x-2 gap-y-2 px-4 py-2.5" style={{ borderBottom: "1px solid color-mix(in srgb, var(--ink) 8%, transparent)", background: "var(--sidebar)" }}>
+        <span className="text-xs font-medium text-ink-2 shrink-0">API Keys</span>
         <div className="flex items-end gap-2 sm:gap-3 min-w-0 flex-wrap sm:flex-nowrap">
           <div className="relative hidden sm:block mb-[1px]">
-            <Search size={12} color="#52525B" className="absolute left-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+            <Search size={12} color="var(--ink-4)" className="absolute left-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
             <input
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               placeholder="Search keys..."
-              className="text-[11px] rounded-md pl-7 pr-2.5 py-1 outline-none w-[150px] focus:w-[190px] transition-all"
-              style={{ color: "#ECECF0", background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.08)" }}
+              className="text-[12px] rounded-md pl-7 pr-2.5 py-1 outline-none w-[150px] focus:w-[190px] transition-all"
+              style={{ color: "var(--ink)", background: "color-mix(in srgb, var(--ink) 10%, transparent)", border: "1px solid color-mix(in srgb, var(--ink) 14%, transparent)" }}
             />
           </div>
           <ProviderFilterDropdown filter={filter} onFilter={onFilter} />
@@ -92,39 +92,39 @@ export function KeysTable({
             onClick={() => setGrouped((g) => !g)}
             className="flex items-center justify-center w-[26px] h-[26px] rounded-md transition-all mb-[1px]"
             style={{
-              background: grouped ? "rgba(0,214,143,0.12)" : "rgba(255,255,255,0.06)",
-              border: `1px solid ${grouped ? "rgba(0,214,143,0.28)" : "rgba(255,255,255,0.08)"}`,
+              background: grouped ? "color-mix(in srgb, var(--accent) 12%, transparent)" : "color-mix(in srgb, var(--ink) 10%, transparent)",
+              border: `1px solid ${grouped ? "color-mix(in srgb, var(--accent) 28%, transparent)" : "color-mix(in srgb, var(--ink) 14%, transparent)"}`,
             }}
             title={grouped ? "Show flat list" : "Group by provider"}
             aria-label={grouped ? "Show flat list" : "Group by provider"}
           >
-            <LayoutGrid size={13} color={grouped ? "#00D68F" : "#71717A"} />
+            <LayoutGrid size={13} color={grouped ? "var(--accent)" : "var(--ink-3)"} />
           </button>
         </div>
       </div>
 
       {filtered.length === 0 ? (
-        <div className="px-4 py-16 text-center" style={{ background: "#111113" }}>
+        <div className="px-4 py-16 text-center" style={{ background: "var(--card)" }}>
           <div className="flex flex-col items-center gap-3">
-            <div className="w-10 h-10 rounded-xl flex items-center justify-center" style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.06)" }}>
-              <KeyRound size={18} color="#3F3F46" />
+            <div className="w-10 h-10 rounded-lg flex items-center justify-center" style={{ background: "color-mix(in srgb, var(--ink) 5%, transparent)", border: "1px solid color-mix(in srgb, var(--ink) 10%, transparent)" }}>
+              <KeyRound size={18} color="var(--ink-4)" />
             </div>
-            <p className="text-sm text-zinc-500">No keys found</p>
-            <p className="text-xs text-zinc-600">
+            <p className="text-sm text-ink-3">No keys found</p>
+            <p className="text-xs text-ink-3">
               {keys.length === 0 ? "Add your first API key to get started" : "Try a different search or filter"}
             </p>
           </div>
         </div>
       ) : (
         <>
-          <div ref={mobileFlipRef} className="sm:hidden" style={{ background: "#111113" }}>
+          <div ref={mobileFlipRef} className="sm:hidden" style={{ background: "var(--card)" }}>
             {grouped
               ? (
                 <div className="flex flex-col gap-2 p-2.5">
                   {groups.map((g) => (
-                    <div key={g.provider} className="rounded-lg overflow-hidden" style={{ border: "1px solid rgba(255,255,255,0.07)", background: "#0F0F11" }}>
+                    <div key={g.provider} className="rounded-lg overflow-hidden" style={{ border: "1px solid color-mix(in srgb, var(--ink) 12%, transparent)", background: "var(--sidebar)" }}>
                       <ProviderGroupHeader provider={g.provider} keys={g.items} />
-                      <div className="divide-y divide-white/[0.03]" style={{ borderTop: "1px solid rgba(255,255,255,0.05)" }}>
+                      <div className="divide-y divide-ink/[0.03]" style={{ borderTop: "1px solid color-mix(in srgb, var(--ink) 8%, transparent)" }}>
                         {g.items.map((k) => (
                           <MobileKeyRow key={k.id} k={k} now={now} checkingIds={checkingIds} onSelect={onSelect} onEdit={onEdit} onToggle={onToggle} onCheck={onCheck} />
                         ))}
@@ -134,7 +134,7 @@ export function KeysTable({
                 </div>
               )
               : (
-                <div className="divide-y divide-white/[0.03]">
+                <div className="divide-y divide-ink/[0.03]">
                   {orderedRows.map((k) => (
                     <MobileKeyRow key={k.id} k={k} now={now} checkingIds={checkingIds} onSelect={onSelect} onEdit={onEdit} onToggle={onToggle} onCheck={onCheck} />
                   ))}
@@ -142,16 +142,16 @@ export function KeysTable({
               )}
           </div>
 
-          <div ref={desktopFlipRef} className="hidden sm:block" style={{ background: grouped ? "transparent" : "#111113" }}>
+          <div ref={desktopFlipRef} className="hidden sm:block" style={{ background: grouped ? "transparent" : "var(--card)" }}>
             {grouped ? (
               <div className="flex flex-col gap-2.5 p-2.5">
                 {groups.map((g) => (
-                  <div key={g.provider} className="rounded-lg overflow-hidden" style={{ border: "1px solid rgba(255,255,255,0.07)", background: "#0F0F11" }}>
+                  <div key={g.provider} className="rounded-lg overflow-hidden" style={{ border: "1px solid color-mix(in srgb, var(--ink) 12%, transparent)", background: "var(--sidebar)" }}>
                     <ProviderGroupHeader provider={g.provider} keys={g.items} />
-                    <div className="overflow-x-auto" style={{ borderTop: "1px solid rgba(255,255,255,0.05)" }}>
+                    <div className="overflow-x-auto" style={{ borderTop: "1px solid color-mix(in srgb, var(--ink) 8%, transparent)" }}>
                       <table className="w-full min-w-[760px]" style={{ tableLayout: "fixed" }}>
                         <ColumnWidths />
-                        <tbody className="divide-y divide-white/[0.03]">
+                        <tbody className="divide-y divide-ink/[0.03]">
                           {g.items.map((k) => (
                             <DesktopKeyRow key={k.id} k={k} now={now} checkingIds={checkingIds} onSelect={onSelect} onEdit={onEdit} onToggle={onToggle} onCheck={onCheck} />
                           ))}
@@ -166,15 +166,15 @@ export function KeysTable({
                 <table className="w-full min-w-[760px]" style={{ tableLayout: "fixed" }}>
                   <ColumnWidths />
                   <thead>
-                    <tr style={{ borderBottom: "1px solid rgba(255,255,255,0.04)" }}>
+                    <tr style={{ borderBottom: "1px solid color-mix(in srgb, var(--ink) 7%, transparent)" }}>
                       {["Label", "Provider", "Status", "Usage", "Ping", "Last Used", ""].map((h, i) => (
-                        <th key={i} className="px-4 py-2.5 text-left text-[10px] font-semibold text-zinc-600 uppercase tracking-widest">
+                        <th key={i} className="px-4 py-2.5 text-left text-[12px] font-semibold text-ink-3">
                           {h}
                         </th>
                       ))}
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-white/[0.03]">
+                  <tbody className="divide-y divide-ink/[0.03]">
                     {orderedRows.map((k) => (
                       <DesktopKeyRow key={k.id} k={k} now={now} checkingIds={checkingIds} onSelect={onSelect} onEdit={onEdit} onToggle={onToggle} onCheck={onCheck} />
                     ))}
@@ -210,24 +210,24 @@ function MobileKeyRow({
   onSelect: (id: string) => void; onEdit: (id: string) => void; onToggle: (id: string) => void; onCheck: (id: string) => void;
 }) {
   return (
-    <div data-flip-id={k.id} className="px-4 py-3.5 transition-colors active:bg-white/[0.03] cursor-pointer" onClick={() => onSelect(k.id)}>
+    <div data-flip-id={k.id} className="px-4 py-3.5 transition-colors active:bg-ink/[0.03] cursor-pointer" onClick={() => onSelect(k.id)}>
       <div className="flex items-start justify-between gap-2 mb-2">
         <div className="min-w-0">
-          <div className="text-sm font-medium text-zinc-200 leading-none truncate">{k.label}</div>
-          <div className="text-[11px] font-mono text-zinc-600 mt-1 truncate">
+          <div className="text-sm font-medium text-ink leading-none truncate">{k.label}</div>
+          <div className="text-[12px] font-mono text-ink-3 mt-1 truncate">
             {k.masked}
-            {k.model && <span className="text-zinc-700"> · {k.model}</span>}
+            {k.model && <span className="text-ink-4"> · {k.model}</span>}
           </div>
         </div>
         <div className="flex items-center gap-1 shrink-0" onClick={(e) => e.stopPropagation()}>
-          <button onClick={() => onCheck(k.id)} disabled={checkingIds.has(k.id)} className="p-1.5 rounded-md transition-colors hover:bg-white/5 disabled:opacity-50" title="Test key">
-            {checkingIds.has(k.id) ? <Loader2 size={13} color="#71717A" className="animate-spin" /> : <Stethoscope size={13} color="#71717A" />}
+          <button onClick={() => onCheck(k.id)} disabled={checkingIds.has(k.id)} className="p-1.5 rounded-md transition-colors hover:bg-ink/5 disabled:opacity-50" title="Test key">
+            {checkingIds.has(k.id) ? <Loader2 size={13} color="var(--ink-3)" className="animate-spin" /> : <Stethoscope size={13} color="var(--ink-3)" />}
           </button>
-          <button onClick={() => onEdit(k.id)} className="p-1.5 rounded-md transition-colors hover:bg-white/5" title="Edit">
-            <Edit2 size={13} color="#71717A" />
+          <button onClick={() => onEdit(k.id)} className="p-1.5 rounded-md transition-colors hover:bg-ink/5" title="Edit">
+            <Edit2 size={13} color="var(--ink-3)" />
           </button>
-          <button onClick={() => onToggle(k.id)} className="p-1.5 rounded-md transition-colors hover:bg-white/5" title={k.status === "disabled" ? "Enable" : "Disable"}>
-            <Power size={13} color={k.status === "disabled" ? "#ECECF0" : "#71717A"} />
+          <button onClick={() => onToggle(k.id)} className="p-1.5 rounded-md transition-colors hover:bg-ink/5" title={k.status === "disabled" ? "Enable" : "Disable"}>
+            <Power size={13} color={k.status === "disabled" ? "var(--ink)" : "var(--ink-3)"} />
           </button>
         </div>
       </div>
@@ -237,13 +237,13 @@ function MobileKeyRow({
       </div>
       <UsageBar used={k.used} limit={k.limit} status={k.status} />
       <div className="flex items-center justify-between mt-2.5">
-        <span className="text-[11px] text-zinc-600">
+        <span className="text-[12px] text-ink-3">
           Ping: <span className="font-mono" style={{ color: pingMeta(k.pingMs).color }}>{pingMeta(k.pingMs).text}</span>
-          <span className="text-zinc-700"> · </span>
-          Last used: <span className="font-mono text-zinc-500">{k.lastUsed ? rel(k.lastUsed, now) : "—"}</span>
+          <span className="text-ink-4"> · </span>
+          Last used: <span className="font-mono text-ink-3">{k.lastUsed ? rel(k.lastUsed, now) : "—"}</span>
         </span>
         {k.cooldownUntil ? (
-          <span className="text-[11px] font-mono" style={{ color: "#F59E0B" }}>
+          <span className="text-[12px] font-mono" style={{ color: "var(--warn)" }}>
             {cd(k.cooldownUntil, now)}
           </span>
         ) : null}
@@ -259,12 +259,12 @@ function DesktopKeyRow({
   onSelect: (id: string) => void; onEdit: (id: string) => void; onToggle: (id: string) => void; onCheck: (id: string) => void;
 }) {
   return (
-    <tr data-flip-id={k.id} className="group cursor-pointer transition-colors hover:bg-white/[0.02]" onClick={() => onSelect(k.id)}>
+    <tr data-flip-id={k.id} className="group cursor-pointer transition-colors hover:bg-ink/[0.02]" onClick={() => onSelect(k.id)}>
       <td className="px-4 py-3 min-w-0">
-        <div className="text-sm font-medium text-zinc-200 leading-none truncate">{k.label}</div>
-        <div className="text-[11px] font-mono text-zinc-600 mt-1 truncate">
+        <div className="text-sm font-medium text-ink leading-none truncate">{k.label}</div>
+        <div className="text-[12px] font-mono text-ink-3 mt-1 truncate">
           {k.masked}
-          {k.model && <span className="text-zinc-700"> · {k.model}</span>}
+          {k.model && <span className="text-ink-4"> · {k.model}</span>}
         </div>
       </td>
       <td className="px-4 py-3"><ProviderBadge provider={k.provider} /></td>
@@ -282,18 +282,18 @@ function DesktopKeyRow({
         </span>
       </td>
       <td className="px-4 py-3">
-        <span className="text-xs font-mono text-zinc-500">{k.lastUsed ? rel(k.lastUsed, now) : "—"}</span>
+        <span className="text-xs font-mono text-ink-3">{k.lastUsed ? rel(k.lastUsed, now) : "—"}</span>
       </td>
       <td className="px-4 py-3">
         <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity" onClick={(e) => e.stopPropagation()}>
-          <button onClick={() => onCheck(k.id)} disabled={checkingIds.has(k.id)} className="p-1.5 rounded-md transition-colors hover:bg-white/5 disabled:opacity-50" title="Test key">
-            {checkingIds.has(k.id) ? <Loader2 size={13} color="#71717A" className="animate-spin" /> : <Stethoscope size={13} color="#71717A" />}
+          <button onClick={() => onCheck(k.id)} disabled={checkingIds.has(k.id)} className="p-1.5 rounded-md transition-colors hover:bg-ink/5 disabled:opacity-50" title="Test key">
+            {checkingIds.has(k.id) ? <Loader2 size={13} color="var(--ink-3)" className="animate-spin" /> : <Stethoscope size={13} color="var(--ink-3)" />}
           </button>
-          <button onClick={() => onEdit(k.id)} className="p-1.5 rounded-md transition-colors hover:bg-white/5" title="Edit">
-            <Edit2 size={13} color="#71717A" />
+          <button onClick={() => onEdit(k.id)} className="p-1.5 rounded-md transition-colors hover:bg-ink/5" title="Edit">
+            <Edit2 size={13} color="var(--ink-3)" />
           </button>
-          <button onClick={() => onToggle(k.id)} className="p-1.5 rounded-md transition-colors hover:bg-white/5" title={k.status === "disabled" ? "Enable" : "Disable"}>
-            <Power size={13} color={k.status === "disabled" ? "#ECECF0" : "#71717A"} />
+          <button onClick={() => onToggle(k.id)} className="p-1.5 rounded-md transition-colors hover:bg-ink/5" title={k.status === "disabled" ? "Enable" : "Disable"}>
+            <Power size={13} color={k.status === "disabled" ? "var(--ink)" : "var(--ink-3)"} />
           </button>
         </div>
       </td>

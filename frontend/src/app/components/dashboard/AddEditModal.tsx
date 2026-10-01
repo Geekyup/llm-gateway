@@ -74,28 +74,28 @@ export function AddEditModal({
   }, [providerPickerOpen]);
 
   const baseInp: React.CSSProperties = {
-    background: "#1A1A1D",
-    border: "1px solid rgba(255,255,255,0.10)",
-    boxShadow: "inset 0 1px 0 rgba(0,0,0,0.25)",
-    color: "#ECECF0",
+    background: "var(--field)",
+    border: "1px solid color-mix(in srgb, var(--ink) 17%, transparent)",
+    boxShadow: "inset 0 1px 0 rgba(26,26,24,0.15)",
+    color: "var(--ink)",
   };
 
   function focus(e: React.FocusEvent<HTMLInputElement>) {
-    e.target.style.borderColor = "rgba(0,214,143,0.4)";
-    e.target.style.boxShadow = "inset 0 1px 0 rgba(0,0,0,0.25), 0 0 0 3px rgba(0,214,143,0.07)";
+    e.target.style.borderColor = "color-mix(in srgb, var(--accent) 40%, transparent)";
+    e.target.style.boxShadow = "inset 0 1px 0 rgba(26,26,24,0.15), 0 0 0 3px color-mix(in srgb, var(--accent) 7%, transparent)";
   }
 
   function blur(e: React.FocusEvent<HTMLInputElement>) {
-    e.target.style.borderColor = "rgba(255,255,255,0.10)";
-    e.target.style.boxShadow = "inset 0 1px 0 rgba(0,0,0,0.25)";
+    e.target.style.borderColor = "color-mix(in srgb, var(--ink) 17%, transparent)";
+    e.target.style.boxShadow = "inset 0 1px 0 rgba(26,26,24,0.15)";
   }
 
   const overlayMouseDownOnSelf = useRef(false);
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center p-4 animate-in fade-in duration-200"
-      style={{ background: "rgba(0,0,0,0.72)", backdropFilter: "blur(4px)" }}
+      className="fixed inset-0 z-50 flex items-center justify-center p-4 duration-200"
+      style={{ background: "rgba(26,26,24,0.43)", backdropFilter: "blur(4px)" }}
       onMouseDown={(e) => { overlayMouseDownOnSelf.current = e.target === e.currentTarget; }}
       onMouseUp={(e) => {
         if (overlayMouseDownOnSelf.current && e.target === e.currentTarget) onClose();
@@ -103,19 +103,19 @@ export function AddEditModal({
       }}
     >
       <div
-        className="w-full sm:max-w-md rounded-2xl p-5 sm:p-6 max-h-[92vh] overflow-y-auto animate-in fade-in zoom-in-95 slide-in-from-bottom-2 duration-200 ease-out"
-        style={{ background: "#141416", border: "1px solid rgba(255,255,255,0.09)", boxShadow: "0 32px 80px rgba(0,0,0,0.6)" }}
+        className="w-full sm:max-w-md rounded-lg p-5 sm:p-6 max-h-[92vh] overflow-y-auto duration-200 ease-out"
+        style={{ background: "var(--card)", border: "1px solid color-mix(in srgb, var(--ink) 15%, transparent)", boxShadow: "0 32px 80px rgba(26,26,24,0.36)" }}
       >
         <div className="flex items-center justify-between mb-6">
-          <h2 className="text-sm font-semibold text-zinc-100">{editKey ? "Edit Key" : "Add API Key"}</h2>
-          <button onClick={onClose} className="p-1.5 rounded-lg transition-colors hover:bg-white/5">
-            <X size={16} color="#52525B" />
+          <h2 className="text-sm font-semibold text-ink">{editKey ? "Edit Key" : "Add API Key"}</h2>
+          <button onClick={onClose} className="p-1.5 rounded-lg transition-colors hover:bg-ink/5">
+            <X size={16} color="var(--ink-4)" />
           </button>
         </div>
 
         <div className="space-y-4">
           <div>
-            <label className="block text-xs font-medium text-zinc-400 mb-1.5">Label</label>
+            <label className="block text-xs font-medium text-ink-2 mb-1.5">Label</label>
             <input
               className="w-full px-3 py-2 rounded-lg text-sm outline-none transition-all"
               style={baseInp}
@@ -129,26 +129,26 @@ export function AddEditModal({
           </div>
 
           <div>
-            <label className="block text-xs font-medium text-zinc-400 mb-1.5">Provider</label>
+            <label className="block text-xs font-medium text-ink-2 mb-1.5">Provider</label>
             <div className="relative" ref={providerPickerRef}>
               <button
                 onClick={() => setProviderPickerOpen((o) => !o)}
                 className="w-full flex items-center justify-between px-3 py-2 rounded-lg text-sm outline-none transition-all"
-                style={{ ...baseInp, borderColor: providerPickerOpen ? "rgba(0,214,143,0.4)" : (baseInp.border as string) }}
+                style={{ ...baseInp, borderColor: providerPickerOpen ? "color-mix(in srgb, var(--accent) 40%, transparent)" : (baseInp.border as string) }}
               >
                 <span className="flex items-center gap-2">
                   <span className="flex items-center justify-center shrink-0">
                     <ProviderIcon provider={form.provider} size={15} />
                   </span>
-                  <span className="font-medium text-zinc-100">{PROVIDER_NAMES[form.provider].name}</span>
+                  <span className="font-medium text-ink">{PROVIDER_NAMES[form.provider].name}</span>
                 </span>
-                <ChevronDown size={14} color="#52525B" style={{ transform: providerPickerOpen ? "rotate(180deg)" : "none", transition: "transform 0.15s ease" }} />
+                <ChevronDown size={14} color="var(--ink-4)" style={{ transform: providerPickerOpen ? "rotate(180deg)" : "none", transition: "transform 0.15s ease" }} />
               </button>
 
               {providerPickerOpen && (
                 <div
-                  className="absolute z-10 mt-1.5 w-full rounded-lg shadow-lg animate-in fade-in slide-in-from-top-1 duration-150 overflow-hidden"
-                  style={{ background: "#202024", border: "1px solid rgba(255,255,255,0.12)", boxShadow: "0 12px 32px rgba(0,0,0,0.5)" }}
+                  className="absolute z-10 mt-1.5 w-full rounded-lg shadow-lg duration-150 overflow-hidden"
+                  style={{ background: "var(--field)", border: "1px solid color-mix(in srgb, var(--ink) 20%, transparent)", boxShadow: "0 12px 32px rgba(26,26,24,0.3)" }}
                 >
                   {(Object.keys(PROVIDER_NAMES) as Provider[]).map((p) => {
                     const meta = PROVIDER_NAMES[p];
@@ -162,14 +162,14 @@ export function AddEditModal({
                           setModelError(null);
                           setProviderPickerOpen(false);
                         }}
-                        className="w-full flex items-center gap-2.5 text-left px-3 py-2.5 text-sm transition-colors hover:bg-white/5"
-                        style={{ background: active ? "#26262B" : "transparent", borderLeft: active ? "2px solid #00D68F" : "2px solid transparent" }}
+                        className="w-full flex items-center gap-2.5 text-left px-3 py-2.5 text-sm transition-colors hover:bg-ink/5"
+                        style={{ background: active ? "var(--field)" : "transparent", borderLeft: active ? "2px solid var(--accent)" : "2px solid transparent" }}
                       >
                         <span className="flex items-center justify-center shrink-0">
                           <ProviderIcon provider={p} size={15} />
                         </span>
-                        <span className="flex-1" style={{ color: active ? "#ECECF0" : "#A1A1AA" }}>{meta.name}</span>
-                        {active && <CheckCircle2 size={14} color="#00D68F" className="shrink-0" />}
+                        <span className="flex-1" style={{ color: active ? "var(--ink)" : "var(--ink-2)" }}>{meta.name}</span>
+                        {active && <CheckCircle2 size={14} color="var(--accent)" className="shrink-0" />}
                       </button>
                     );
                   })}
@@ -179,7 +179,7 @@ export function AddEditModal({
           </div>
 
           <div>
-            <label className="block text-xs font-medium text-zinc-400 mb-1.5">API Key</label>
+            <label className="block text-xs font-medium text-ink-2 mb-1.5">API Key</label>
             <div className="relative">
               <input
                 className="w-full px-3 py-2 pr-9 rounded-lg text-sm font-mono outline-none transition-all"
@@ -191,21 +191,21 @@ export function AddEditModal({
                 onFocus={focus}
                 onBlur={blur}
               />
-              <button onClick={() => setShowKey(!showKey)} className="absolute right-2.5 top-1/2 -translate-y-1/2 p-0.5 rounded transition-colors hover:bg-white/5">
-                {showKey ? <EyeOff size={14} color="#52525B" /> : <Eye size={14} color="#52525B" />}
+              <button onClick={() => setShowKey(!showKey)} className="absolute right-2.5 top-1/2 -translate-y-1/2 p-0.5 rounded transition-colors hover:bg-ink/5">
+                {showKey ? <EyeOff size={14} color="var(--ink-4)" /> : <Eye size={14} color="var(--ink-4)" />}
               </button>
             </div>
-            <p className="mt-1.5 text-[11px] text-zinc-600 flex items-center gap-1.5">
-              <Shield size={10} color="#52525B" className="shrink-0" />
+            <p className="mt-1.5 text-[12px] text-ink-3 flex items-center gap-1.5">
+              <Shield size={10} color="var(--ink-4)" className="shrink-0" />
               Encrypted before storage — never shown in plaintext
             </p>
           </div>
 
           <div>
-            <label className="block text-xs font-medium text-zinc-400 mb-1.5">
-              Model <span className="text-zinc-600 font-normal">(optional)</span>
+            <label className="block text-xs font-medium text-ink-2 mb-1.5">
+              Model <span className="text-ink-3 font-normal">(optional)</span>
             </label>
-            <p className="text-[11px] text-zinc-600 mb-2">
+            <p className="text-[12px] text-ink-3 mb-2">
               Pin this key to one model — it will still be used for requests to that model, plus any request
               that doesn't specify a model. Leave unset to serve requests for any model.
             </p>
@@ -213,11 +213,11 @@ export function AddEditModal({
             {form.model ? (
               <div
                 className="flex items-center justify-between px-3 py-2 rounded-lg text-sm"
-                style={{ ...baseInp, background: "rgba(0,214,143,0.06)", borderColor: "rgba(0,214,143,0.2)" }}
+                style={{ ...baseInp, background: "color-mix(in srgb, var(--accent) 6%, transparent)", borderColor: "color-mix(in srgb, var(--accent) 20%, transparent)" }}
               >
-                <span className="font-mono text-zinc-200 truncate">{form.model}</span>
-                <button onClick={() => setForm({ ...form, model: "" })} className="shrink-0 ml-2 p-0.5 rounded transition-colors hover:bg-white/10">
-                  <X size={13} color="#71717A" />
+                <span className="font-mono text-ink truncate">{form.model}</span>
+                <button onClick={() => setForm({ ...form, model: "" })} className="shrink-0 ml-2 p-0.5 rounded transition-colors hover:bg-ink/10">
+                  <X size={13} color="var(--ink-3)" />
                 </button>
               </div>
             ) : (
@@ -226,7 +226,7 @@ export function AddEditModal({
                   onClick={() => { fetchModels(); setModelSearch(""); }}
                   disabled={modelLoading}
                   className="w-full flex items-center justify-center gap-2 py-2 rounded-lg text-xs font-medium transition-all active:scale-[0.98] disabled:active:scale-100 disabled:opacity-60"
-                  style={{ background: "#1A1A1D", color: "#A1A1AA", border: "1px solid rgba(255,255,255,0.10)", boxShadow: "inset 0 1px 0 rgba(0,0,0,0.25)" }}
+                  style={{ background: "var(--field)", color: "var(--ink-2)", border: "1px solid color-mix(in srgb, var(--ink) 17%, transparent)", boxShadow: "inset 0 1px 0 rgba(26,26,24,0.15)" }}
                 >
                   {modelLoading ? <Loader2 size={13} className="animate-spin" /> : <ChevronDown size={13} />}
                   {modelLoading ? "Loading models…" : editKey ? "Select Model (uses saved key)" : "Select Model"}
@@ -234,20 +234,20 @@ export function AddEditModal({
 
                 {modelPickerOpen && modelOptions && (
                   <div
-                    className="relative z-10 mt-1.5 w-full rounded-lg shadow-lg animate-in fade-in slide-in-from-top-1 duration-150 overflow-hidden"
-                    style={{ background: "#202024", border: "1px solid rgba(255,255,255,0.12)", boxShadow: "0 12px 32px rgba(0,0,0,0.5)" }}
+                    className="relative z-10 mt-1.5 w-full rounded-lg shadow-lg duration-150 overflow-hidden"
+                    style={{ background: "var(--field)", border: "1px solid color-mix(in srgb, var(--ink) 20%, transparent)", boxShadow: "0 12px 32px rgba(26,26,24,0.3)" }}
                   >
                     {modelOptions.length > 5 && (
-                      <div className="p-1.5 sticky top-0" style={{ background: "#202024", borderBottom: "1px solid rgba(255,255,255,0.08)" }}>
+                      <div className="p-1.5 sticky top-0" style={{ background: "var(--field)", borderBottom: "1px solid color-mix(in srgb, var(--ink) 14%, transparent)" }}>
                         <div className="relative">
-                          <Search size={12} color="#52525B" className="absolute left-2 top-1/2 -translate-y-1/2" />
+                          <Search size={12} color="var(--ink-4)" className="absolute left-2 top-1/2 -translate-y-1/2" />
                           <input
                             autoFocus
                             value={modelSearch}
                             onChange={(e) => setModelSearch(e.target.value)}
                             placeholder="Search models…"
                             className="w-full pl-6.5 pr-2 py-1.5 rounded-md text-xs outline-none"
-                            style={{ background: "rgba(255,255,255,0.05)", color: "#ECECF0", border: "1px solid transparent" }}
+                            style={{ background: "color-mix(in srgb, var(--ink) 8%, transparent)", color: "var(--ink)", border: "1px solid transparent" }}
                           />
                         </div>
                       </div>
@@ -259,19 +259,19 @@ export function AddEditModal({
                           ? modelOptions.filter((m) => m.label.toLowerCase().includes(q) || m.id.toLowerCase().includes(q))
                           : modelOptions;
                         if (modelOptions.length === 0) {
-                          return <p className="px-3 py-2.5 text-xs text-zinc-500">No models available for this key.</p>;
+                          return <p className="px-3 py-2.5 text-xs text-ink-3">No models available for this key.</p>;
                         }
                         if (filtered.length === 0) {
-                          return <p className="px-3 py-2.5 text-xs text-zinc-500">No models match "{modelSearch}".</p>;
+                          return <p className="px-3 py-2.5 text-xs text-ink-3">No models match "{modelSearch}".</p>;
                         }
                         return filtered.map((m) => (
                           <button
                             key={m.id}
                             onClick={() => { setForm({ ...form, model: m.id }); setModelPickerOpen(false); setModelSearch(""); }}
-                            className="w-full text-left px-3 py-2 text-xs transition-colors hover:bg-white/5"
+                            className="w-full text-left px-3 py-2 text-xs transition-colors hover:bg-ink/5"
                           >
-                            <div className="text-zinc-200 truncate">{m.label}</div>
-                            {m.label !== m.id && <div className="text-[10px] font-mono text-zinc-600 truncate">{m.id}</div>}
+                            <div className="text-ink truncate">{m.label}</div>
+                            {m.label !== m.id && <div className="text-[12px] font-mono text-ink-3 truncate">{m.id}</div>}
                           </button>
                         ));
                       })()}
@@ -280,11 +280,11 @@ export function AddEditModal({
                 )}
               </div>
             )}
-            {modelError && <p className="mt-1.5 text-[11px]" style={{ color: "#EF4444" }}>{modelError}</p>}
+            {modelError && <p className="mt-1.5 text-[12px]" style={{ color: "var(--bad)" }}>{modelError}</p>}
           </div>
 
           <div>
-            <label className="block text-xs font-medium text-zinc-400 mb-1.5">Daily Limit</label>
+            <label className="block text-xs font-medium text-ink-2 mb-1.5">Daily Limit</label>
             <input
               className="w-full px-3 py-2 rounded-lg text-sm font-mono outline-none transition-all"
               style={baseInp}
@@ -299,7 +299,7 @@ export function AddEditModal({
         </div>
 
         {error && (
-          <div className="mt-4 flex items-start gap-2 px-3 py-2 rounded-lg text-xs" style={{ background: "rgba(239,68,68,0.08)", color: "#EF4444", border: "1px solid rgba(239,68,68,0.2)" }}>
+          <div className="mt-4 flex items-start gap-2 px-3 py-2 rounded-lg text-xs" style={{ background: "color-mix(in srgb, var(--bad) 8%, transparent)", color: "var(--bad)", border: "1px solid color-mix(in srgb, var(--bad) 20%, transparent)" }}>
             <AlertTriangle size={13} className="shrink-0 mt-0.5" />
             <span>{error}</span>
           </div>
@@ -309,7 +309,7 @@ export function AddEditModal({
           <button
             onClick={onClose}
             className="flex-1 py-2 rounded-lg text-sm font-medium transition-colors active:scale-95"
-            style={{ background: "rgba(255,255,255,0.04)", color: "#71717A", border: "1px solid rgba(255,255,255,0.06)" }}
+            style={{ background: "color-mix(in srgb, var(--ink) 7%, transparent)", color: "var(--ink-3)", border: "1px solid color-mix(in srgb, var(--ink) 10%, transparent)" }}
           >
             Cancel
           </button>
@@ -317,9 +317,7 @@ export function AddEditModal({
             onClick={() => !saving && onSave(form)}
             disabled={saving}
             className="flex-1 py-2 rounded-lg text-sm font-semibold transition-all flex items-center justify-center gap-1.5 active:scale-95 disabled:active:scale-100"
-            style={{ background: "#00D68F", color: "#0A0A0B", boxShadow: "0 0 16px rgba(0,214,143,0.3)", opacity: saving ? 0.7 : 1 }}
-            onMouseEnter={(e) => (e.currentTarget.style.boxShadow = "0 0 28px rgba(0,214,143,0.55)")}
-            onMouseLeave={(e) => (e.currentTarget.style.boxShadow = "0 0 16px rgba(0,214,143,0.3)")}
+            style={{ background: "var(--accent)", color: "var(--on-accent)", boxShadow: "none", opacity: saving ? 0.7 : 1 }}
           >
             {saving && <Loader2 size={13} className="animate-spin" />}
             {editKey ? "Save Changes" : "Add Key"}

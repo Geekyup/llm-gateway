@@ -41,20 +41,20 @@ export function BulkAddModal({
   }, [providerPickerOpen]);
 
   const baseInp: React.CSSProperties = {
-    background: "#1A1A1D",
-    border: "1px solid rgba(255,255,255,0.10)",
-    boxShadow: "inset 0 1px 0 rgba(0,0,0,0.25)",
-    color: "#ECECF0",
+    background: "var(--field)",
+    border: "1px solid color-mix(in srgb, var(--ink) 17%, transparent)",
+    boxShadow: "inset 0 1px 0 rgba(26,26,24,0.15)",
+    color: "var(--ink)",
   };
 
   function focus(e: React.FocusEvent<HTMLElement>) {
-    e.currentTarget.style.borderColor = "rgba(0,214,143,0.4)";
-    e.currentTarget.style.boxShadow = "inset 0 1px 0 rgba(0,0,0,0.25), 0 0 0 3px rgba(0,214,143,0.07)";
+    e.currentTarget.style.borderColor = "color-mix(in srgb, var(--accent) 40%, transparent)";
+    e.currentTarget.style.boxShadow = "inset 0 1px 0 rgba(26,26,24,0.15), 0 0 0 3px color-mix(in srgb, var(--accent) 7%, transparent)";
   }
 
   function blur(e: React.FocusEvent<HTMLElement>) {
-    e.currentTarget.style.borderColor = "rgba(255,255,255,0.10)";
-    e.currentTarget.style.boxShadow = "inset 0 1px 0 rgba(0,0,0,0.25)";
+    e.currentTarget.style.borderColor = "color-mix(in srgb, var(--ink) 17%, transparent)";
+    e.currentTarget.style.boxShadow = "inset 0 1px 0 rgba(26,26,24,0.15)";
   }
 
   const keyCount = rawKeys.split(/[\s,]+/).map((s) => s.trim()).filter(Boolean).length;
@@ -87,8 +87,8 @@ export function BulkAddModal({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center p-4 animate-in fade-in duration-200"
-      style={{ background: "rgba(0,0,0,0.72)", backdropFilter: "blur(4px)" }}
+      className="fixed inset-0 z-50 flex items-center justify-center p-4 duration-200"
+      style={{ background: "rgba(26,26,24,0.43)", backdropFilter: "blur(4px)" }}
       onMouseDown={(e) => { overlayMouseDownOnSelf.current = e.target === e.currentTarget; }}
       onMouseUp={(e) => {
         if (overlayMouseDownOnSelf.current && e.target === e.currentTarget) onClose();
@@ -96,19 +96,19 @@ export function BulkAddModal({
       }}
     >
       <div
-        className="w-full sm:max-w-lg rounded-2xl p-5 sm:p-6 max-h-[92vh] overflow-y-auto animate-in fade-in zoom-in-95 slide-in-from-bottom-2 duration-200 ease-out"
-        style={{ background: "#141416", border: "1px solid rgba(255,255,255,0.09)", boxShadow: "0 32px 80px rgba(0,0,0,0.6)" }}
+        className="w-full sm:max-w-lg rounded-lg p-5 sm:p-6 max-h-[92vh] overflow-y-auto duration-200 ease-out"
+        style={{ background: "var(--card)", border: "1px solid color-mix(in srgb, var(--ink) 15%, transparent)", boxShadow: "0 32px 80px rgba(26,26,24,0.36)" }}
       >
         <div className="flex items-center justify-between mb-6">
-          <h2 className="text-sm font-semibold text-zinc-100">Bulk Add Keys</h2>
-          <button onClick={onClose} className="p-1.5 rounded-lg transition-colors hover:bg-white/5">
-            <X size={16} color="#52525B" />
+          <h2 className="text-sm font-semibold text-ink">Bulk Add Keys</h2>
+          <button onClick={onClose} className="p-1.5 rounded-lg transition-colors hover:bg-ink/5">
+            <X size={16} color="var(--ink-4)" />
           </button>
         </div>
 
         {result ? (
           <div className="space-y-4">
-            <div className="flex items-start gap-2 px-3 py-2.5 rounded-lg text-xs" style={{ background: "rgba(0,214,143,0.08)", color: "#00D68F", border: "1px solid rgba(0,214,143,0.2)" }}>
+            <div className="flex items-start gap-2 px-3 py-2.5 rounded-lg text-xs" style={{ background: "color-mix(in srgb, var(--accent) 8%, transparent)", color: "var(--accent)", border: "1px solid color-mix(in srgb, var(--accent) 20%, transparent)" }}>
               <CheckCircle2 size={14} className="shrink-0 mt-0.5" />
               <span>
                 Added {result.created.length} key{result.created.length === 1 ? "" : "s"}.
@@ -118,14 +118,14 @@ export function BulkAddModal({
 
             {result.errors.length > 0 && (
               <div className="space-y-1.5">
-                <p className="text-xs font-medium text-zinc-400">{result.errors.length} key{result.errors.length === 1 ? "" : "s"} failed:</p>
-                <div className="rounded-lg overflow-hidden" style={{ border: "1px solid rgba(239,68,68,0.2)" }}>
+                <p className="text-xs font-medium text-ink-2">{result.errors.length} key{result.errors.length === 1 ? "" : "s"} failed:</p>
+                <div className="rounded-lg overflow-hidden" style={{ border: "1px solid color-mix(in srgb, var(--bad) 20%, transparent)" }}>
                   {result.errors.map((e, i) => (
-                    <div key={i} className="flex items-start gap-2 px-3 py-2 text-xs" style={{ background: "rgba(239,68,68,0.06)", borderTop: i > 0 ? "1px solid rgba(239,68,68,0.15)" : undefined }}>
-                      <AlertTriangle size={12} color="#EF4444" className="shrink-0 mt-0.5" />
+                    <div key={i} className="flex items-start gap-2 px-3 py-2 text-xs" style={{ background: "color-mix(in srgb, var(--bad) 6%, transparent)", borderTop: i > 0 ? "1px solid color-mix(in srgb, var(--bad) 15%, transparent)" : undefined }}>
+                      <AlertTriangle size={12} color="var(--bad)" className="shrink-0 mt-0.5" />
                       <div>
-                        <span className="font-mono text-zinc-300">{e.raw_key_preview}</span>
-                        <span className="text-zinc-500"> — {e.detail}</span>
+                        <span className="font-mono text-ink-2">{e.raw_key_preview}</span>
+                        <span className="text-ink-3"> — {e.detail}</span>
                       </div>
                     </div>
                   ))}
@@ -136,7 +136,7 @@ export function BulkAddModal({
             <button
               onClick={onClose}
               className="w-full py-2 rounded-lg text-sm font-semibold transition-all active:scale-95"
-              style={{ background: "#00D68F", color: "#0A0A0B" }}
+              style={{ background: "var(--accent)", color: "var(--on-accent)" }}
             >
               Done
             </button>
@@ -145,26 +145,26 @@ export function BulkAddModal({
           <>
             <div className="space-y-4">
               <div>
-                <label className="block text-xs font-medium text-zinc-400 mb-1.5">Provider</label>
+                <label className="block text-xs font-medium text-ink-2 mb-1.5">Provider</label>
                 <div className="relative" ref={providerPickerRef}>
                   <button
                     onClick={() => setProviderPickerOpen((o) => !o)}
                     className="w-full flex items-center justify-between px-3 py-2 rounded-lg text-sm outline-none transition-all"
-                    style={{ ...baseInp, borderColor: providerPickerOpen ? "rgba(0,214,143,0.4)" : (baseInp.border as string) }}
+                    style={{ ...baseInp, borderColor: providerPickerOpen ? "color-mix(in srgb, var(--accent) 40%, transparent)" : (baseInp.border as string) }}
                   >
                     <span className="flex items-center gap-2">
                       <span className="flex items-center justify-center shrink-0">
                         <ProviderIcon provider={provider} size={15} />
                       </span>
-                      <span className="font-medium text-zinc-100">{PROVIDER_NAMES[provider].name}</span>
+                      <span className="font-medium text-ink">{PROVIDER_NAMES[provider].name}</span>
                     </span>
-                    <ChevronDown size={14} color="#52525B" style={{ transform: providerPickerOpen ? "rotate(180deg)" : "none", transition: "transform 0.15s ease" }} />
+                    <ChevronDown size={14} color="var(--ink-4)" style={{ transform: providerPickerOpen ? "rotate(180deg)" : "none", transition: "transform 0.15s ease" }} />
                   </button>
 
                   {providerPickerOpen && (
                     <div
-                      className="absolute z-10 mt-1.5 w-full rounded-lg shadow-lg animate-in fade-in slide-in-from-top-1 duration-150 overflow-hidden"
-                      style={{ background: "#202024", border: "1px solid rgba(255,255,255,0.12)", boxShadow: "0 12px 32px rgba(0,0,0,0.5)" }}
+                      className="absolute z-10 mt-1.5 w-full rounded-lg shadow-lg duration-150 overflow-hidden"
+                      style={{ background: "var(--field)", border: "1px solid color-mix(in srgb, var(--ink) 20%, transparent)", boxShadow: "0 12px 32px rgba(26,26,24,0.3)" }}
                     >
                       {(Object.keys(PROVIDER_NAMES) as Provider[]).map((p) => {
                         const meta = PROVIDER_NAMES[p];
@@ -173,14 +173,14 @@ export function BulkAddModal({
                           <button
                             key={p}
                             onClick={() => { setProvider(p); setProviderPickerOpen(false); }}
-                            className="w-full flex items-center gap-2.5 text-left px-3 py-2.5 text-sm transition-colors hover:bg-white/5"
-                            style={{ background: active ? "#26262B" : "transparent", borderLeft: active ? "2px solid #00D68F" : "2px solid transparent" }}
+                            className="w-full flex items-center gap-2.5 text-left px-3 py-2.5 text-sm transition-colors hover:bg-ink/5"
+                            style={{ background: active ? "var(--field)" : "transparent", borderLeft: active ? "2px solid var(--accent)" : "2px solid transparent" }}
                           >
                             <span className="flex items-center justify-center shrink-0">
                               <ProviderIcon provider={p} size={15} />
                             </span>
-                            <span className="flex-1" style={{ color: active ? "#ECECF0" : "#A1A1AA" }}>{meta.name}</span>
-                            {active && <CheckCircle2 size={14} color="#00D68F" className="shrink-0" />}
+                            <span className="flex-1" style={{ color: active ? "var(--ink)" : "var(--ink-2)" }}>{meta.name}</span>
+                            {active && <CheckCircle2 size={14} color="var(--accent)" className="shrink-0" />}
                           </button>
                         );
                       })}
@@ -190,8 +190,8 @@ export function BulkAddModal({
               </div>
 
               <div>
-                <label className="block text-xs font-medium text-zinc-400 mb-1.5">
-                  API Keys <span className="text-zinc-600 font-normal">— one per line (commas also work)</span>
+                <label className="block text-xs font-medium text-ink-2 mb-1.5">
+                  API Keys <span className="text-ink-3 font-normal">— one per line (commas also work)</span>
                 </label>
                 <textarea
                   className="dark-scrollbar w-full px-3 py-2.5 rounded-lg text-xs font-mono leading-relaxed outline-none transition-all resize-none"
@@ -204,14 +204,14 @@ export function BulkAddModal({
                   onBlur={blur}
                   autoFocus
                 />
-                <p className="mt-1.5 text-[11px] text-zinc-600">
+                <p className="mt-1.5 text-[12px] text-ink-3">
                   {keyCount} key{keyCount === 1 ? "" : "s"} detected. Duplicates of keys you already have are skipped automatically.
                 </p>
               </div>
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-xs font-medium text-zinc-400 mb-1.5">Label Prefix</label>
+                  <label className="block text-xs font-medium text-ink-2 mb-1.5">Label Prefix</label>
                   <input
                     className="w-full px-3 py-2 rounded-lg text-sm outline-none transition-all"
                     style={baseInp}
@@ -221,10 +221,10 @@ export function BulkAddModal({
                     onFocus={focus}
                     onBlur={blur}
                   />
-                  <p className="mt-1 text-[10px] text-zinc-600">Keys are labeled "{labelPrefix || "Key"} 1", "{labelPrefix || "Key"} 2", …</p>
+                  <p className="mt-1 text-[12px] text-ink-3">Keys are labeled "{labelPrefix || "Key"} 1", "{labelPrefix || "Key"} 2", …</p>
                 </div>
                 <div>
-                  <label className="block text-xs font-medium text-zinc-400 mb-1.5">Daily Limit</label>
+                  <label className="block text-xs font-medium text-ink-2 mb-1.5">Daily Limit</label>
                   <input
                     className="w-full px-3 py-2 rounded-lg text-sm font-mono outline-none transition-all"
                     style={baseInp}
@@ -239,8 +239,8 @@ export function BulkAddModal({
               </div>
 
               <div>
-                <label className="block text-xs font-medium text-zinc-400 mb-1.5">
-                  Model <span className="text-zinc-600 font-normal">(optional, applies to all)</span>
+                <label className="block text-xs font-medium text-ink-2 mb-1.5">
+                  Model <span className="text-ink-3 font-normal">(optional, applies to all)</span>
                 </label>
                 <input
                   className="w-full px-3 py-2 rounded-lg text-sm font-mono outline-none transition-all"
@@ -255,7 +255,7 @@ export function BulkAddModal({
             </div>
 
             {error && (
-              <div className="mt-4 flex items-start gap-2 px-3 py-2 rounded-lg text-xs" style={{ background: "rgba(239,68,68,0.08)", color: "#EF4444", border: "1px solid rgba(239,68,68,0.2)" }}>
+              <div className="mt-4 flex items-start gap-2 px-3 py-2 rounded-lg text-xs" style={{ background: "color-mix(in srgb, var(--bad) 8%, transparent)", color: "var(--bad)", border: "1px solid color-mix(in srgb, var(--bad) 20%, transparent)" }}>
                 <AlertTriangle size={13} className="shrink-0 mt-0.5" />
                 <span>{error}</span>
               </div>
@@ -265,7 +265,7 @@ export function BulkAddModal({
               <button
                 onClick={onClose}
                 className="flex-1 py-2 rounded-lg text-sm font-medium transition-colors active:scale-95"
-                style={{ background: "rgba(255,255,255,0.04)", color: "#71717A", border: "1px solid rgba(255,255,255,0.06)" }}
+                style={{ background: "color-mix(in srgb, var(--ink) 7%, transparent)", color: "var(--ink-3)", border: "1px solid color-mix(in srgb, var(--ink) 10%, transparent)" }}
               >
                 Cancel
               </button>
@@ -273,7 +273,7 @@ export function BulkAddModal({
                 onClick={() => !saving && handleSubmit()}
                 disabled={saving || keyCount === 0}
                 className="flex-1 py-2 rounded-lg text-sm font-semibold transition-all flex items-center justify-center gap-1.5 active:scale-95 disabled:active:scale-100 disabled:opacity-60"
-                style={{ background: "#00D68F", color: "#0A0A0B", boxShadow: "0 0 16px rgba(0,214,143,0.3)" }}
+                style={{ background: "var(--accent)", color: "var(--on-accent)", boxShadow: "none" }}
               >
                 {saving && <Loader2 size={13} className="animate-spin" />}
                 {saving ? "Adding…" : `Add ${keyCount || ""} Key${keyCount === 1 ? "" : "s"}`}

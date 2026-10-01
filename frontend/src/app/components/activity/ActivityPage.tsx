@@ -74,7 +74,7 @@ export function ActivityPage() {
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
-        <h2 className="text-sm font-medium text-zinc-300">Activity</h2>
+        <h2 className="text-sm font-medium text-ink-2">Activity</h2>
         <RangeSwitch value={range} onChange={setRange} options={RANGE_OPTIONS} label="Activity time range" />
       </div>
 

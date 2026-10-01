@@ -166,7 +166,7 @@ export function Dashboard({ user, onLogout }: { user: UserRead | null; onLogout:
 
         <main className="flex-1 px-3 sm:px-6 py-4 sm:py-5 w-full max-w-[1400px] mx-auto space-y-4">
           {loadError && (
-            <div className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs" style={{ background: "rgba(239,68,68,0.08)", color: "var(--destructive)", border: "1px solid rgba(239,68,68,0.2)" }}>
+            <div className="flex items-center gap-2 px-4 py-2.5 rounded-lg text-xs" style={{ background: "color-mix(in srgb, var(--bad) 8%, transparent)", color: "var(--destructive)", border: "1px solid color-mix(in srgb, var(--bad) 20%, transparent)" }}>
               <AlertTriangle size={13} className="shrink-0" />
               Could not reach the API: {loadError}
             </div>
@@ -179,7 +179,7 @@ export function Dashboard({ user, onLogout }: { user: UserRead | null; onLogout:
           ) : (
             <>
               {view === "dashboard" && (
-                <div key="dashboard" className="space-y-4 animate-in fade-in slide-in-from-bottom-1 duration-300 ease-out">
+                <div key="dashboard" className="space-y-4 duration-300 ease-out">
                   <MetricCards keys={keys} />
                   <KeysTable
                     keys={keys}
@@ -197,15 +197,15 @@ export function Dashboard({ user, onLogout }: { user: UserRead | null; onLogout:
                 </div>
               )}
               {view === "activity" && (
-                <div key="activity" className="animate-in fade-in slide-in-from-bottom-1 duration-300 ease-out">
+                <div key="activity" className="animate-in duration-300 ease-out">
                   <ActivityPage />
                 </div>
               )}
-              <div key="playground" className={view === "playground" ? "animate-in fade-in slide-in-from-bottom-1 duration-300 ease-out" : "hidden"}>
+              <div key="playground" className={view === "playground" ? "animate-in duration-300 ease-out" : "hidden"}>
                 <ChatPlayground keys={keys} active={view === "playground"} onAddKey={() => setAddOpen(true)} />
               </div>
               {view === "access" && (
-                <div key="access" className="animate-in fade-in slide-in-from-bottom-1 duration-300 ease-out">
+                <div key="access" className="animate-in duration-300 ease-out">
                   <GatewayAccessPanel />
                 </div>
               )}
@@ -219,13 +219,13 @@ export function Dashboard({ user, onLogout }: { user: UserRead | null; onLogout:
           {checkResults.map((r) => (
             <div
               key={r.toastId}
-              className="flex items-center gap-2 px-4 py-3 rounded-lg shadow-lg animate-in fade-in slide-in-from-bottom-2 duration-250 ease-out pointer-events-auto"
-              style={{ background: "var(--muted)", border: `1px solid ${r.ok ? "rgba(0,214,143,0.3)" : "rgba(239,68,68,0.3)"}`, maxWidth: 360 }}
+              className="flex items-center gap-2 px-4 py-3 rounded-lg shadow-lg duration-250 ease-out pointer-events-auto"
+              style={{ background: "var(--muted)", border: `1px solid ${r.ok ? "color-mix(in srgb, var(--accent) 30%, transparent)" : "color-mix(in srgb, var(--bad) 30%, transparent)"}`, maxWidth: 360 }}
             >
               {r.ok ? <CheckCircle2 size={16} color="var(--primary)" className="shrink-0" /> : <AlertTriangle size={16} color="var(--destructive)" className="shrink-0" />}
               <div className="min-w-0">
-                <div className="text-xs font-medium text-zinc-200">{r.ok ? "Key is working" : "Key check failed"}</div>
-                {r.detail && <div className="text-[11px] text-zinc-500 truncate">{r.detail}</div>}
+                <div className="text-xs font-medium text-ink">{r.ok ? "Key is working" : "Key check failed"}</div>
+                {r.detail && <div className="text-[12px] text-ink-3 truncate">{r.detail}</div>}
               </div>
             </div>
           ))}

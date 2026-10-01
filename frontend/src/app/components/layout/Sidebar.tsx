@@ -6,7 +6,7 @@ export function Sidebar({ view, onView }: { view: View; onView: (v: View) => voi
   return (
     <aside
       className="hidden md:flex md:flex-col w-56 shrink-0 h-screen sticky top-0"
-      style={{ background: "#0D0D0F", borderRight: "1px solid rgba(255,255,255,0.06)" }}
+      style={{ background: "var(--background)", borderRight: "1px solid color-mix(in srgb, var(--ink) 10%, transparent)" }}
     >
       <SidebarBrand />
       <SidebarNav view={view} onView={onView} />

@@ -36,18 +36,18 @@ export function ActivityProviderFilterDropdown({
     <div className="relative" ref={ref}>
       <button
         onClick={() => setOpen((o) => !o)}
-        className="flex items-center gap-1.5 text-[11px] rounded-md px-2 py-1 outline-none transition-colors hover:brightness-125"
+        className="flex items-center gap-1.5 text-[12px] rounded-md px-2 py-1 outline-none transition-colors hover:brightness-125"
         style={{
-          color: "#ECECF0",
-          background: active ? (PROVIDER_META[value]?.bg ?? "rgba(255,255,255,0.06)") : "rgba(255,255,255,0.06)",
-          border: `1px solid ${active ? (PROVIDER_META[value]?.color ?? "#71717A") + "38" : "rgba(255,255,255,0.08)"}`,
+          color: "var(--ink)",
+          background: active ? (PROVIDER_META[value]?.bg ?? "color-mix(in srgb, var(--ink) 10%, transparent)") : "color-mix(in srgb, var(--ink) 10%, transparent)",
+          border: `1px solid ${active ? (PROVIDER_META[value]?.color ?? "var(--ink-3)") + "38" : "color-mix(in srgb, var(--ink) 14%, transparent)"}`,
         }}
       >
-        {active ? <ProviderIcon provider={value} size={13} className="shrink-0" /> : <Plug size={11} color="#71717A" className="shrink-0" />}
+        {active ? <ProviderIcon provider={value} size={13} className="shrink-0" /> : <Plug size={11} color="var(--ink-3)" className="shrink-0" />}
         {fullLabel}
         <ChevronDown
           size={11}
-          color="#71717A"
+          color="var(--ink-3)"
           className="shrink-0"
           style={{ transform: open ? "rotate(180deg)" : "none", transition: "transform 0.15s ease" }}
         />
@@ -56,21 +56,21 @@ export function ActivityProviderFilterDropdown({
       <DropdownPortal anchorRef={ref} open={open} align="right">
         <div
           ref={menuRef}
-          className="min-w-[150px] rounded-lg shadow-lg animate-in fade-in slide-in-from-top-1 duration-150 overflow-hidden"
-          style={{ background: "#1C1C1E", border: "1px solid rgba(255,255,255,0.1)" }}
+          className="min-w-[150px] rounded-lg shadow-lg duration-150 overflow-hidden"
+          style={{ background: "var(--field)", border: "1px solid color-mix(in srgb, var(--ink) 17%, transparent)" }}
         >
           <button
             onClick={() => { onChange(""); setOpen(false); }}
-            className="group w-full flex items-center justify-between gap-2 text-left px-3 py-2 text-xs transition-colors hover:bg-white/10"
-            style={{ background: !active ? "rgba(255,255,255,0.04)" : "transparent" }}
+            className="group w-full flex items-center justify-between gap-2 text-left px-3 py-2 text-xs transition-colors hover:bg-ink/10"
+            style={{ background: !active ? "color-mix(in srgb, var(--ink) 7%, transparent)" : "transparent" }}
           >
             <span
-              className="transition-colors group-hover:!text-[#ECECF0]"
-              style={{ color: !active ? "#ECECF0" : "#A1A1AA" }}
+              className="transition-colors group-hover:!text-[var(--ink)]"
+              style={{ color: !active ? "var(--ink)" : "var(--ink-2)" }}
             >
               All providers
             </span>
-            {!active && <CheckCircle2 size={13} color="#ECECF0" className="shrink-0" />}
+            {!active && <CheckCircle2 size={13} color="var(--ink)" className="shrink-0" />}
           </button>
           {PROVIDER_OPTIONS.map((p) => {
             const isSelected = value === p;
@@ -79,19 +79,19 @@ export function ActivityProviderFilterDropdown({
               <button
                 key={p}
                 onClick={() => { onChange(p); setOpen(false); }}
-                className="group w-full flex items-center justify-between gap-2 text-left px-3 py-2 text-xs transition-colors hover:bg-white/10"
-                style={{ background: isSelected ? "rgba(255,255,255,0.04)" : "transparent" }}
+                className="group w-full flex items-center justify-between gap-2 text-left px-3 py-2 text-xs transition-colors hover:bg-ink/10"
+                style={{ background: isSelected ? "color-mix(in srgb, var(--ink) 7%, transparent)" : "transparent" }}
               >
                 <span className="flex items-center gap-1.5">
                   <ProviderIcon provider={p} size={12} className="shrink-0" />
                   <span
-                    className="transition-colors group-hover:!text-[#ECECF0]"
-                    style={{ color: isSelected ? "#ECECF0" : "#A1A1AA" }}
+                    className="transition-colors group-hover:!text-[var(--ink)]"
+                    style={{ color: isSelected ? "var(--ink)" : "var(--ink-2)" }}
                   >
                     {meta.name}
                   </span>
                 </span>
-                {isSelected && <CheckCircle2 size={13} color="#ECECF0" className="shrink-0" />}
+                {isSelected && <CheckCircle2 size={13} color="var(--ink)" className="shrink-0" />}
               </button>
             );
           })}

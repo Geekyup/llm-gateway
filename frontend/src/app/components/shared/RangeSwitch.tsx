@@ -12,7 +12,7 @@ export function RangeSwitch<T extends string>({
   return (
     <div
       className="inline-flex items-center rounded-lg p-0.5"
-      style={{ background: "#0B0B0D", border: "1px solid rgba(255,255,255,0.08)" }}
+      style={{ background: "var(--background)", border: "1px solid color-mix(in srgb, var(--ink) 14%, transparent)" }}
       role="group"
       aria-label={label}
     >
@@ -23,11 +23,11 @@ export function RangeSwitch<T extends string>({
             key={opt.value}
             onClick={() => onChange(opt.value)}
             aria-pressed={active}
-            className="px-2.5 py-1 rounded-md text-[11px] font-medium font-mono transition-colors"
+            className="px-2.5 py-1 rounded-md text-[12px] font-medium font-mono transition-colors"
             style={
               active
-                ? { background: "rgba(0,214,143,0.14)", color: "#22E3A8" }
-                : { background: "transparent", color: "#71717A" }
+                ? { background: "color-mix(in srgb, var(--accent) 14%, transparent)", color: "var(--accent-hover)" }
+                : { background: "transparent", color: "var(--ink-3)" }
             }
           >
             {opt.label}

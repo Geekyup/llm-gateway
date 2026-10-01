@@ -25,7 +25,7 @@ export function MessageActions({
   return (
     <div className={`message-actions ${className ?? ""}`}>
       <button onClick={copy} title="Copy" type="button" className="message-action-btn">
-        {copied ? <Check size={12} color="#00D68F" /> : <Copy size={12} />}
+        {copied ? <Check size={12} color="var(--ok)" /> : <Copy size={12} />}
       </button>
       {onRegenerate && (
         <button onClick={onRegenerate} title="Regenerate" type="button" className="message-action-btn">

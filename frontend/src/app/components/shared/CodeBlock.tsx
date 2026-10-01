@@ -36,7 +36,7 @@ export function CodeBlock({ children, className }: HTMLAttributes<HTMLElement> &
       <div className="code-block-header">
         <span className="code-block-lang">{lang || "text"}</span>
         <button onClick={copy} className="code-block-copy" type="button">
-          {copied ? <Check size={12} color="#00D68F" /> : <Copy size={12} />}
+          {copied ? <Check size={12} color="var(--ok)" /> : <Copy size={12} />}
           {copied ? "Copied" : "Copy"}
         </button>
       </div>

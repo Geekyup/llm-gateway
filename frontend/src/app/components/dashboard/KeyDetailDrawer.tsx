@@ -107,21 +107,21 @@ export function KeyDetailDrawer({
 
   return (
     <>
-      <div className="fixed inset-0 z-40 animate-in fade-in duration-200" onClick={onClose} style={{ background: "rgba(0,0,0,0.5)", backdropFilter: "blur(2px)" }} />
+      <div className="fixed inset-0 z-40 duration-200" onClick={onClose} style={{ background: "rgba(26,26,24,0.3)", backdropFilter: "blur(2px)" }} />
       <aside
-        className="fixed right-0 top-0 bottom-0 z-50 w-full sm:w-96 flex flex-col overflow-y-auto thin-scrollbar animate-in slide-in-from-right duration-300 ease-out"
-        style={{ background: "#111113", borderLeft: "1px solid rgba(255,255,255,0.07)", boxShadow: "-24px 0 60px rgba(0,0,0,0.4)" }}
+        className="fixed right-0 top-0 bottom-0 z-50 w-full sm:w-96 flex flex-col overflow-y-auto thin-scrollbar duration-300 ease-out"
+        style={{ background: "var(--card)", borderLeft: "1px solid color-mix(in srgb, var(--ink) 12%, transparent)", boxShadow: "-24px 0 60px rgba(26,26,24,0.24)" }}
       >
-        <div className="flex items-start justify-between p-5" style={{ borderBottom: "1px solid rgba(255,255,255,0.05)" }}>
+        <div className="flex items-start justify-between p-5" style={{ borderBottom: "1px solid color-mix(in srgb, var(--ink) 8%, transparent)" }}>
           <div>
-            <h2 className="text-sm font-semibold text-zinc-100">{keyData.label}</h2>
+            <h2 className="text-sm font-semibold text-ink">{keyData.label}</h2>
             <div className="flex items-center gap-2 mt-1">
-              <span className="text-[11px] font-mono text-zinc-600">{keyData.masked}</span>
+              <span className="text-[12px] font-mono text-ink-3">{keyData.masked}</span>
               <ProviderBadge provider={keyData.provider} />
             </div>
           </div>
-          <button onClick={onClose} className="p-1.5 rounded-lg transition-colors hover:bg-white/5 shrink-0 mt-0.5">
-            <X size={16} color="#52525B" />
+          <button onClick={onClose} className="p-1.5 rounded-lg transition-colors hover:bg-ink/5 shrink-0 mt-0.5">
+            <X size={16} color="var(--ink-4)" />
           </button>
         </div>
 
@@ -131,11 +131,11 @@ export function KeyDetailDrawer({
             <div className="space-y-3">
               <StatusBadge status={keyData.status} />
               <div>
-                <p className="text-[11px] text-zinc-600 mb-0.5">Daily quota</p>
-                <p className="text-sm font-mono text-zinc-200">{keyData.limit.toLocaleString()} req</p>
+                <p className="text-[12px] text-ink-3 mb-0.5">Daily quota</p>
+                <p className="text-sm font-mono text-ink">{keyData.limit.toLocaleString()} req</p>
               </div>
               <div>
-                <p className="text-[11px] text-zinc-600 mb-0.5">Remaining</p>
+                <p className="text-[12px] text-ink-3 mb-0.5">Remaining</p>
                 <p className="text-sm font-mono" style={{ color: s.color }}>
                   {Math.max(0, keyData.limit - keyData.used).toLocaleString()} req
                 </p>
@@ -145,16 +145,16 @@ export function KeyDetailDrawer({
 
           <div>
             <div className="flex items-center justify-between mb-2.5">
-              <p className="text-[10px] text-zinc-600 uppercase tracking-widest font-semibold">
+              <p className="text-[12px] text-ink-3 font-semibold">
                 {chartMode === "requests" ? "Hourly Usage Today" : "Hourly Tokens Today"}
               </p>
-              <div className="flex gap-0.5 rounded-md p-0.5" style={{ background: "rgba(255,255,255,0.03)" }}>
+              <div className="flex gap-0.5 rounded-md p-0.5" style={{ background: "color-mix(in srgb, var(--ink) 5%, transparent)" }}>
                 {(["requests", "tokens"] as const).map((m) => (
                   <button
                     key={m}
                     onClick={() => setChartMode(m)}
-                    className="px-2 py-0.5 rounded text-[10px] font-medium transition-all"
-                    style={{ color: chartMode === m ? "#ECECF0" : "#52525B", background: chartMode === m ? "rgba(255,255,255,0.07)" : "transparent" }}
+                    className="px-2 py-0.5 rounded text-[12px] font-medium transition-all"
+                    style={{ color: chartMode === m ? "var(--ink)" : "var(--ink-4)", background: chartMode === m ? "color-mix(in srgb, var(--ink) 12%, transparent)" : "transparent" }}
                   >
                     {m === "requests" ? "Requests" : "Tokens"}
                   </button>
@@ -164,11 +164,11 @@ export function KeyDetailDrawer({
             <div style={{ height: 88 }} className="flex items-center justify-center">
               {chartMode === "requests" ? (
                 chartError ? (
-                  <p className="text-[11px] text-zinc-600">Couldn't load usage data</p>
+                  <p className="text-[12px] text-ink-3">Couldn't load usage data</p>
                 ) : chartData === null ? (
-                  <Loader2 size={16} className="animate-spin" color="#52525B" />
+                  <Loader2 size={16} className="animate-spin" color="var(--ink-4)" />
                 ) : chartData.every((p) => p.r === 0) ? (
-                  <p className="text-[11px] text-zinc-600">No requests yet today</p>
+                  <p className="text-[12px] text-ink-3">No requests yet today</p>
                 ) : (
                   <ResponsiveContainer width="100%" height="100%">
                     <AreaChart data={chartData} margin={{ top: 4, right: 0, left: -32, bottom: 0 }}>
@@ -181,14 +181,14 @@ export function KeyDetailDrawer({
                       <XAxis
                         dataKey="h"
                         padding={{ left: 0, right: 0 }}
-                        tick={{ fontSize: 9, fill: "#52525B", fontFamily: "JetBrains Mono, monospace" }}
+                        tick={{ fontSize: 9, fill: "var(--ink-4)", fontFamily: "JetBrains Mono, monospace" }}
                         tickLine={false}
                         axisLine={false}
                         interval={3}
                       />
                       <Tooltip
-                        contentStyle={{ background: "#1C1C1E", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 8, fontSize: 11, fontFamily: "JetBrains Mono, monospace" }}
-                        labelStyle={{ color: "#71717A" }}
+                        contentStyle={{ background: "var(--field)", border: "1px solid color-mix(in srgb, var(--ink) 14%, transparent)", borderRadius: 8, fontSize: 11, fontFamily: "JetBrains Mono, monospace" }}
+                        labelStyle={{ color: "var(--ink-3)" }}
                         itemStyle={{ color: s.color }}
                         formatter={(v: number) => [v.toLocaleString(), "req"]}
                       />
@@ -197,31 +197,31 @@ export function KeyDetailDrawer({
                   </ResponsiveContainer>
                 )
               ) : tokenError ? (
-                <p className="text-[11px] text-zinc-600">Couldn't load token data</p>
+                <p className="text-[12px] text-ink-3">Couldn't load token data</p>
               ) : tokenData === null ? (
-                <Loader2 size={16} className="animate-spin" color="#52525B" />
+                <Loader2 size={16} className="animate-spin" color="var(--ink-4)" />
               ) : tokenData.every((p) => p.r === 0) ? (
-                <p className="text-[11px] text-zinc-600">No token usage yet today</p>
+                <p className="text-[12px] text-ink-3">No token usage yet today</p>
               ) : (
                 <ResponsiveContainer width="100%" height="100%">
                   <AreaChart data={tokenData} margin={{ top: 4, right: 0, left: -32, bottom: 0 }}>
                     <defs>
                       <linearGradient id="tgrad" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="5%" stopColor="#A78BFA" stopOpacity={0.22} />
-                        <stop offset="95%" stopColor="#A78BFA" stopOpacity={0} />
+                        <stop offset="5%" stopColor="#7C5CD6" stopOpacity={0.22} />
+                        <stop offset="95%" stopColor="#7C5CD6" stopOpacity={0} />
                       </linearGradient>
                     </defs>
                     <XAxis
                       dataKey="h"
                       padding={{ left: 0, right: 0 }}
-                      tick={{ fontSize: 9, fill: "#52525B", fontFamily: "JetBrains Mono, monospace" }}
+                      tick={{ fontSize: 9, fill: "var(--ink-4)", fontFamily: "JetBrains Mono, monospace" }}
                       tickLine={false}
                       axisLine={false}
                       interval={3}
                     />
                     <Tooltip
-                      contentStyle={{ background: "#1C1C1E", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 8, fontSize: 11, fontFamily: "JetBrains Mono, monospace" }}
-                      labelStyle={{ color: "#71717A" }}
+                      contentStyle={{ background: "var(--field)", border: "1px solid color-mix(in srgb, var(--ink) 14%, transparent)", borderRadius: 8, fontSize: 11, fontFamily: "JetBrains Mono, monospace" }}
+                      labelStyle={{ color: "var(--ink-3)" }}
                       formatter={(v: number, name: string, p: { payload?: { prompt: number; completion: number } }) => {
                         if (name !== "r") return [v, name];
                         const pt = p.payload;
@@ -231,25 +231,25 @@ export function KeyDetailDrawer({
                         ];
                       }}
                     />
-                    <Area type="monotone" dataKey="r" stroke="#A78BFA" strokeWidth={1.5} fill="url(#tgrad)" dot={false} />
+                    <Area type="monotone" dataKey="r" stroke="#7C5CD6" strokeWidth={1.5} fill="url(#tgrad)" dot={false} />
                   </AreaChart>
                 </ResponsiveContainer>
               )}
             </div>
           </div>
 
-          <div className="rounded-xl overflow-hidden" style={{ border: "1px solid rgba(255,255,255,0.06)" }}>
+          <div className="rounded-lg overflow-hidden" style={{ border: "1px solid color-mix(in srgb, var(--ink) 10%, transparent)" }}>
             {meta.map((m, i) => (
               <div
                 key={m.label}
                 className="flex items-center justify-between px-3.5 py-2.5"
                 style={{
-                  borderBottom: i < meta.length - 1 ? "1px solid rgba(255,255,255,0.04)" : "none",
-                  background: i % 2 === 0 ? "transparent" : "rgba(255,255,255,0.01)",
+                  borderBottom: i < meta.length - 1 ? "1px solid color-mix(in srgb, var(--ink) 7%, transparent)" : "none",
+                  background: i % 2 === 0 ? "transparent" : "color-mix(in srgb, var(--ink) 2%, transparent)",
                 }}
               >
-                <span className="text-[11px] text-zinc-600">{m.label}</span>
-                <span className={`text-[11px] text-zinc-300 ${m.mono ? "font-mono" : ""}`}>{m.val}</span>
+                <span className="text-[12px] text-ink-3">{m.label}</span>
+                <span className={`text-[12px] text-ink-2 ${m.mono ? "font-mono" : ""}`}>{m.val}</span>
               </div>
             ))}
           </div>
@@ -259,7 +259,7 @@ export function KeyDetailDrawer({
               onClick={onCheck}
               disabled={checking}
               className="w-full flex items-center justify-center gap-2 py-2 rounded-lg text-xs font-medium transition-all active:scale-[0.97] disabled:active:scale-100 disabled:opacity-50"
-              style={{ background: "rgba(0,214,143,0.08)", color: "#00D68F", border: "1px solid rgba(0,214,143,0.16)" }}
+              style={{ background: "color-mix(in srgb, var(--accent) 8%, transparent)", color: "var(--accent)", border: "1px solid color-mix(in srgb, var(--accent) 16%, transparent)" }}
             >
               {checking ? <Loader2 size={12} className="animate-spin" /> : <Stethoscope size={12} />}
               {checking ? "Checking..." : "Test Key"}
@@ -268,7 +268,7 @@ export function KeyDetailDrawer({
               onClick={onReset}
               disabled={resetting}
               className="w-full flex items-center justify-center gap-2 py-2 rounded-lg text-xs font-medium transition-all active:scale-[0.97] disabled:active:scale-100 disabled:opacity-50"
-              style={{ background: "rgba(79,142,247,0.08)", color: "#4F8EF7", border: "1px solid rgba(79,142,247,0.16)" }}
+              style={{ background: "rgba(79,142,247,0.08)", color: "#2F6FD6", border: "1px solid rgba(79,142,247,0.16)" }}
             >
               {resetting ? <Loader2 size={12} className="animate-spin" /> : <RefreshCw size={12} />}
               {resetting ? "Resetting..." : "Reset Cooldown"}
@@ -276,7 +276,7 @@ export function KeyDetailDrawer({
             <button
               onClick={onDisable}
               className="w-full flex items-center justify-center gap-2 py-2 rounded-lg text-xs font-medium transition-all active:scale-[0.97]"
-              style={{ background: "rgba(255,255,255,0.04)", color: "#71717A", border: "1px solid rgba(255,255,255,0.07)" }}
+              style={{ background: "color-mix(in srgb, var(--ink) 7%, transparent)", color: "var(--ink-3)", border: "1px solid color-mix(in srgb, var(--ink) 12%, transparent)" }}
             >
               <Power size={12} />
               {keyData.status === "disabled" ? "Enable Key" : "Disable Key"}
@@ -284,7 +284,7 @@ export function KeyDetailDrawer({
             <button
               onClick={onDelete}
               className="w-full flex items-center justify-center gap-2 py-2 rounded-lg text-xs font-medium transition-all active:scale-[0.97]"
-              style={{ background: "rgba(239,68,68,0.07)", color: "#EF4444", border: "1px solid rgba(239,68,68,0.16)" }}
+              style={{ background: "color-mix(in srgb, var(--bad) 7%, transparent)", color: "var(--bad)", border: "1px solid color-mix(in srgb, var(--bad) 16%, transparent)" }}
             >
               <Trash2 size={12} /> Delete Key
             </button>

@@ -19,6 +19,6 @@ export function ProviderIcon({
   className?: string;
 }) {
   const Icon = ICONS[provider as Provider];
-  if (!Icon) return <KeyRound size={size} color="#71717A" className={className} />;
+  if (!Icon) return <KeyRound size={size} color="var(--ink-3)" className={className} />;
   return <Icon width={size} height={size} className={className} />;
 }

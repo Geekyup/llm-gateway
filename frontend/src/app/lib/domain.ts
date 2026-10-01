@@ -21,28 +21,32 @@ export function toAK(k: ApiKeyRead): AK {
 }
 
 export const STATUS_META: Record<Status, { text: string; color: string; bg: string; bd: string }> = {
-  active:    { text: "Active",    color: "#00D68F", bg: "rgba(0,214,143,0.08)",  bd: "rgba(0,214,143,0.22)"  },
-  cooldown:  { text: "Cooldown",  color: "#F59E0B", bg: "rgba(245,158,11,0.08)", bd: "rgba(245,158,11,0.22)" },
-  exhausted: { text: "Exhausted", color: "#EF4444", bg: "rgba(239,68,68,0.08)",  bd: "rgba(239,68,68,0.22)"  },
-  disabled:  { text: "Disabled",  color: "#52525B", bg: "rgba(82,82,91,0.08)",   bd: "rgba(82,82,91,0.18)"   },
+  active:    { text: "Active",    color: "var(--ok)", bg: "color-mix(in srgb, var(--ok) 8%, transparent)",  bd: "color-mix(in srgb, var(--ok) 22%, transparent)"  },
+  cooldown:  { text: "Cooldown",  color: "var(--warn)", bg: "color-mix(in srgb, var(--warn) 8%, transparent)", bd: "color-mix(in srgb, var(--warn) 22%, transparent)" },
+  exhausted: { text: "Exhausted", color: "var(--bad)", bg: "color-mix(in srgb, var(--bad) 8%, transparent)",  bd: "color-mix(in srgb, var(--bad) 22%, transparent)"  },
+  disabled:  { text: "Disabled",  color: "var(--ink-4)", bg: "color-mix(in srgb, var(--ink-4) 8%, transparent)",   bd: "color-mix(in srgb, var(--ink-4) 18%, transparent)"   },
 };
 
+export function alpha(color: string, percent: number): string {
+  return `color-mix(in srgb, ${color} ${percent}%, transparent)`;
+}
+
 export function pingMeta(ms: number | undefined): { text: string; color: string } {
-  if (ms === undefined) return { text: "—", color: "#52525B" };
+  if (ms === undefined) return { text: "—", color: "var(--ink-4)" };
   const text = `${ms} ms`;
-  if (ms < 300) return { text, color: "#00D68F" };
-  if (ms < 1000) return { text, color: "#F59E0B" };
-  return { text, color: "#EF4444" };
+  if (ms < 300) return { text, color: "var(--ok)" };
+  if (ms < 1000) return { text, color: "var(--warn)" };
+  return { text, color: "var(--bad)" };
 }
 
 export const PROVIDER_META: Record<string, { name: string; color: string; bg: string }> = {
-  gemini:     { name: "Gemini",     color: "#4F8EF7", bg: "rgba(79,142,247,0.1)"  },
-  openrouter: { name: "OpenRouter", color: "#A78BFA", bg: "rgba(167,139,250,0.1)" },
-  groq:       { name: "Groq",       color: "#F97316", bg: "rgba(249,115,22,0.1)"  },
+  gemini:     { name: "Gemini",     color: "#2F6FD6", bg: "rgba(79,142,247,0.1)"  },
+  openrouter: { name: "OpenRouter", color: "#7C5CD6", bg: "rgba(167,139,250,0.1)" },
+  groq:       { name: "Groq",       color: "#D9611A", bg: "rgba(249,115,22,0.1)"  },
 };
 
 export function providerMeta(provider: string) {
-  return PROVIDER_META[provider] ?? { name: provider, color: "#71717A", bg: "rgba(113,113,122,0.1)" };
+  return PROVIDER_META[provider] ?? { name: provider, color: "var(--ink-3)", bg: "color-mix(in srgb, var(--ink-3) 10%, transparent)" };
 }
 
 export const PROVIDER_NAMES: Record<Provider, { name: string }> = {
@@ -52,16 +56,16 @@ export const PROVIDER_NAMES: Record<Provider, { name: string }> = {
 };
 
 export const OUTCOME_META: Record<string, { text: string; color: string; bg: string }> = {
-  success:            { text: "success",            color: "#00D68F", bg: "rgba(0,214,143,0.1)" },
-  rate_limited:       { text: "rate limited",        color: "#F59E0B", bg: "rgba(245,158,11,0.1)" },
-  exhausted:          { text: "exhausted",           color: "#F59E0B", bg: "rgba(245,158,11,0.1)" },
-  no_keys:            { text: "no keys",             color: "#EF4444", bg: "rgba(239,68,68,0.1)" },
-  upstream_exhausted: { text: "upstream exhausted",  color: "#EF4444", bg: "rgba(239,68,68,0.1)" },
-  error:              { text: "error",               color: "#EF4444", bg: "rgba(239,68,68,0.1)" },
+  success:            { text: "success",            color: "var(--ok)", bg: "color-mix(in srgb, var(--ok) 10%, transparent)" },
+  rate_limited:       { text: "rate limited",        color: "var(--warn)", bg: "color-mix(in srgb, var(--warn) 10%, transparent)" },
+  exhausted:          { text: "exhausted",           color: "var(--warn)", bg: "color-mix(in srgb, var(--warn) 10%, transparent)" },
+  no_keys:            { text: "no keys",             color: "var(--bad)", bg: "color-mix(in srgb, var(--bad) 10%, transparent)" },
+  upstream_exhausted: { text: "upstream exhausted",  color: "var(--bad)", bg: "color-mix(in srgb, var(--bad) 10%, transparent)" },
+  error:              { text: "error",               color: "var(--bad)", bg: "color-mix(in srgb, var(--bad) 10%, transparent)" },
 };
 
 export function outcomeMeta(outcome: string) {
-  return OUTCOME_META[outcome] ?? { text: outcome, color: "#71717A", bg: "rgba(113,113,122,0.1)" };
+  return OUTCOME_META[outcome] ?? { text: outcome, color: "var(--ink-3)", bg: "color-mix(in srgb, var(--ink-3) 10%, transparent)" };
 }
 
 export function rel(ts: number, now: number): string {
