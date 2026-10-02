@@ -7,6 +7,33 @@ import type { Status } from "./types";
 
 const REPO_URL = "https://github.com/Geekyup/llm-gateway";
 
+function useRunning<T extends Element>() {
+  const ref = useRef<T>(null);
+  const [running, setRunning] = useState(false);
+
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const reduce = window.matchMedia("(prefers-reduced-motion: reduce)");
+    let inView = false;
+    const update = () => setRunning(inView && !reduce.matches && !document.hidden);
+    const io = new IntersectionObserver(([entry]) => {
+      inView = entry.isIntersecting;
+      update();
+    });
+    io.observe(el);
+    reduce.addEventListener("change", update);
+    document.addEventListener("visibilitychange", update);
+    return () => {
+      io.disconnect();
+      reduce.removeEventListener("change", update);
+      document.removeEventListener("visibilitychange", update);
+    };
+  }, []);
+
+  return [ref, running] as const;
+}
+
 type PoolKey = { name: string; provider: string; fill: number };
 
 const POOL: PoolKey[] = [
@@ -20,12 +47,14 @@ const POOL: PoolKey[] = [
 const SLOTS = 16;
 
 function PoolLedger() {
+  const [ref, running] = useRunning<HTMLDivElement>();
   const [active, setActive] = useState(0);
   const [limited, setLimited] = useState<number | null>(null);
   const [cooling, setCooling] = useState<Set<number>>(new Set());
   const activeRef = useRef(0);
 
   useEffect(() => {
+    if (!running) return;
     let cancelled = false;
     const sleep = (ms: number) => new Promise((res) => setTimeout(res, ms));
 
@@ -55,8 +84,10 @@ function PoolLedger() {
     cycle();
     return () => {
       cancelled = true;
+      setLimited(null);
+      setCooling(new Set());
     };
-  }, []);
+  }, [running]);
 
   function stateOf(i: number) {
     if (limited === i) return "429";
@@ -66,10 +97,10 @@ function PoolLedger() {
   }
 
   return (
-    <div className="border-y border-border">
-      <div className="flex items-baseline justify-between py-2 border-b border-border">
+    <div ref={ref} className="border-y border-border">
+      <div className="flex items-baseline justify-between gap-3 py-2 border-b border-border">
         <span className="font-mono text-[12px] text-ink-3">pool / 5 keys / 3 providers</span>
-        <span className="font-mono text-[12px] text-ink-3">requests today</span>
+        <span className="font-mono text-[12px] text-ink-3 hidden sm:inline">requests today</span>
       </div>
       <ul role="img" aria-label={`Key pool: ${POOL[active].name} is serving requests`}>
         {POOL.map((k, i) => {
@@ -80,7 +111,7 @@ function PoolLedger() {
           return (
             <li
               key={k.name}
-              className="grid grid-cols-[18px_64px_1fr_74px] items-center gap-3 py-3 border-b border-border transition-colors duration-200"
+              className="grid grid-cols-[14px_54px_1fr_62px] md:grid-cols-[18px_64px_1fr_74px] items-center gap-2 md:gap-3 py-3.5 border-b border-border transition-colors duration-200"
               style={{ background: isActive ? "color-mix(in srgb, var(--accent) 6%, transparent)" : "transparent" }}
             >
               <span className="font-mono text-[13px]" style={{ color }}>
@@ -112,7 +143,7 @@ function PoolLedger() {
           );
         })}
       </ul>
-      <p className="pt-3 font-mono text-[13px] text-ink-2 min-h-[2.4em]" role="status" aria-live="polite">
+      <p className="pt-3 font-mono text-[13px] leading-snug text-ink-2 min-h-[3.2em]" role="status" aria-live="polite">
         {limited !== null ? (
           <>
             <span style={{ color: "var(--bad)" }}>{POOL[limited].name}</span> returned 429. Retrying the same request on{" "}
@@ -128,6 +159,9 @@ function PoolLedger() {
   );
 }
 
+const AUTH_TIP = "Bearer plus a gateway token. Create one under Account → Gateway tokens.";
+const MODEL_TIP = "Any model served by one of your pooled providers. Omit it and the gateway picks from active keys.";
+
 function CodeToken({
   children,
   tip,
@@ -142,7 +176,7 @@ function CodeToken({
   const [show, setShow] = useState(false);
   return (
     <span
-      className="relative inline-block underline decoration-dotted cursor-help"
+      className="relative inline-block md:underline md:decoration-dotted md:cursor-help"
       style={{ color: accent ? "var(--accent-hover)" : "inherit", textDecorationColor: "var(--ink-4)" }}
       onMouseEnter={() => setShow(true)}
       onMouseLeave={() => setShow(false)}
@@ -153,7 +187,7 @@ function CodeToken({
       {children}
       {show && (
         <span
-          className={`absolute bottom-full mb-2 z-30 w-[240px] max-w-[80vw] whitespace-normal px-2.5 py-1.5 text-[12px] font-mono normal-case bg-card border border-border text-ink ${
+          className={`hidden md:block absolute bottom-full mb-2 z-30 w-[240px] whitespace-normal px-2.5 py-1.5 text-[12px] font-mono normal-case bg-card border border-border text-ink ${
             align === "right" ? "right-0" : "left-0"
           }`}
         >
@@ -166,26 +200,34 @@ function CodeToken({
 
 function RequestSnippet() {
   return (
-    <div className="bg-card border border-border text-ink">
+    <div className="bg-card border border-border text-ink min-w-0">
       <div className="flex items-center justify-between px-4 py-2.5 border-b border-border">
         <span className="font-mono text-[12px] text-ink-3">request.sh</span>
-        <span className="font-mono text-[12px] hidden sm:inline text-ink-4">
-          hover the underlined parts
-        </span>
+        <span className="font-mono text-[12px] hidden md:inline text-ink-4">hover the underlined parts</span>
       </div>
       <div className="overflow-x-auto">
-        <pre className="px-4 pt-10 pb-5 text-[13px] font-mono leading-relaxed w-max min-w-full">
+        <pre className="px-4 pt-5 md:pt-10 pb-5 text-[12px] md:text-[13px] font-mono leading-relaxed w-max min-w-full">
           {"curl https://api.your-gateway.dev/v1/chat/completions \\\n  -H \""}
-          <CodeToken tip="Bearer plus a gateway token. Create one under Account → Gateway tokens." accent>
+          <CodeToken tip={AUTH_TIP} accent>
             Authorization: Bearer $GATEWAY_TOKEN
           </CodeToken>
           {'" \\\n  -d \'{\n    "model": "'}
-          <CodeToken tip="Any model served by one of your pooled providers. Omit it and the gateway picks from active keys." align="right">
+          <CodeToken tip={MODEL_TIP} align="right">
             gemini-2.0-flash
           </CodeToken>
           {'",\n    "messages": [{ "role": "user", "content": "hi" }]\n  }\''}
         </pre>
       </div>
+      <dl className="md:hidden border-t border-border px-4 py-3 space-y-2.5 text-[13px] leading-snug text-ink-3">
+        <div>
+          <dt className="font-mono text-ink-2">Authorization</dt>
+          <dd>{AUTH_TIP}</dd>
+        </div>
+        <div>
+          <dt className="font-mono text-ink-2">model</dt>
+          <dd>{MODEL_TIP}</dd>
+        </div>
+      </dl>
     </div>
   );
 }
@@ -194,13 +236,16 @@ function SignInButton({
   onClick,
   size = "md",
   showArrow = false,
+  block = false,
 }: {
   onClick: () => void;
   size?: "sm" | "md";
   showArrow?: boolean;
+  block?: boolean;
 }) {
   const [pending, setPending] = useState(false);
-  const padding = size === "sm" ? "px-3.5 py-1.5 text-[13px]" : "px-5 py-3 text-[15px]";
+  const padding = size === "sm" ? "px-3.5 min-h-[40px] text-[13px]" : "px-5 min-h-[48px] text-[15px]";
+  const width = block ? "w-full sm:w-auto justify-center" : "";
 
   function handleClick() {
     if (pending) return;
@@ -213,10 +258,19 @@ function SignInButton({
       onClick={handleClick}
       disabled={pending}
       aria-busy={pending}
-      className={`group font-medium rounded-[2px] flex items-center gap-2 transition-colors disabled:opacity-70 disabled:cursor-not-allowed hover:brightness-90 ${padding}`}
+      className={`group font-medium rounded-[2px] flex items-center gap-2 transition-colors disabled:opacity-70 disabled:cursor-not-allowed hover:brightness-90 active:brightness-90 ${padding} ${width}`}
       style={{ background: "var(--accent)", color: "var(--on-accent)" }}
     >
-      {pending ? "Redirecting…" : "Sign in with Google"}
+      {pending ? (
+        "Redirecting…"
+      ) : size === "sm" ? (
+        <>
+          <span className="sm:hidden">Sign in</span>
+          <span className="hidden sm:inline">Sign in with Google</span>
+        </>
+      ) : (
+        "Sign in with Google"
+      )}
       {showArrow && !pending && <ArrowRight size={16} className="transition-transform duration-200 group-hover:translate-x-0.5" />}
     </button>
   );
@@ -248,52 +302,79 @@ function formatCountdown(total: number) {
 }
 
 function DashboardPreview() {
+  const [ref, running] = useRunning<HTMLDivElement>();
   const [left, setLeft] = useState(252);
 
   useEffect(() => {
+    if (!running) return;
     const id = setInterval(() => setLeft((v) => (v <= 1 ? 252 : v - 1)), 1000);
     return () => clearInterval(id);
-  }, []);
+  }, [running]);
 
   return (
-    <div className="border border-border bg-card">
-      <div className="flex items-center justify-between px-4 h-11 border-b border-border">
+    <div ref={ref} className="border border-border bg-card">
+      <div className="flex items-center justify-between gap-3 px-4 h-11 border-b border-border">
         <span className="text-[13px] text-ink-2">Dashboard / Keys</span>
         <span className="font-mono text-[12px] text-ink-3">5 keys · 3 active</span>
       </div>
-      <div className="overflow-x-auto">
-        <div className="min-w-[720px]">
-          <div className="grid grid-cols-[1.1fr_1fr_1.2fr_1.6fr_0.7fr_0.8fr] gap-4 px-4 py-2.5 border-b border-border text-[12px] text-ink-3">
-            <span>Key</span>
-            <span>Provider</span>
-            <span>Status</span>
-            <span>Usage today</span>
-            <span>Ping</span>
-            <span>Last used</span>
-          </div>
-          {PREVIEW_ROWS.map((r) => {
-            const meta = providerMeta(r.provider);
-            const ping = pingMeta(r.ping);
-            return (
-              <div
-                key={r.name}
-                className="grid grid-cols-[1.1fr_1fr_1.2fr_1.6fr_0.7fr_0.8fr] gap-4 px-4 py-3.5 items-center border-b border-border last:border-b-0"
-              >
-                <span className="font-mono text-[13px] text-ink">{r.name}</span>
-                <span className="inline-flex items-center gap-2 text-[13px] text-ink-2">
-                  <span className="w-1.5 h-1.5 rounded-full" style={{ background: meta.color }} />
-                  {meta.name}
-                </span>
+
+      <div className="md:hidden divide-y divide-border">
+        {PREVIEW_ROWS.map((r) => {
+          const meta = providerMeta(r.provider);
+          const ping = pingMeta(r.ping);
+          return (
+            <div key={r.name} className="p-4 space-y-3">
+              <div className="flex items-center justify-between gap-3">
+                <div className="flex items-center gap-2.5 min-w-0">
+                  <span className="font-mono text-[14px] text-ink">{r.name}</span>
+                  <span className="inline-flex items-center gap-1.5 text-[13px] text-ink-3">
+                    <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ background: meta.color }} />
+                    {meta.name}
+                  </span>
+                </div>
                 <StatusBadge status={r.status} cooldownText={r.cooldown ? formatCountdown(left) : undefined} />
-                <UsageBar used={r.used} limit={r.limit} status={r.status} />
-                <span className="font-mono text-[13px]" style={{ color: ping.color }}>
-                  {ping.text}
-                </span>
-                <span className="font-mono text-[13px] text-ink-3">{r.lastUsed}</span>
               </div>
-            );
-          })}
+              <UsageBar used={r.used} limit={r.limit} status={r.status} />
+              <div className="flex items-center justify-between font-mono text-[12px]">
+                <span style={{ color: ping.color }}>ping {ping.text}</span>
+                <span className="text-ink-3">{r.lastUsed}</span>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
+      <div className="hidden md:block">
+        <div className="grid grid-cols-[1.1fr_1fr_1.2fr_1.6fr_0.7fr_0.8fr] gap-4 px-4 py-2.5 border-b border-border text-[12px] text-ink-3">
+          <span>Key</span>
+          <span>Provider</span>
+          <span>Status</span>
+          <span>Usage today</span>
+          <span>Ping</span>
+          <span>Last used</span>
         </div>
+        {PREVIEW_ROWS.map((r) => {
+          const meta = providerMeta(r.provider);
+          const ping = pingMeta(r.ping);
+          return (
+            <div
+              key={r.name}
+              className="grid grid-cols-[1.1fr_1fr_1.2fr_1.6fr_0.7fr_0.8fr] gap-4 px-4 py-3.5 items-center border-b border-border last:border-b-0"
+            >
+              <span className="font-mono text-[13px] text-ink">{r.name}</span>
+              <span className="inline-flex items-center gap-2 text-[13px] text-ink-2">
+                <span className="w-1.5 h-1.5 rounded-full" style={{ background: meta.color }} />
+                {meta.name}
+              </span>
+              <StatusBadge status={r.status} cooldownText={r.cooldown ? formatCountdown(left) : undefined} />
+              <UsageBar used={r.used} limit={r.limit} status={r.status} />
+              <span className="font-mono text-[13px]" style={{ color: ping.color }}>
+                {ping.text}
+              </span>
+              <span className="font-mono text-[13px] text-ink-3">{r.lastUsed}</span>
+            </div>
+          );
+        })}
       </div>
     </div>
   );
@@ -326,15 +407,19 @@ const FEATURES = [
   { title: "Runs itself", body: "A background worker lifts cooldowns and resets daily limits. Provider keys are encrypted at rest." },
 ];
 
+const H2_STYLE = { fontWeight: 600, letterSpacing: "-0.03em" } as const;
+const H2_CLASS = "font-display text-[26px] sm:text-[30px] md:text-[36px] leading-[1.15] text-balance";
+const SECTION = "max-w-6xl mx-auto px-5 sm:px-6 py-12 md:py-20";
+
 export default function LandingPage({ onSignIn }: { onSignIn: () => void }) {
   return (
-    <div className="min-h-screen w-full bg-background text-foreground">
-      <header className="border-b border-border">
-        <div className="max-w-6xl mx-auto px-6 h-14 flex items-center justify-between">
+    <div className="min-h-dvh w-full overflow-x-clip bg-background text-foreground">
+      <header className="sticky top-0 z-40 border-b border-border bg-background">
+        <div className="max-w-6xl mx-auto px-5 sm:px-6 h-14 flex items-center justify-between gap-3">
           <span className="font-mono font-medium text-[18px]">
             key<span style={{ color: "var(--accent)" }}>pool</span>
           </span>
-          <nav className="flex items-center gap-5">
+          <nav className="flex items-center gap-4 sm:gap-5">
             <a href="#preview" className="hidden md:inline text-[13px] text-ink-3 hover:text-ink transition-colors">
               Dashboard
             </a>
@@ -346,9 +431,9 @@ export default function LandingPage({ onSignIn }: { onSignIn: () => void }) {
               target="_blank"
               rel="noreferrer noopener"
               aria-label="View source on GitHub"
-              className="flex items-center gap-1.5 text-[13px] text-ink-3 hover:text-ink transition-colors"
+              className="flex items-center gap-1.5 p-2.5 -m-2.5 text-[13px] text-ink-3 hover:text-ink transition-colors"
             >
-              <Github size={15} />
+              <Github size={18} />
               <span className="hidden sm:inline">Source</span>
             </a>
             <SignInButton onClick={onSignIn} size="sm" />
@@ -356,34 +441,34 @@ export default function LandingPage({ onSignIn }: { onSignIn: () => void }) {
         </div>
       </header>
 
-      <section className="max-w-6xl mx-auto px-6 pt-16 md:pt-24 pb-16 md:pb-20">
-        <div className="grid md:grid-cols-12 gap-12 md:gap-10 items-center">
+      <section className="max-w-6xl mx-auto px-5 sm:px-6 pt-10 sm:pt-16 md:pt-24 pb-12 md:pb-20">
+        <div className="grid md:grid-cols-12 gap-10 md:gap-10 items-center">
           <div className="md:col-span-7">
-            <p className="font-mono text-[13px] text-ink-3 mb-6">self-hosted LLM key pool</p>
+            <p className="font-mono text-[13px] text-ink-3 mb-5 md:mb-6">self-hosted LLM key pool</p>
             <h1
-              className="font-display text-ink"
-              style={{ fontSize: "clamp(38px, 5.6vw, 68px)", lineHeight: 1.05, letterSpacing: "-0.035em", fontWeight: 600 }}
+              className="font-display text-ink text-balance"
+              style={{ fontSize: "clamp(34px, 9.4vw, 68px)", lineHeight: 1.06, letterSpacing: "-0.035em", fontWeight: 600 }}
             >
               Keys run out.
               <br />
               <span style={{ color: "var(--accent)" }}>Requests shouldn’t fail.</span>
             </h1>
-            <p className="mt-8 max-w-xl text-[17px] leading-relaxed text-ink-2">
+            <p className="mt-6 md:mt-8 max-w-xl text-[16px] md:text-[17px] leading-relaxed text-ink-2">
               Round-robin across your Gemini, Groq and OpenRouter keys. When one hits a rate limit it cools down and the same
               request goes out on the next key. OpenAI-compatible, so you change a base URL and nothing else.
             </p>
-            <div className="mt-9 flex flex-wrap items-center gap-x-5 gap-y-3">
-              <SignInButton onClick={onSignIn} showArrow />
+            <div className="mt-8 md:mt-9 flex flex-col sm:flex-row sm:items-center gap-x-5 gap-y-4">
+              <SignInButton onClick={onSignIn} showArrow block />
               <a
                 href={REPO_URL}
                 target="_blank"
                 rel="noreferrer noopener"
-                className="text-[14px] text-ink underline underline-offset-4 decoration-ink-4 hover:decoration-ink"
+                className="text-[14px] text-ink underline underline-offset-4 decoration-ink-4 hover:decoration-ink py-2 text-center sm:text-left"
               >
                 Read the source
               </a>
             </div>
-            <div className="mt-10 flex flex-wrap items-center gap-x-6 gap-y-2 text-[13px] text-ink-3">
+            <div className="mt-8 md:mt-10 flex flex-wrap items-center gap-x-5 gap-y-2 text-[13px] text-ink-3">
               {["gemini", "groq", "openrouter"].map((k) => {
                 const m = providerMeta(k);
                 return (
@@ -402,10 +487,10 @@ export default function LandingPage({ onSignIn }: { onSignIn: () => void }) {
         </div>
       </section>
 
-      <section id="preview" className="border-t border-border bg-sidebar">
-        <div className="max-w-6xl mx-auto px-6 py-16 md:py-20">
-          <div className="max-w-2xl mb-10">
-            <h2 className="font-display text-[28px] md:text-[36px] leading-[1.12]" style={{ fontWeight: 600, letterSpacing: "-0.03em" }}>
+      <section id="preview" className="border-t border-border bg-sidebar scroll-mt-14">
+        <div className={SECTION}>
+          <div className="max-w-2xl mb-8 md:mb-10">
+            <h2 className={H2_CLASS} style={H2_STYLE}>
               See what every key is doing.
             </h2>
             <p className="mt-4 text-[15px] leading-relaxed text-ink-2">
@@ -417,11 +502,11 @@ export default function LandingPage({ onSignIn }: { onSignIn: () => void }) {
       </section>
 
       <section className="border-t border-border">
-        <div className="max-w-6xl mx-auto px-6 py-16 md:py-20">
-          <h2 className="font-display text-[28px] md:text-[36px] leading-[1.12] mb-12" style={{ fontWeight: 600, letterSpacing: "-0.03em" }}>
+        <div className={SECTION}>
+          <h2 className={`${H2_CLASS} mb-8 md:mb-12`} style={H2_STYLE}>
             Three steps, no SDK.
           </h2>
-          <ol className="grid md:grid-cols-3 gap-x-10 gap-y-10">
+          <ol className="grid md:grid-cols-3 gap-x-10 gap-y-8 md:gap-y-10">
             {STEPS.map((s) => (
               <li key={s.n} className="border-t border-border pt-4">
                 <span className="font-mono text-[13px]" style={{ color: "var(--accent)" }}>
@@ -435,14 +520,14 @@ export default function LandingPage({ onSignIn }: { onSignIn: () => void }) {
         </div>
       </section>
 
-      <section id="features" className="border-t border-border bg-sidebar">
-        <div className="max-w-6xl mx-auto px-6 py-16 md:py-20">
-          <h2 className="font-display text-[28px] md:text-[36px] leading-[1.12] mb-12" style={{ fontWeight: 600, letterSpacing: "-0.03em" }}>
+      <section id="features" className="border-t border-border bg-sidebar scroll-mt-14">
+        <div className={SECTION}>
+          <h2 className={`${H2_CLASS} mb-8 md:mb-12`} style={H2_STYLE}>
             What it does.
           </h2>
-          <div className="grid sm:grid-cols-2 lg:grid-cols-3 border-t border-l border-border">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 border-t border-l border-border">
             {FEATURES.map((f) => (
-              <div key={f.title} className="p-6 border-r border-b border-border">
+              <div key={f.title} className="p-5 md:p-6 border-r border-b border-border">
                 <h3 className="text-[16px] font-medium text-ink mb-2">{f.title}</h3>
                 <p className="text-[14px] leading-relaxed text-ink-2">{f.body}</p>
               </div>
@@ -452,9 +537,9 @@ export default function LandingPage({ onSignIn }: { onSignIn: () => void }) {
       </section>
 
       <section className="border-t border-border">
-        <div className="max-w-6xl mx-auto px-6 py-16 md:py-20 grid md:grid-cols-2 gap-12 items-center">
+        <div className={`${SECTION} grid md:grid-cols-2 gap-8 md:gap-12 items-center`}>
           <div>
-            <h2 className="font-display text-[28px] md:text-[36px] leading-[1.12] mb-5" style={{ fontWeight: 600, letterSpacing: "-0.03em" }}>
+            <h2 className={`${H2_CLASS} mb-4 md:mb-5`} style={H2_STYLE}>
               The request you already write.
             </h2>
             <p className="text-[15px] leading-relaxed text-ink-2 max-w-md">
@@ -466,20 +551,20 @@ export default function LandingPage({ onSignIn }: { onSignIn: () => void }) {
       </section>
 
       <section className="border-t border-border bg-sidebar">
-        <div className="max-w-6xl mx-auto px-6 py-16 md:py-20 flex flex-col md:flex-row md:items-center md:justify-between gap-8">
+        <div className={`${SECTION} flex flex-col md:flex-row md:items-center md:justify-between gap-8`}>
           <div>
-            <h2 className="font-display text-[28px] md:text-[36px] leading-[1.12]" style={{ fontWeight: 600, letterSpacing: "-0.03em" }}>
+            <h2 className={H2_CLASS} style={H2_STYLE}>
               Add your keys. Keep your code.
             </h2>
-            <p className="mt-4 font-mono text-[13px] text-ink-3">self-host: docker compose up --build</p>
+            <p className="mt-4 font-mono text-[13px] text-ink-3 break-words">self-host: docker compose up --build</p>
           </div>
-          <div className="flex flex-wrap items-center gap-x-5 gap-y-3">
-            <SignInButton onClick={onSignIn} showArrow />
+          <div className="flex flex-col sm:flex-row sm:items-center gap-x-5 gap-y-4">
+            <SignInButton onClick={onSignIn} showArrow block />
             <a
               href={REPO_URL}
               target="_blank"
               rel="noreferrer noopener"
-              className="text-[14px] text-ink underline underline-offset-4 decoration-ink-4 hover:decoration-ink"
+              className="text-[14px] text-ink underline underline-offset-4 decoration-ink-4 hover:decoration-ink py-2 text-center sm:text-left"
             >
               Source on GitHub
             </a>
@@ -488,7 +573,7 @@ export default function LandingPage({ onSignIn }: { onSignIn: () => void }) {
       </section>
 
       <footer className="border-t border-border">
-        <div className="max-w-6xl mx-auto px-6 py-6 text-[13px] flex flex-col sm:flex-row gap-2 sm:items-center sm:justify-between text-ink-3">
+        <div className="max-w-6xl mx-auto px-5 sm:px-6 py-6 text-[13px] flex flex-col sm:flex-row gap-2 sm:items-center sm:justify-between text-ink-3">
           <span className="font-mono">
             key<span style={{ color: "var(--accent)" }}>pool</span>
           </span>
