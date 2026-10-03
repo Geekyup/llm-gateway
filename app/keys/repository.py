@@ -69,6 +69,7 @@ class APIKeyRepository:
         query = select(APIKey).where(
             APIKey.user_id == user_id,
             APIKey.status == KeyStatus.ACTIVE,
+            APIKey.requests_today < APIKey.daily_limit,
         )
         if provider is not None:
             query = query.where(APIKey.provider == provider)
@@ -143,7 +144,7 @@ class APIKeyRepository:
         await self._session.commit()
         return key
 
-    async def increment_usage(self, key_id: int, user_id: int) -> bool:
+    async def increment_usage(self, key_id: int, user_id: int) -> APIKey | None:
         result = await self._session.execute(
             update(APIKey)
             .where(
@@ -156,10 +157,12 @@ class APIKeyRepository:
                 requests_today=APIKey.requests_today + 1,
                 last_used_at=datetime.now(UTC),
             )
+            .returning(APIKey)
             .execution_options(synchronize_session="fetch")
         )
+        key = result.scalar_one_or_none()
         await self._session.commit()
-        return result.rowcount > 0
+        return key
 
     async def record_ping(
         self, key_id: int, user_id: int, latency_ms: int, at: datetime | None = None

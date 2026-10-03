@@ -14,6 +14,7 @@ def make_dto(key_id: int, user_id: int = 1) -> APIKeyDTO:
         status=KeyStatus.ACTIVE,
         requests_today=0,
         daily_limit=1000,
+        key_encrypted="ciphertext",
     )
 
 

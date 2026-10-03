@@ -2,6 +2,7 @@ from datetime import datetime
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from app.core.security import decrypt_key
 from app.keys.enums import KeyStatus, ProviderType
 
 
@@ -80,6 +81,10 @@ class APIKeyDTO(BaseModel):
     requests_today: int
     daily_limit: int
     model: str | None = None
-    decrypted_key: str | None = None
+    key_encrypted: str
 
     model_config = ConfigDict(from_attributes=True)
+
+    @property
+    def decrypted_key(self) -> str:
+        return decrypt_key(self.key_encrypted)

@@ -11,7 +11,7 @@ class KeyStatusCache:
         self._ttl = ttl_seconds
 
     def _cache_key(self, user_id: int, provider: str) -> str:
-        return f"keypool:active:{user_id}:{provider}"
+        return f"keypool:active:v2:{user_id}:{provider}"
 
     async def get_active(self, user_id: int, provider: str) -> list[APIKeyDTO] | None:
         raw = await self._redis.get(self._cache_key(user_id, provider))

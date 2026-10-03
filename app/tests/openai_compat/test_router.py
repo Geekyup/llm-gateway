@@ -4,6 +4,7 @@ import httpx
 import pytest
 
 from app.core.exceptions import NoAvailableKeysError
+from app.core.security import encrypt_key
 from app.keys.enums import KeyStatus, ProviderType
 from app.keys.schemas import APIKeyDTO
 from app.openai_compat.router import chat_completions
@@ -13,7 +14,7 @@ from app.openai_compat.schemas import ChatCompletionRequest, ChatMessage
 def _fake_dto(provider: ProviderType, model: str | None = None) -> APIKeyDTO:
     return APIKeyDTO(
         id=1, user_id=1, label="k", provider=provider, status=KeyStatus.ACTIVE,
-        requests_today=0, daily_limit=100, model=model, decrypted_key="raw",
+        requests_today=0, daily_limit=100, model=model, key_encrypted=encrypt_key("raw"),
     )
 
 

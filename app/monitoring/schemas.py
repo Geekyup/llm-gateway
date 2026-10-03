@@ -3,7 +3,7 @@ from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
-Outcome = Literal["success", "rate_limited", "exhausted", "no_keys", "upstream_exhausted", "error"]
+Outcome = Literal["success", "rate_limited", "exhausted", "no_keys", "upstream_exhausted", "invalid", "error"]
 ActivityRange = Literal["24h", "7d", "30d"]
 
 

@@ -14,6 +14,10 @@ def key_pool(key_repo, fake_redis):
     return KeyPoolService(key_repo, cache, selector)
 
 
+def _cache_key(key_pool: KeyPoolService, user_id: int) -> str:
+    return key_pool._cache._cache_key(user_id, ProviderType.GEMINI.value)
+
+
 async def _create_key(key_pool: KeyPoolService, user_id: int, label: str, model: str | None = None):
     return await key_pool.create_key(
         user_id,
@@ -103,5 +107,96 @@ async def test_disabled_key_pinned_to_model_is_never_a_candidate(key_pool, test_
     await key_pool.set_status(key.id, test_user.id, KeyStatus.DISABLED)
 
     candidates = await key_pool.get_candidate_keys(test_user.id, ProviderType.GEMINI, model="gemini-3.6-flash")
+
+    assert candidates == []
+
+@pytest.mark.asyncio
+async def test_cache_never_holds_plaintext_key(key_pool, test_user, fake_redis):
+    key = await _create_key(key_pool, test_user.id, "secret-holder")
+
+    await key_pool.get_candidate_keys(test_user.id, ProviderType.GEMINI)
+
+    raw = await fake_redis.get(_cache_key(key_pool, test_user.id))
+    assert raw is not None
+    assert "raw-secret-holder" not in raw
+    assert "decrypted_key" not in raw
+    assert key.key_encrypted in raw
+
+
+@pytest.mark.asyncio
+async def test_selected_candidate_decrypts_to_the_original_key(key_pool, test_user):
+    await _create_key(key_pool, test_user.id, "k1")
+
+    chosen = await key_pool.select_key(test_user.id, ProviderType.GEMINI)
+
+    assert chosen is not None
+    assert chosen.decrypted_key == "raw-k1"
+
+
+@pytest.mark.asyncio
+async def test_exclude_ids_filters_cached_candidates(key_pool, test_user):
+    first = await _create_key(key_pool, test_user.id, "k1")
+    second = await _create_key(key_pool, test_user.id, "k2")
+
+    await key_pool.get_candidate_keys(test_user.id, ProviderType.GEMINI)
+    candidates = await key_pool.get_candidate_keys(
+        test_user.id, ProviderType.GEMINI, exclude_ids={first.id}
+    )
+
+    assert [c.id for c in candidates] == [second.id]
+
+
+@pytest.mark.asyncio
+async def test_record_success_keeps_cache_while_under_limit(key_pool, test_user, fake_redis):
+    key = await _create_key(key_pool, test_user.id, "k1")
+    await key_pool.get_candidate_keys(test_user.id, ProviderType.GEMINI)
+    assert await fake_redis.get(_cache_key(key_pool, test_user.id)) is not None
+
+    recorded = await key_pool.record_success(key.id, test_user.id, ProviderType.GEMINI)
+
+    assert recorded is True
+    assert await fake_redis.get(_cache_key(key_pool, test_user.id)) is not None
+
+
+@pytest.mark.asyncio
+async def test_record_success_at_daily_limit_exhausts_key_and_invalidates_cache(key_pool, test_user, fake_redis):
+    key = await key_pool.create_key(
+        test_user.id,
+        APIKeyCreate(label="tiny", provider=ProviderType.GEMINI, raw_key="raw-tiny", daily_limit=2),
+    )
+    await key_pool.get_candidate_keys(test_user.id, ProviderType.GEMINI)
+
+    await key_pool.record_success(key.id, test_user.id, ProviderType.GEMINI)
+    assert await fake_redis.get(_cache_key(key_pool, test_user.id)) is not None
+    await key_pool.record_success(key.id, test_user.id, ProviderType.GEMINI)
+
+    assert await fake_redis.get(_cache_key(key_pool, test_user.id)) is None
+    refreshed = await key_pool.get_key(key.id, test_user.id)
+    assert refreshed.status == KeyStatus.EXHAUSTED
+    assert refreshed.requests_today == 2
+    assert await key_pool.select_key(test_user.id, ProviderType.GEMINI) is None
+
+
+@pytest.mark.asyncio
+async def test_record_success_beyond_limit_returns_false_and_invalidates_cache(key_pool, test_user, fake_redis):
+    key = await key_pool.create_key(
+        test_user.id,
+        APIKeyCreate(label="tiny", provider=ProviderType.GEMINI, raw_key="raw-tiny", daily_limit=1),
+    )
+    await key_pool.record_success(key.id, test_user.id, ProviderType.GEMINI)
+    await key_pool.get_candidate_keys(test_user.id, ProviderType.GEMINI)
+
+    recorded = await key_pool.record_success(key.id, test_user.id, ProviderType.GEMINI)
+
+    assert recorded is False
+    assert await fake_redis.get(_cache_key(key_pool, test_user.id)) is None
+
+
+@pytest.mark.asyncio
+async def test_key_at_daily_limit_is_never_a_candidate(key_pool, key_repo, test_user):
+    key = await _create_key(key_pool, test_user.id, "full")
+    await key_repo.update_fields(key.id, user_id=test_user.id, daily_limit=1, requests_today=1)
+
+    candidates = await key_pool.get_candidate_keys(test_user.id, ProviderType.GEMINI)
 
     assert candidates == []

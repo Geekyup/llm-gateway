@@ -318,3 +318,47 @@ async def test_clear_expired_cooldowns_runs_a_single_update(key_repo, db_session
 @pytest.mark.asyncio
 async def test_clear_expired_cooldowns_returns_empty_when_nothing_expired(key_repo, test_user):
     assert await key_repo.clear_expired_cooldowns() == []
+
+
+@pytest.mark.asyncio
+async def test_increment_usage_returns_updated_key(key_repo, test_user):
+    key = await key_repo.create(
+        user_id=test_user.id, label="k", provider=ProviderType.GEMINI, key_encrypted="c", daily_limit=2
+    )
+
+    first = await key_repo.increment_usage(key.id, user_id=test_user.id)
+    assert first is not None
+    first_count = first.requests_today
+    second = await key_repo.increment_usage(key.id, user_id=test_user.id)
+
+    assert first_count == 1
+    assert second is not None and second.requests_today == 2
+
+
+@pytest.mark.asyncio
+async def test_increment_usage_returns_none_at_daily_limit(key_repo, test_user):
+    key = await key_repo.create(
+        user_id=test_user.id, label="k", provider=ProviderType.GEMINI, key_encrypted="c", daily_limit=1
+    )
+    await key_repo.increment_usage(key.id, user_id=test_user.id)
+
+    result = await key_repo.increment_usage(key.id, user_id=test_user.id)
+
+    assert result is None
+    fetched = await key_repo.get(key.id, user_id=test_user.id)
+    assert fetched.requests_today == 1
+
+
+@pytest.mark.asyncio
+async def test_list_active_excludes_keys_at_daily_limit(key_repo, test_user):
+    full = await key_repo.create(
+        user_id=test_user.id, label="full", provider=ProviderType.GEMINI, key_encrypted="c", daily_limit=1
+    )
+    room = await key_repo.create(
+        user_id=test_user.id, label="room", provider=ProviderType.GEMINI, key_encrypted="c", daily_limit=5
+    )
+    await key_repo.increment_usage(full.id, user_id=test_user.id)
+
+    active = await key_repo.list_active(user_id=test_user.id)
+
+    assert [k.id for k in active] == [room.id]

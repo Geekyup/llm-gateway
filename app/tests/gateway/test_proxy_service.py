@@ -3,6 +3,7 @@ import pytest
 from sqlalchemy import select
 
 from app.core.exceptions import NoAvailableKeysError, UpstreamExhaustedError
+from app.core.security import encrypt_key
 from app.gateway.proxy_service import GatewayService, UpstreamRequestSpec
 from app.keys.cache import KeyStatusCache
 from app.keys.enums import ProviderType
@@ -32,13 +33,15 @@ async def _recent_events(session, redis, user_id: int, limit: int = 10) -> list[
 
 
 class ScriptedProvider:
-    def __init__(self, status_codes: list[int]) -> None:
+    def __init__(self, status_codes: list[int | Exception]) -> None:
         self._status_codes = iter(status_codes)
         self.calls: list[str] = []
 
     async def forward(self, *, key, path, method, payload, headers):
         self.calls.append(key)
         status = next(self._status_codes)
+        if isinstance(status, Exception):
+            raise status
         return httpx.Response(status_code=status, json={"ok": status == 200})
 
     def is_rate_limited(self, response: httpx.Response) -> bool:
@@ -67,7 +70,7 @@ class UsageMetadataProvider:
 
 class ScriptedStreamProvider:
     
-    def __init__(self, status_codes: list[int], bodies: list[bytes] | None = None) -> None:
+    def __init__(self, status_codes: list[int | Exception], bodies: list[bytes] | None = None) -> None:
         self._status_codes = iter(status_codes)
         self._bodies = iter(bodies or [])
         self.calls: list[str] = []
@@ -75,6 +78,8 @@ class ScriptedStreamProvider:
     def forward_stream(self, *, key, path, method, payload, headers):
         self.calls.append(key)
         status = next(self._status_codes)
+        if isinstance(status, Exception):
+            raise status
         try:
             body = next(self._bodies)
         except StopIteration:
@@ -415,11 +420,11 @@ async def test_cross_provider_failover_rebuilds_request_per_attempt(key_pool, te
 
     gem_dto = APIKeyDTO(
         id=gem_key.id, user_id=test_user.id, label="gem", provider=ProviderType.GEMINI,
-        status=gem_key.status, requests_today=0, daily_limit=100, decrypted_key="raw-gem",
+        status=gem_key.status, requests_today=0, daily_limit=100, key_encrypted=encrypt_key("raw-gem"),
     )
     or_dto = APIKeyDTO(
         id=or_key.id, user_id=test_user.id, label="or", provider=ProviderType.OPENROUTER,
-        status=or_key.status, requests_today=0, daily_limit=100, decrypted_key="raw-or",
+        status=or_key.status, requests_today=0, daily_limit=100, key_encrypted=encrypt_key("raw-or"),
     )
     select_sequence = iter([gem_dto, or_dto])
     monkeypatch.setattr(key_pool, "select_key", lambda *a, **kw: _async_return(next(select_sequence)))
@@ -541,3 +546,169 @@ async def test_stream_no_keys_available_raises(key_pool, test_user, _patch_regis
             provider_type=ProviderType.GEMINI,
         ):
             pass
+
+@pytest.mark.asyncio
+async def test_network_error_triggers_failover_to_second_key(key_pool, db_session, fake_redis, test_user, _patch_registry):
+    await _create_active_key(key_pool, test_user.id, "k1")
+    await _create_active_key(key_pool, test_user.id, "k2")
+    provider = ScriptedProvider([httpx.ConnectError("boom"), 200])
+    _patch_registry(provider)
+    publisher = RequestEventPublisher(redis=fake_redis)
+    gateway = GatewayService(key_pool, max_attempts=3, event_publisher=publisher)
+
+    response, _ = await gateway.proxy_request(
+        user_id=test_user.id, build_request=_build_request(), provider_type=ProviderType.GEMINI
+    )
+
+    assert response.status_code == 200
+    assert provider.calls[0] != provider.calls[1]
+    events = await _recent_events(db_session, fake_redis, test_user.id)
+    assert sorted(e.outcome for e in events) == ["error", "success"]
+
+
+@pytest.mark.asyncio
+async def test_network_error_on_single_key_retries_nothing_and_raises_exhausted(key_pool, test_user, _patch_registry):
+    key = await _create_active_key(key_pool, test_user.id, "k1")
+    provider = ScriptedProvider([httpx.ReadTimeout("slow")])
+    _patch_registry(provider)
+    gateway = GatewayService(key_pool, max_attempts=3)
+
+    with pytest.raises(UpstreamExhaustedError):
+        await gateway.proxy_request(
+            user_id=test_user.id, build_request=_build_request(), provider_type=ProviderType.GEMINI
+        )
+
+    assert len(provider.calls) == 1
+    refreshed = await key_pool.get_key(key.id, test_user.id)
+    assert refreshed.status.value == "active"
+    assert refreshed.requests_today == 0
+
+
+@pytest.mark.asyncio
+async def test_5xx_triggers_failover_and_does_not_count_usage(key_pool, test_user, _patch_registry):
+    first = await _create_active_key(key_pool, test_user.id, "k1")
+    second = await _create_active_key(key_pool, test_user.id, "k2")
+    provider = ScriptedProvider([503, 200])
+    _patch_registry(provider)
+    gateway = GatewayService(key_pool, max_attempts=3)
+
+    response, _ = await gateway.proxy_request(
+        user_id=test_user.id, build_request=_build_request(), provider_type=ProviderType.GEMINI
+    )
+
+    assert response.status_code == 200
+    usage = {
+        key.id: (await key_pool.get_key(key.id, test_user.id)).requests_today for key in (first, second)
+    }
+    assert sorted(usage.values()) == [0, 1]
+
+
+@pytest.mark.asyncio
+async def test_all_keys_returning_5xx_raises_upstream_exhausted_and_keeps_keys_active(key_pool, test_user, _patch_registry):
+    first = await _create_active_key(key_pool, test_user.id, "k1")
+    second = await _create_active_key(key_pool, test_user.id, "k2")
+    provider = ScriptedProvider([500, 502])
+    _patch_registry(provider)
+    gateway = GatewayService(key_pool, max_attempts=3)
+
+    with pytest.raises(UpstreamExhaustedError):
+        await gateway.proxy_request(
+            user_id=test_user.id, build_request=_build_request(), provider_type=ProviderType.GEMINI
+        )
+
+    for key in (first, second):
+        refreshed = await key_pool.get_key(key.id, test_user.id)
+        assert refreshed.status.value == "active"
+        assert refreshed.requests_today == 0
+
+
+@pytest.mark.asyncio
+async def test_4xx_is_returned_without_retry_and_without_usage(key_pool, db_session, fake_redis, test_user, _patch_registry):
+    key = await _create_active_key(key_pool, test_user.id, "k1")
+    await _create_active_key(key_pool, test_user.id, "k2")
+    provider = ScriptedProvider([400, 200])
+    _patch_registry(provider)
+    publisher = RequestEventPublisher(redis=fake_redis)
+    gateway = GatewayService(key_pool, max_attempts=3, event_publisher=publisher)
+
+    response, _ = await gateway.proxy_request(
+        user_id=test_user.id, build_request=_build_request(), provider_type=ProviderType.GEMINI
+    )
+
+    assert response.status_code == 400
+    assert len(provider.calls) == 1
+    for candidate in await key_pool.list_keys(test_user.id):
+        assert candidate.requests_today == 0
+    events = await _recent_events(db_session, fake_redis, test_user.id)
+    assert [(e.outcome, e.upstream_status) for e in events] == [("error", 400)]
+    assert key.id in {k.id for k in await key_pool.list_keys(test_user.id)}
+
+
+@pytest.mark.asyncio
+async def test_stream_network_error_triggers_failover(key_pool, test_user, _patch_registry):
+    await _create_active_key(key_pool, test_user.id, "k1")
+    await _create_active_key(key_pool, test_user.id, "k2")
+    provider = ScriptedStreamProvider([httpx.ConnectError("boom"), 200])
+    _patch_registry(provider)
+    gateway = GatewayService(key_pool, max_attempts=3)
+
+    async with gateway.proxy_stream_request(
+        user_id=test_user.id, build_request=_build_request(), provider_type=ProviderType.GEMINI
+    ) as (response, record_tokens, _):
+        assert response.status_code == 200
+        await record_tokens(None, None, None)
+
+    assert len(provider.calls) == 2
+
+
+@pytest.mark.asyncio
+async def test_stream_5xx_triggers_failover(key_pool, test_user, _patch_registry):
+    await _create_active_key(key_pool, test_user.id, "k1")
+    await _create_active_key(key_pool, test_user.id, "k2")
+    provider = ScriptedStreamProvider([500, 200])
+    _patch_registry(provider)
+    gateway = GatewayService(key_pool, max_attempts=3)
+
+    async with gateway.proxy_stream_request(
+        user_id=test_user.id, build_request=_build_request(), provider_type=ProviderType.GEMINI
+    ) as (response, record_tokens, _):
+        assert response.status_code == 200
+        await record_tokens(None, None, None)
+
+    assert len(provider.calls) == 2
+
+
+@pytest.mark.asyncio
+async def test_stream_4xx_is_yielded_without_retry(key_pool, test_user, _patch_registry):
+    await _create_active_key(key_pool, test_user.id, "k1")
+    await _create_active_key(key_pool, test_user.id, "k2")
+    provider = ScriptedStreamProvider([400, 200])
+    _patch_registry(provider)
+    gateway = GatewayService(key_pool, max_attempts=3)
+
+    async with gateway.proxy_stream_request(
+        user_id=test_user.id, build_request=_build_request(), provider_type=ProviderType.GEMINI
+    ) as (response, record_tokens, _):
+        assert response.status_code == 400
+        await record_tokens(None, None, None)
+
+    assert len(provider.calls) == 1
+    for candidate in await key_pool.list_keys(test_user.id):
+        assert candidate.requests_today == 0
+
+
+@pytest.mark.asyncio
+async def test_stream_error_raised_by_consumer_does_not_trigger_failover(key_pool, test_user, _patch_registry):
+    await _create_active_key(key_pool, test_user.id, "k1")
+    await _create_active_key(key_pool, test_user.id, "k2")
+    provider = ScriptedStreamProvider([200, 200])
+    _patch_registry(provider)
+    gateway = GatewayService(key_pool, max_attempts=3)
+
+    with pytest.raises(httpx.ReadError):
+        async with gateway.proxy_stream_request(
+            user_id=test_user.id, build_request=_build_request(), provider_type=ProviderType.GEMINI
+        ):
+            raise httpx.ReadError("mid-stream")
+
+    assert len(provider.calls) == 1

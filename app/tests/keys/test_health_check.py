@@ -514,3 +514,23 @@ async def test_check_key_health_keeps_previous_ping_on_network_error(key_repo, k
     assert result.latency_ms is None
     refreshed = await key_repo.get(key.id, user_id=test_user.id)
     assert refreshed.last_ping_ms == 120
+
+
+@pytest.mark.asyncio
+async def test_check_key_health_does_not_revive_key_at_daily_limit(key_repo, key_pool_service, test_user):
+    key = await key_repo.create(
+        user_id=test_user.id, label="k1", provider=ProviderType.GEMINI, key_encrypted="ciphertext", daily_limit=1
+    )
+    await key_repo.increment_usage(key.id, user_id=test_user.id)
+    await key_repo.mark_status(key.id, KeyStatus.EXHAUSTED, user_id=test_user.id)
+
+    fake_provider = AsyncMock()
+    fake_provider.health_check.return_value = HealthCheckResult(ok=True)
+
+    with patch("app.keys.service.get_provider", return_value=fake_provider), \
+         patch("app.keys.service.decrypt_key", return_value="plaintext-key"):
+        result = await key_pool_service.check_key_health(key.id, test_user.id)
+
+    assert result.ok is True
+    refreshed = await key_repo.get(key.id, user_id=test_user.id)
+    assert refreshed.status == KeyStatus.EXHAUSTED

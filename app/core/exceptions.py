@@ -22,7 +22,7 @@ class NoAvailableKeysError(LLMGatewayError):
 class UpstreamExhaustedError(LLMGatewayError):
     status_code = 503
     slug = "upstream_exhausted"
-    detail = "All {attempts} candidate key(s) for '{provider}' were rate-limited or exhausted"
+    detail = "All {attempts} attempted key(s) for '{provider}' were rate-limited, exhausted or failed upstream"
 
 
 class KeyNotFoundError(LLMGatewayError):

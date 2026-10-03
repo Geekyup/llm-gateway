@@ -2,7 +2,7 @@ import logging
 import time
 import uuid
 from collections.abc import AsyncIterator, Awaitable, Callable
-from contextlib import asynccontextmanager
+from contextlib import AsyncExitStack, asynccontextmanager
 from dataclasses import dataclass
 from datetime import UTC, datetime
 
@@ -27,9 +27,28 @@ class UpstreamRequestSpec:
     payload: dict | None
     headers: dict
 
+
 RequestSpecBuilder = Callable[[APIKeyDTO], UpstreamRequestSpec]
 
 TokenRecorder = Callable[[int | None, int | None, int | None], Awaitable[None]]
+
+_RETRY_OUTCOMES = frozenset({"invalid", "exhausted", "rate_limited", "upstream_error"})
+
+
+@dataclass(frozen=True, slots=True)
+class _AttemptContext:
+    user_id: int
+    request_id: str
+    attempt: int
+    dto: APIKeyDTO
+    spec: UpstreamRequestSpec
+    effective_model: str | None
+
+
+async def _noop_recorder(
+    prompt_tokens: int | None, completion_tokens: int | None, total_tokens: int | None
+) -> None:
+    return None
 
 
 class GatewayService:
@@ -90,6 +109,37 @@ class GatewayService:
             )
         )
 
+    async def _emit_attempt(
+        self,
+        ctx: _AttemptContext,
+        *,
+        outcome: str,
+        upstream_status: int | None,
+        latency_ms: int | None,
+        error_detail: str | None = None,
+        prompt_tokens: int | None = None,
+        completion_tokens: int | None = None,
+        total_tokens: int | None = None,
+    ) -> None:
+        await self._emit(
+            user_id=ctx.user_id,
+            request_id=ctx.request_id,
+            attempt=ctx.attempt,
+            provider_type=ctx.dto.provider,
+            path=ctx.spec.path,
+            method=ctx.spec.method,
+            key_id=ctx.dto.id,
+            key_label=ctx.dto.label,
+            upstream_status=upstream_status,
+            outcome=outcome,
+            latency_ms=latency_ms,
+            error_detail=error_detail,
+            prompt_tokens=prompt_tokens,
+            completion_tokens=completion_tokens,
+            total_tokens=total_tokens,
+            model=ctx.effective_model,
+        )
+
     async def _select_next_key(
         self,
         *,
@@ -101,7 +151,9 @@ class GatewayService:
         tried_key_ids: set[int],
         last_provider_type: ProviderType | None,
     ) -> APIKeyDTO:
-        dto = await self._key_pool.select_key(user_id, provider_type, model=model)
+        dto = await self._key_pool.select_key(
+            user_id, provider_type, model=model, exclude_ids=tried_key_ids
+        )
         if dto is None:
             outcome = "upstream_exhausted" if tried_key_ids else "no_keys"
             await self._emit(
@@ -126,79 +178,82 @@ class GatewayService:
             raise NoAvailableKeysError(provider=provider_label)
         return dto
 
+    async def _record_network_error(
+        self, ctx: _AttemptContext, exc: httpx.HTTPError, latency_ms: int
+    ) -> None:
+        logger.warning(
+            "attempt=%d key_id=%s provider=%s network error %s, retrying",
+            ctx.attempt, ctx.dto.id, ctx.dto.provider.value, type(exc).__name__,
+        )
+        await self._emit_attempt(
+            ctx,
+            outcome="error",
+            upstream_status=None,
+            latency_ms=latency_ms,
+            error_detail=type(exc).__name__,
+        )
+
     async def _record_attempt_outcome(
         self,
         *,
         provider: Provider,
         response: httpx.Response,
-        dto: APIKeyDTO,
-        user_id: int,
-        request_id: str,
-        attempt: int,
-        key_provider_type: ProviderType,
-        spec: UpstreamRequestSpec,
+        ctx: _AttemptContext,
         latency_ms: int,
-        effective_model: str | None,
     ) -> str:
+        dto = ctx.dto
+        key_provider_type = dto.provider
+
         is_key_invalid = getattr(provider, "is_key_invalid", None)
         if is_key_invalid is not None and is_key_invalid(response):
-            await self._key_pool.record_invalid(dto.id, user_id, key_provider_type)
-            await self._emit(
-                user_id=user_id,
-                request_id=request_id,
-                attempt=attempt,
-                provider_type=key_provider_type,
-                path=spec.path,
-                method=spec.method,
-                key_id=dto.id,
-                key_label=dto.label,
-                upstream_status=response.status_code,
-                outcome="invalid",
-                latency_ms=latency_ms,
-                model=effective_model,
+            await self._key_pool.record_invalid(dto.id, ctx.user_id, key_provider_type)
+            await self._emit_attempt(
+                ctx, outcome="invalid", upstream_status=response.status_code, latency_ms=latency_ms
             )
-            logger.info("attempt=%d key_id=%s provider=%s invalid, retrying", attempt, dto.id, key_provider_type.value)
+            logger.info("attempt=%d key_id=%s provider=%s invalid, retrying", ctx.attempt, dto.id, key_provider_type.value)
             return "invalid"
 
         if provider.is_key_exhausted(response):
-            await self._key_pool.record_exhausted(dto.id, user_id, key_provider_type)
-            await self._emit(
-                user_id=user_id,
-                request_id=request_id,
-                attempt=attempt,
-                provider_type=key_provider_type,
-                path=spec.path,
-                method=spec.method,
-                key_id=dto.id,
-                key_label=dto.label,
-                upstream_status=response.status_code,
-                outcome="exhausted",
-                latency_ms=latency_ms,
-                model=effective_model,
+            await self._key_pool.record_exhausted(dto.id, ctx.user_id, key_provider_type)
+            await self._emit_attempt(
+                ctx, outcome="exhausted", upstream_status=response.status_code, latency_ms=latency_ms
             )
-            logger.info("attempt=%d key_id=%s provider=%s exhausted, retrying", attempt, dto.id, key_provider_type.value)
+            logger.info("attempt=%d key_id=%s provider=%s exhausted, retrying", ctx.attempt, dto.id, key_provider_type.value)
             return "exhausted"
 
         if provider.is_rate_limited(response):
-            await self._key_pool.record_rate_limited(dto.id, user_id, key_provider_type)
-            await self._emit(
-                user_id=user_id,
-                request_id=request_id,
-                attempt=attempt,
-                provider_type=key_provider_type,
-                path=spec.path,
-                method=spec.method,
-                key_id=dto.id,
-                key_label=dto.label,
-                upstream_status=response.status_code,
-                outcome="rate_limited",
-                latency_ms=latency_ms,
-                model=effective_model,
+            await self._key_pool.record_rate_limited(dto.id, ctx.user_id, key_provider_type)
+            await self._emit_attempt(
+                ctx, outcome="rate_limited", upstream_status=response.status_code, latency_ms=latency_ms
             )
-            logger.info("attempt=%d key_id=%s provider=%s rate-limited, retrying", attempt, dto.id, key_provider_type.value)
+            logger.info("attempt=%d key_id=%s provider=%s rate-limited, retrying", ctx.attempt, dto.id, key_provider_type.value)
             return "rate_limited"
 
-        recorded = await self._key_pool.record_success(dto.id, user_id, key_provider_type)
+        if response.status_code >= 500:
+            await self._emit_attempt(
+                ctx,
+                outcome="error",
+                upstream_status=response.status_code,
+                latency_ms=latency_ms,
+                error_detail=f"HTTP {response.status_code}",
+            )
+            logger.info(
+                "attempt=%d key_id=%s provider=%s upstream status=%d, retrying",
+                ctx.attempt, dto.id, key_provider_type.value, response.status_code,
+            )
+            return "upstream_error"
+
+        if response.status_code >= 400:
+            await self._emit_attempt(
+                ctx,
+                outcome="error",
+                upstream_status=response.status_code,
+                latency_ms=latency_ms,
+                error_detail=f"HTTP {response.status_code}",
+            )
+            return "client_error"
+
+        recorded = await self._key_pool.record_success(dto.id, ctx.user_id, key_provider_type)
         if not recorded:
             logger.warning(
                 "key_id=%s provider=%s succeeded upstream but daily limit was already exhausted "
@@ -220,6 +275,14 @@ class GatewayService:
             logger.warning("failed to parse usage data for token accounting", exc_info=True)
             return None, None, None
 
+    def _exhausted_error(
+        self, tried_key_ids: set[int], last_provider_type: ProviderType | None
+    ) -> Exception:
+        provider_label = last_provider_type.value if last_provider_type is not None else "any"
+        if tried_key_ids:
+            return UpstreamExhaustedError(provider=provider_label, attempts=len(tried_key_ids))
+        return NoAvailableKeysError(provider=provider_label)
+
     async def proxy_request(
         self,
         *,
@@ -230,7 +293,6 @@ class GatewayService:
     ) -> tuple[httpx.Response, ProviderType]:
         request_id = uuid.uuid4().hex
         tried_key_ids: set[int] = set()
-        last_response: httpx.Response | None = None
         last_provider_type: ProviderType | None = provider_type
 
         for attempt in range(1, self._max_attempts + 1):
@@ -243,67 +305,56 @@ class GatewayService:
                 tried_key_ids=tried_key_ids,
                 last_provider_type=last_provider_type,
             )
-            if dto.id in tried_key_ids:
-                break
             tried_key_ids.add(dto.id)
 
             key_provider_type = dto.provider
             last_provider_type = key_provider_type
             provider: Provider = get_provider(key_provider_type.value)
             spec = build_request(dto)
-            effective_model = dto.model or model or self._default_models.get(key_provider_type)
+            ctx = _AttemptContext(
+                user_id=user_id,
+                request_id=request_id,
+                attempt=attempt,
+                dto=dto,
+                spec=spec,
+                effective_model=dto.model or model or self._default_models.get(key_provider_type),
+            )
 
             started = time.monotonic()
-            response = await provider.forward(
-                key=dto.decrypted_key,
-                path=spec.path,
-                method=spec.method,
-                payload=spec.payload,
-                headers=spec.headers,
-            )
+            try:
+                response = await provider.forward(
+                    key=dto.decrypted_key,
+                    path=spec.path,
+                    method=spec.method,
+                    payload=spec.payload,
+                    headers=spec.headers,
+                )
+            except httpx.HTTPError as exc:
+                await self._record_network_error(ctx, exc, int((time.monotonic() - started) * 1000))
+                continue
             latency_ms = int((time.monotonic() - started) * 1000)
-            last_response = response
 
             outcome = await self._record_attempt_outcome(
-                provider=provider,
-                response=response,
-                dto=dto,
-                user_id=user_id,
-                request_id=request_id,
-                attempt=attempt,
-                key_provider_type=key_provider_type,
-                spec=spec,
-                latency_ms=latency_ms,
-                effective_model=effective_model,
+                provider=provider, response=response, ctx=ctx, latency_ms=latency_ms
             )
-            if outcome in ("invalid", "exhausted", "rate_limited"):
+            if outcome in _RETRY_OUTCOMES:
                 continue
+            if outcome == "client_error":
+                return response, key_provider_type
 
             prompt_tokens, completion_tokens, total_tokens = self._extract_usage(response)
-            await self._emit(
-                user_id=user_id,
-                request_id=request_id,
-                attempt=attempt,
-                provider_type=key_provider_type,
-                path=spec.path,
-                method=spec.method,
-                key_id=dto.id,
-                key_label=dto.label,
-                upstream_status=response.status_code,
+            await self._emit_attempt(
+                ctx,
                 outcome="success",
+                upstream_status=response.status_code,
                 latency_ms=latency_ms,
                 prompt_tokens=prompt_tokens,
                 completion_tokens=completion_tokens,
                 total_tokens=total_tokens,
-                model=effective_model,
             )
             return response, key_provider_type
 
-        provider_label = last_provider_type.value if last_provider_type is not None else "any"
-        if last_response is not None:
-            raise UpstreamExhaustedError(provider=provider_label, attempts=len(tried_key_ids))
-
-        raise NoAvailableKeysError(provider=provider_label)
+        raise self._exhausted_error(tried_key_ids, last_provider_type)
 
     @asynccontextmanager
     async def proxy_stream_request(
@@ -316,7 +367,6 @@ class GatewayService:
     ) -> AsyncIterator[tuple[httpx.Response, TokenRecorder, ProviderType]]:
         request_id = uuid.uuid4().hex
         tried_key_ids: set[int] = set()
-        last_status: int | None = None
         last_provider_type: ProviderType | None = provider_type
 
         for attempt in range(1, self._max_attempts + 1):
@@ -329,78 +379,67 @@ class GatewayService:
                 tried_key_ids=tried_key_ids,
                 last_provider_type=last_provider_type,
             )
-            if dto.id in tried_key_ids:
-                break
             tried_key_ids.add(dto.id)
 
             key_provider_type = dto.provider
             last_provider_type = key_provider_type
             provider: Provider = get_provider(key_provider_type.value)
             spec = build_request(dto)
-            effective_model = dto.model or model or self._default_models.get(key_provider_type)
+            ctx = _AttemptContext(
+                user_id=user_id,
+                request_id=request_id,
+                attempt=attempt,
+                dto=dto,
+                spec=spec,
+                effective_model=dto.model or model or self._default_models.get(key_provider_type),
+            )
 
             started = time.monotonic()
-            async with provider.forward_stream(
-                key=dto.decrypted_key,
-                path=spec.path,
-                method=spec.method,
-                payload=spec.payload,
-                headers=spec.headers,
-            ) as response:
+            async with AsyncExitStack() as stack:
+                try:
+                    response = await stack.enter_async_context(
+                        provider.forward_stream(
+                            key=dto.decrypted_key,
+                            path=spec.path,
+                            method=spec.method,
+                            payload=spec.payload,
+                            headers=spec.headers,
+                        )
+                    )
+                except httpx.HTTPError as exc:
+                    await self._record_network_error(ctx, exc, int((time.monotonic() - started) * 1000))
+                    continue
                 latency_ms = int((time.monotonic() - started) * 1000)
-                last_status = response.status_code
 
                 outcome = await self._record_attempt_outcome(
-                    provider=provider,
-                    response=response,
-                    dto=dto,
-                    user_id=user_id,
-                    request_id=request_id,
-                    attempt=attempt,
-                    key_provider_type=key_provider_type,
-                    spec=spec,
-                    latency_ms=latency_ms,
-                    effective_model=effective_model,
+                    provider=provider, response=response, ctx=ctx, latency_ms=latency_ms
                 )
-                if outcome in ("invalid", "exhausted", "rate_limited"):
+                if outcome in _RETRY_OUTCOMES:
                     continue
+                if outcome == "client_error":
+                    yield response, _noop_recorder, key_provider_type
+                    return
 
                 async def record_tokens(
                     prompt_tokens: int | None,
                     completion_tokens: int | None,
                     total_tokens: int | None,
                     *,
-                    _attempt: int = attempt,
-                    _key_provider_type: ProviderType = key_provider_type,
-                    _spec: UpstreamRequestSpec = spec,
-                    _dto: APIKeyDTO = dto,
+                    _ctx: _AttemptContext = ctx,
                     _status_code: int = response.status_code,
                     _latency_ms: int = latency_ms,
-                    _model: str | None = effective_model,
                 ) -> None:
-                    await self._emit(
-                        user_id=user_id,
-                        request_id=request_id,
-                        attempt=_attempt,
-                        provider_type=_key_provider_type,
-                        path=_spec.path,
-                        method=_spec.method,
-                        key_id=_dto.id,
-                        key_label=_dto.label,
-                        upstream_status=_status_code,
+                    await self._emit_attempt(
+                        _ctx,
                         outcome="success",
+                        upstream_status=_status_code,
                         latency_ms=_latency_ms,
                         prompt_tokens=prompt_tokens,
                         completion_tokens=completion_tokens,
                         total_tokens=total_tokens,
-                        model=_model,
                     )
 
                 yield response, record_tokens, key_provider_type
                 return
 
-        provider_label = last_provider_type.value if last_provider_type is not None else "any"
-        if last_status is not None:
-            raise UpstreamExhaustedError(provider=provider_label, attempts=len(tried_key_ids))
-
-        raise NoAvailableKeysError(provider=provider_label)
+        raise self._exhausted_error(tried_key_ids, last_provider_type)

@@ -26,7 +26,7 @@ _ACTIVITY_RANGE_DAYS: dict[ActivityRange, int] = {
     "30d": 30,
 }
 
-_ATTEMPTED_OUTCOMES = ("success", "rate_limited", "exhausted")
+_ATTEMPTED_OUTCOMES = ("success", "rate_limited", "exhausted", "error")
 
 EVENTS_QUEUE_KEY = "monitoring:events:queue"
 
@@ -195,6 +195,8 @@ class RequestEventPublisher:
             bucket = by_day.setdefault(label, {"success": 0, "rate_limited": 0, "error": 0})
             if outcome == "success":
                 bucket["success"] += count
+            elif outcome == "error":
+                bucket["error"] += count
             else:
                 bucket["rate_limited"] += count
 

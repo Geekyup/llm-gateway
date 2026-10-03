@@ -2,7 +2,7 @@ import asyncio
 import hashlib
 import logging
 import re
-from collections.abc import Sequence
+from collections.abc import Collection, Sequence
 from datetime import UTC, datetime, timedelta
 
 from app.core.security import decrypt_key, encrypt_key
@@ -172,6 +172,7 @@ class KeyPoolService:
         provider: ProviderType,
         *,
         model: str | None = None,
+        exclude_ids: Collection[int] = (),
     ) -> list[APIKeyDTO]:
         active = await self._cache.get_active(user_id, provider.value)
         if active is None:
@@ -186,15 +187,18 @@ class KeyPoolService:
                     requests_today=row.requests_today,
                     daily_limit=row.daily_limit,
                     model=row.model,
-                    decrypted_key=decrypt_key(row.key_encrypted),
+                    key_encrypted=row.key_encrypted,
                 )
                 for row in rows
             ]
             await self._cache.set_active(user_id, provider.value, active)
 
-        if model is None:
-            return active
-        return [dto for dto in active if dto.model is None or dto.model == model]
+        candidates = active
+        if model is not None:
+            candidates = [dto for dto in candidates if dto.model is None or dto.model == model]
+        if exclude_ids:
+            candidates = [dto for dto in candidates if dto.id not in exclude_ids]
+        return candidates
 
     async def select_key(
         self,
@@ -202,14 +206,28 @@ class KeyPoolService:
         provider: ProviderType,
         *,
         model: str | None = None,
+        exclude_ids: Collection[int] = (),
     ) -> APIKeyDTO | None:
-        candidates = await self.get_candidate_keys(user_id, provider, model=model)
+        candidates = await self.get_candidate_keys(
+            user_id, provider, model=model, exclude_ids=exclude_ids
+        )
         return await self._selector.select(user_id, provider.value, candidates)
 
     async def record_success(self, key_id: int, user_id: int, provider: ProviderType) -> bool:
-        recorded = await self._repo.increment_usage(key_id, user_id=user_id)
-        await self._cache.invalidate(user_id, provider.value)
-        return recorded
+        key = await self._repo.increment_usage(key_id, user_id=user_id)
+        if key is None:
+            await self._cache.invalidate(user_id, provider.value)
+            return False
+        if key.requests_today >= key.daily_limit:
+            await self._repo.compare_and_swap_status(
+                key_id,
+                user_id=user_id,
+                expected_status=KeyStatus.ACTIVE,
+                new_status=KeyStatus.EXHAUSTED,
+                set_cooldown=False,
+            )
+            await self._cache.invalidate(user_id, provider.value)
+        return True
 
     async def record_invalid(self, key_id: int, user_id: int, provider: ProviderType):
         key = await self._repo.mark_status(key_id, KeyStatus.DISABLED, user_id=user_id)
@@ -289,15 +307,16 @@ class KeyPoolService:
 
         if key.status != KeyStatus.DISABLED:
             if result.ok:
-                updated = await self._repo.compare_and_swap_status(
-                    key.id,
-                    user_id=key.user_id,
-                    expected_status=key.status,
-                    new_status=KeyStatus.ACTIVE,
-                    cooldown_until=None,
-                )
-                if updated is not None:
-                    await self._cache.invalidate(key.user_id, key.provider.value)
+                if key.requests_today < key.daily_limit:
+                    updated = await self._repo.compare_and_swap_status(
+                        key.id,
+                        user_id=key.user_id,
+                        expected_status=key.status,
+                        new_status=KeyStatus.ACTIVE,
+                        cooldown_until=None,
+                    )
+                    if updated is not None:
+                        await self._cache.invalidate(key.user_id, key.provider.value)
             elif key.status != KeyStatus.COOLDOWN:
                 updated = await self._repo.compare_and_swap_status(
                     key.id,
