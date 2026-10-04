@@ -8,6 +8,7 @@ from app.account.keys_router import router as keys_router
 from app.account.playground_router import router as playground_router
 from app.auth.router import router as auth_router
 from app.config import get_settings
+from app.core.body_limit import BodySizeLimitMiddleware
 from app.core.exceptions import LLMGatewayError
 from app.core.logging import configure_logging
 from app.gateway.router import router as gateway_router
@@ -34,6 +35,7 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+app.add_middleware(BodySizeLimitMiddleware, max_bytes=settings.MAX_REQUEST_BODY_BYTES)
 app.add_middleware(SessionMiddleware, secret_key=settings.SESSION_SECRET_KEY, same_site="lax")
 
 

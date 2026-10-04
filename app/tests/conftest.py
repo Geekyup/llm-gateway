@@ -2,10 +2,10 @@ import os
 from typing import Self
 
 os.environ.setdefault("ENCRYPTION_KEY", "kQ80G5wq1v3o2r7m6b8p3s5t9u1w4y6a8c0e2g4i6k8=")
-os.environ.setdefault("ADMIN_API_KEY", "test-admin-key")
+os.environ.setdefault("ADMIN_API_KEY", "test-admin-key-0123456789abcdef0123456789")
 os.environ.setdefault("DATABASE_URL", "postgresql+asyncpg://test:test@localhost/test")
-os.environ.setdefault("JWT_SECRET_KEY", "test-jwt-secret-key")
-os.environ.setdefault("SESSION_SECRET_KEY", "test-session-secret-key")
+os.environ.setdefault("JWT_SECRET_KEY", "test-jwt-secret-key-0123456789abcdef0123456789")
+os.environ.setdefault("SESSION_SECRET_KEY", "test-session-secret-key-0123456789abcdef0123456789")
 
 import pytest
 import pytest_asyncio
@@ -138,6 +138,9 @@ class FakeRedis:
 
     async def set(self, key: str, value: str, ex: int | None = None) -> None:
         self._store[key] = value
+
+    async def expire(self, key: str, seconds: int) -> bool:
+        return key in self._store
 
     async def delete(self, key: str) -> None:
         self._store.pop(key, None)

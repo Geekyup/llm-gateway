@@ -1,14 +1,16 @@
+import re
 from typing import ClassVar
 
 import httpx
 
 from app.config import get_settings
-from app.providers.base import HTTPProvider
+from app.providers.base import OPENAI_COMPATIBLE_ROUTES, HTTPProvider
 
 
 class GroqProvider(HTTPProvider):
     name: ClassVar[str] = "groq"
     _MODELS_PATH: ClassVar[str] = "v1/models"
+    ALLOWED_ROUTES: ClassVar[tuple[tuple[str, re.Pattern[str]], ...]] = OPENAI_COMPATIBLE_ROUTES
     _MODELS_RESPONSE_KEY: ClassVar[str] = "data"
 
     def __init__(self, client: httpx.AsyncClient | None = None) -> None:

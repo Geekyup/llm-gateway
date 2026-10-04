@@ -1,3 +1,5 @@
+import json
+
 from fastapi import APIRouter, Depends, Request, Response
 from fastapi.responses import JSONResponse
 
@@ -7,8 +9,18 @@ from app.gateway.proxy_service import GatewayService, UpstreamRequestSpec
 from app.gateway.schemas import GatewayErrorBody
 from app.keys.enums import ProviderType
 from app.keys.schemas import APIKeyDTO
+from app.providers.registry import get_provider
 
 router = APIRouter(prefix="/v1", tags=["gateway"])
+
+_FORWARDED_HEADERS = frozenset({"accept"})
+
+
+def _error(status_code: int, error: str, provider: str, detail: str) -> JSONResponse:
+    return JSONResponse(
+        status_code=status_code,
+        content=GatewayErrorBody(error=error, provider=provider, detail=detail).model_dump(),
+    )
 
 
 async def _proxy_impl(
@@ -21,16 +33,26 @@ async def _proxy_impl(
     try:
         provider_type = ProviderType(provider_name)
     except ValueError:
-        return JSONResponse(
-            status_code=404,
-            content=GatewayErrorBody(
-                error="unknown_provider", provider=provider_name, detail=f"'{provider_name}' is not a supported provider"
-            ).model_dump(),
+        return _error(404, "unknown_provider", provider_name, f"'{provider_name}' is not a supported provider")
+
+    method = request.method
+    if not get_provider(provider_type.value).is_path_allowed(method, path):
+        return _error(
+            404, "path_not_allowed", provider_name, f"{method} /{path} is not exposed for '{provider_name}'"
         )
 
-    payload = await request.json() if await request.body() else None
-    method = request.method
-    headers = dict(request.headers)
+    raw_body = await request.body()
+    payload: dict | None = None
+    if raw_body:
+        try:
+            decoded = json.loads(raw_body)
+        except (json.JSONDecodeError, UnicodeDecodeError):
+            return _error(400, "invalid_json", provider_name, "Request body is not valid JSON")
+        if not isinstance(decoded, dict):
+            return _error(400, "invalid_json", provider_name, "Request body must be a JSON object")
+        payload = decoded
+
+    headers = {k: v for k, v in request.headers.items() if k.lower() in _FORWARDED_HEADERS}
 
     def build_request(_dto: APIKeyDTO) -> UpstreamRequestSpec:
         return UpstreamRequestSpec(path=path, method=method, payload=payload, headers=headers)

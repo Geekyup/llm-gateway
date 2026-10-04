@@ -1,4 +1,5 @@
 import logging
+import re
 import time
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
@@ -10,6 +11,13 @@ import httpx
 from app.core.exceptions import ProviderRequestError
 
 logger = logging.getLogger(__name__)
+
+_SAFE_SEGMENT = re.compile(r"^[A-Za-z0-9._:\-]+$")
+
+OPENAI_COMPATIBLE_ROUTES: tuple[tuple[str, re.Pattern[str]], ...] = (
+    ("POST", re.compile(r"v1/(?:chat/completions|completions|embeddings)")),
+    ("GET", re.compile(r"v1/models(?:/.+)?")),
+)
 
 
 @dataclass(frozen=True, slots=True)
@@ -29,6 +37,16 @@ class ModelInfo:
 
 class Provider:
     name: ClassVar[str]
+    ALLOWED_ROUTES: ClassVar[tuple[tuple[str, re.Pattern[str]], ...]] = ()
+
+    def is_path_allowed(self, method: str, path: str) -> bool:
+        segments = path.split("/")
+        if any(seg in ("", ".", "..") or not _SAFE_SEGMENT.match(seg) for seg in segments):
+            return False
+        return any(
+            allowed_method == method.upper() and pattern.fullmatch(path)
+            for allowed_method, pattern in self.ALLOWED_ROUTES
+        )
 
     async def forward(
         self, *, key: str, path: str, method: str,

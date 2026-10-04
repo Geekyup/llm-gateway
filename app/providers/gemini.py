@@ -1,4 +1,5 @@
 import logging
+import re
 from typing import ClassVar
 
 import httpx
@@ -14,6 +15,15 @@ _QUOTA_EXHAUSTED_STATUSES = {"RESOURCE_EXHAUSTED"}
 class GeminiProvider(HTTPProvider):
     name: ClassVar[str] = "gemini"
     _MODELS_PATH: ClassVar[str] = "v1beta/models"
+    ALLOWED_ROUTES: ClassVar[tuple[tuple[str, re.Pattern[str]], ...]] = (
+        ("GET", re.compile(r"v1(?:beta)?/models(?:/[^/]+)?")),
+        (
+            "POST",
+            re.compile(
+                r"v1(?:beta)?/models/[^/:]+:(?:generateContent|streamGenerateContent|countTokens|embedContent|batchEmbedContents)"
+            ),
+        ),
+    )
 
     def __init__(self, client: httpx.AsyncClient | None = None) -> None:
         settings = get_settings()
