@@ -51,7 +51,7 @@ async def google_callback(
     except InactiveUserError:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="This account has been deactivated")
 
-    frontend_url = settings.CORS_ORIGINS[0] if settings.CORS_ORIGINS else "/"
+    frontend_url = settings.FRONTEND_URL.rstrip("/")
     return RedirectResponse(
         f"{frontend_url}/#access_token={pair.access_token}&refresh_token={pair.refresh_token}"
     )

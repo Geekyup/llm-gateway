@@ -12,6 +12,7 @@ from app.auth.jwt import (
     hash_refresh_token,
 )
 from app.auth.service import AuthService
+from app.config import get_settings
 from app.core.exceptions import InactiveUserError, TokenRevokedError
 
 
@@ -179,7 +180,7 @@ async def test_refresh_reuse_of_revoked_token_revokes_whole_session(auth_service
 @pytest.mark.asyncio
 async def test_refresh_with_expired_token_raises(auth_service):
     with patch("app.auth.jwt.get_settings") as mock_settings:
-        mock_settings.return_value.JWT_SECRET_KEY = "test-jwt-secret-key"
+        mock_settings.return_value.JWT_SECRET_KEY = get_settings().JWT_SECRET_KEY
         mock_settings.return_value.JWT_ALGORITHM = "HS256"
         mock_settings.return_value.REFRESH_TOKEN_EXPIRE_DAYS = -1  
         expired_refresh = create_refresh_token(user_id=1)

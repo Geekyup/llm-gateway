@@ -1,6 +1,7 @@
 from functools import lru_cache
 
-from pydantic import Field, PostgresDsn, RedisDsn
+from cryptography.fernet import Fernet
+from pydantic import Field, PostgresDsn, RedisDsn, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -21,18 +22,31 @@ class Settings(BaseSettings):
     def CORS_ORIGINS(self) -> list[str]:
         return [origin.strip() for origin in self.CORS_ORIGINS_RAW.split(",") if origin.strip()]
 
-    DATABASE_URL: PostgresDsn = "postgresql+asyncpg://llm_gateway:llm_gateway@localhost:5432/llm_gateway"
+    FRONTEND_URL: str = "http://localhost:5173"
+
+    DATABASE_URL: PostgresDsn
     DB_ECHO: bool = False
 
     REDIS_URL: RedisDsn = "redis://localhost:6379/0"
 
     ENCRYPTION_KEY: str
-    ADMIN_API_KEY: str
-    JWT_SECRET_KEY: str
-    SESSION_SECRET_KEY: str
+    ADMIN_API_KEY: str = Field(min_length=32)
+    JWT_SECRET_KEY: str = Field(min_length=32)
+    SESSION_SECRET_KEY: str = Field(min_length=32)
+
+    @field_validator("ENCRYPTION_KEY")
+    @classmethod
+    def _validate_encryption_key(cls, value: str) -> str:
+        try:
+            Fernet(value.encode())
+        except ValueError as exc:
+            raise ValueError("ENCRYPTION_KEY must be a valid Fernet key (32 url-safe base64-encoded bytes)") from exc
+        return value
 
     KEY_STATUS_CACHE_TTL_SECONDS: int = 30
     GATEWAY_MAX_RETRY_ATTEMPTS: int = 3
+    GATEWAY_RATE_LIMIT_PER_MINUTE: int = Field(default=120, ge=0)
+    MAX_REQUEST_BODY_BYTES: int = Field(default=10 * 1024 * 1024, ge=1)
     DEFAULT_DAILY_LIMIT: int = 1_000
 
     GEMINI_BASE_URL: str = "https://generativelanguage.googleapis.com"
