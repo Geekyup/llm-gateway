@@ -45,10 +45,10 @@ jobs:
 
     env:
       ENCRYPTION_KEY: "kQ80G5wq1v3o2r7m6b8p3s5t9u1w4y6a8c0e2g4i6k8="
-      ADMIN_API_KEY: "test-admin-key"
+      ADMIN_API_KEY: "test-admin-key-0123456789abcdef0123456789"
       DATABASE_URL: "postgresql+asyncpg://test:test@localhost:5432/test"
-      JWT_SECRET_KEY: "test-jwt-secret-key"
-      SESSION_SECRET_KEY: "test-session-secret-key"
+      JWT_SECRET_KEY: "test-jwt-secret-key-0123456789abcdef0123456789"
+      SESSION_SECRET_KEY: "test-session-secret-key-0123456789abcdef0123456789"
       REDIS_URL: "redis://localhost:6379/0"
 
     steps:
