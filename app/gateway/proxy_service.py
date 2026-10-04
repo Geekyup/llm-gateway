@@ -178,6 +178,38 @@ class GatewayService:
             raise NoAvailableKeysError(provider=provider_label)
         return dto
 
+    async def _begin_attempt(
+        self,
+        *,
+        user_id: int,
+        request_id: str,
+        attempt: int,
+        provider_type: ProviderType | None,
+        model: str | None,
+        tried_key_ids: set[int],
+        last_provider_type: ProviderType | None,
+        build_request: RequestSpecBuilder,
+    ) -> tuple[Provider, _AttemptContext]:
+        dto = await self._select_next_key(
+            user_id=user_id,
+            request_id=request_id,
+            attempt=attempt,
+            provider_type=provider_type,
+            model=model,
+            tried_key_ids=tried_key_ids,
+            last_provider_type=last_provider_type,
+        )
+        tried_key_ids.add(dto.id)
+        ctx = _AttemptContext(
+            user_id=user_id,
+            request_id=request_id,
+            attempt=attempt,
+            dto=dto,
+            spec=build_request(dto),
+            effective_model=dto.model or model or self._default_models.get(dto.provider),
+        )
+        return get_provider(dto.provider.value), ctx
+
     async def _record_network_error(
         self, ctx: _AttemptContext, exc: httpx.HTTPError, latency_ms: int
     ) -> None:
@@ -204,8 +236,7 @@ class GatewayService:
         dto = ctx.dto
         key_provider_type = dto.provider
 
-        is_key_invalid = getattr(provider, "is_key_invalid", None)
-        if is_key_invalid is not None and is_key_invalid(response):
+        if provider.is_key_invalid(response):
             await self._key_pool.record_invalid(dto.id, ctx.user_id, key_provider_type)
             await self._emit_attempt(
                 ctx, outcome="invalid", upstream_status=response.status_code, latency_ms=latency_ms
@@ -296,7 +327,7 @@ class GatewayService:
         last_provider_type: ProviderType | None = provider_type
 
         for attempt in range(1, self._max_attempts + 1):
-            dto = await self._select_next_key(
+            provider, ctx = await self._begin_attempt(
                 user_id=user_id,
                 request_id=request_id,
                 attempt=attempt,
@@ -304,21 +335,11 @@ class GatewayService:
                 model=model,
                 tried_key_ids=tried_key_ids,
                 last_provider_type=last_provider_type,
+                build_request=build_request,
             )
-            tried_key_ids.add(dto.id)
-
+            dto, spec = ctx.dto, ctx.spec
             key_provider_type = dto.provider
             last_provider_type = key_provider_type
-            provider: Provider = get_provider(key_provider_type.value)
-            spec = build_request(dto)
-            ctx = _AttemptContext(
-                user_id=user_id,
-                request_id=request_id,
-                attempt=attempt,
-                dto=dto,
-                spec=spec,
-                effective_model=dto.model or model or self._default_models.get(key_provider_type),
-            )
 
             started = time.monotonic()
             try:
@@ -370,7 +391,7 @@ class GatewayService:
         last_provider_type: ProviderType | None = provider_type
 
         for attempt in range(1, self._max_attempts + 1):
-            dto = await self._select_next_key(
+            provider, ctx = await self._begin_attempt(
                 user_id=user_id,
                 request_id=request_id,
                 attempt=attempt,
@@ -378,21 +399,11 @@ class GatewayService:
                 model=model,
                 tried_key_ids=tried_key_ids,
                 last_provider_type=last_provider_type,
+                build_request=build_request,
             )
-            tried_key_ids.add(dto.id)
-
+            dto, spec = ctx.dto, ctx.spec
             key_provider_type = dto.provider
             last_provider_type = key_provider_type
-            provider: Provider = get_provider(key_provider_type.value)
-            spec = build_request(dto)
-            ctx = _AttemptContext(
-                user_id=user_id,
-                request_id=request_id,
-                attempt=attempt,
-                dto=dto,
-                spec=spec,
-                effective_model=dto.model or model or self._default_models.get(key_provider_type),
-            )
 
             started = time.monotonic()
             async with AsyncExitStack() as stack:

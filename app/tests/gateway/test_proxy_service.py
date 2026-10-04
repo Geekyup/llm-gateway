@@ -11,6 +11,7 @@ from app.keys.selector import RoundRobinSelector
 from app.keys.service import KeyPoolService
 from app.monitoring.models import RequestEventRecord
 from app.monitoring.publisher import RequestEventPublisher, drain_event_queue
+from app.providers.base import Provider
 
 
 async def _recent_events(session, redis, user_id: int, limit: int = 10) -> list[RequestEventRecord]:
@@ -32,7 +33,7 @@ async def _recent_events(session, redis, user_id: int, limit: int = 10) -> list[
     return list(result.scalars().all())
 
 
-class ScriptedProvider:
+class ScriptedProvider(Provider):
     def __init__(self, status_codes: list[int | Exception]) -> None:
         self._status_codes = iter(status_codes)
         self.calls: list[str] = []
@@ -51,7 +52,7 @@ class ScriptedProvider:
         return response.status_code == 403
 
 
-class UsageMetadataProvider:
+class UsageMetadataProvider(Provider):
     def __init__(self, usage_metadata: dict | None = None) -> None:
         self._usage_metadata = usage_metadata
 
@@ -68,7 +69,7 @@ class UsageMetadataProvider:
         return response.status_code == 403
 
 
-class ScriptedStreamProvider:
+class ScriptedStreamProvider(Provider):
     
     def __init__(self, status_codes: list[int | Exception], bodies: list[bytes] | None = None) -> None:
         self._status_codes = iter(status_codes)
