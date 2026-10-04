@@ -1,8 +1,9 @@
 import pytest
 
+from app.core.exceptions import DuplicateKeyError
 from app.keys.cache import KeyStatusCache
 from app.keys.enums import KeyStatus, ProviderType
-from app.keys.schemas import APIKeyCreate
+from app.keys.schemas import APIKeyBulkCreate, APIKeyCreate
 from app.keys.selector import RoundRobinSelector
 from app.keys.service import KeyPoolService
 
@@ -200,3 +201,114 @@ async def test_key_at_daily_limit_is_never_a_candidate(key_pool, key_repo, test_
     candidates = await key_pool.get_candidate_keys(test_user.id, ProviderType.GEMINI)
 
     assert candidates == []
+
+
+@pytest.mark.asyncio
+async def test_create_key_rejects_duplicate_raw_key_for_same_provider(key_pool, test_user):
+    await _create_key(key_pool, test_user.id, "k1")
+
+    with pytest.raises(DuplicateKeyError):
+        await key_pool.create_key(
+            test_user.id,
+            APIKeyCreate(label="again", provider=ProviderType.GEMINI, raw_key="raw-k1", daily_limit=100),
+        )
+
+
+@pytest.mark.asyncio
+async def test_same_raw_key_is_allowed_for_another_provider_and_user(key_pool, test_user, other_user):
+    await _create_key(key_pool, test_user.id, "k1")
+
+    await key_pool.create_key(
+        test_user.id,
+        APIKeyCreate(label="grp", provider=ProviderType.GROQ, raw_key="raw-k1", daily_limit=100),
+    )
+    await key_pool.create_key(
+        other_user.id,
+        APIKeyCreate(label="theirs", provider=ProviderType.GEMINI, raw_key="raw-k1", daily_limit=100),
+    )
+
+
+@pytest.mark.asyncio
+async def test_bulk_create_skips_duplicates_in_batch_and_existing(key_pool, test_user):
+    await _create_key(key_pool, test_user.id, "existing")
+
+    result = await key_pool.create_keys_bulk(
+        test_user.id,
+        APIKeyBulkCreate(
+            provider=ProviderType.GEMINI,
+            raw_keys="raw-existing, new-a\nnew-b new-a",
+            label_prefix="Bulk",
+            daily_limit=50,
+        ),
+    )
+
+    assert [k.label for k in result.created] == ["Bulk 2", "Bulk 3"]
+    assert result.skipped_duplicates == 2
+    assert result.errors == []
+
+
+@pytest.mark.asyncio
+async def test_bulk_create_commits_once(key_pool, key_repo, db_session, test_user):
+    from sqlalchemy import event
+
+    commits = []
+    event.listen(db_session.sync_session, "after_commit", lambda session: commits.append(1))
+
+    await key_pool.create_keys_bulk(
+        test_user.id,
+        APIKeyBulkCreate(
+            provider=ProviderType.GEMINI, raw_keys="k1 k2 k3 k4", label_prefix="B", daily_limit=10
+        ),
+    )
+
+    assert len(commits) == 1
+
+
+@pytest.mark.asyncio
+async def test_bulk_create_falls_back_when_a_concurrent_insert_wins_the_race(
+    key_pool, key_repo, test_user, monkeypatch
+):
+    from sqlalchemy.exc import IntegrityError
+
+    async def losing_create_many(items):
+        await key_repo.create(**items[0])
+        raise IntegrityError("insert", {}, Exception("duplicate"))
+
+    monkeypatch.setattr(key_repo, "create_many", losing_create_many)
+
+    result = await key_pool.create_keys_bulk(
+        test_user.id,
+        APIKeyBulkCreate(
+            provider=ProviderType.GEMINI, raw_keys="k1 k2", label_prefix="B", daily_limit=10
+        ),
+    )
+
+    assert len(result.created) == 1
+    assert result.skipped_duplicates == 1
+    assert result.errors == []
+
+
+@pytest.mark.asyncio
+async def test_candidates_without_provider_span_all_providers(key_pool, test_user):
+    gemini = await _create_key(key_pool, test_user.id, "gem")
+    groq = await key_pool.create_key(
+        test_user.id,
+        APIKeyCreate(label="grq", provider=ProviderType.GROQ, raw_key="raw-grq", daily_limit=100),
+    )
+
+    candidates = await key_pool.get_candidate_keys(test_user.id, None)
+
+    assert {c.id for c in candidates} == {gemini.id, groq.id}
+
+
+@pytest.mark.asyncio
+async def test_select_key_without_provider_round_robins_across_providers(key_pool, test_user):
+    await _create_key(key_pool, test_user.id, "gem")
+    await key_pool.create_key(
+        test_user.id,
+        APIKeyCreate(label="grq", provider=ProviderType.GROQ, raw_key="raw-grq", daily_limit=100),
+    )
+
+    picked = {(await key_pool.select_key(test_user.id, None)).provider for _ in range(4)}
+
+    assert picked == {ProviderType.GEMINI, ProviderType.GROQ}

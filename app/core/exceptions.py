@@ -30,6 +30,11 @@ class KeyNotFoundError(LLMGatewayError):
     detail = "API key with id={key_id} not found"
 
 
+class DuplicateKeyError(LLMGatewayError):
+    status_code = 409
+    detail = "This API key is already added for provider '{provider}'"
+
+
 class ProviderNotSupportedError(LLMGatewayError):
     status_code = 404
     slug = "provider_not_supported"

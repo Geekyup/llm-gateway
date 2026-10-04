@@ -1,9 +1,10 @@
 from datetime import UTC, datetime
 
 from sqlalchemy import select, update
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.exceptions import KeyNotFoundError
+from app.core.exceptions import DuplicateKeyError, KeyNotFoundError
 from app.keys.enums import KeyStatus, ProviderType
 from app.keys.models import APIKey
 
@@ -21,20 +22,59 @@ class APIKeyRepository:
         key_encrypted: str,
         daily_limit: int,
         model: str | None = None,
+        key_hash: str | None = None,
     ) -> APIKey:
-        key = APIKey(
+        key = self._build(
             user_id=user_id,
             label=label,
             provider=provider,
             key_encrypted=key_encrypted,
             daily_limit=daily_limit,
             model=model,
-            status=KeyStatus.ACTIVE,
+            key_hash=key_hash,
         )
         self._session.add(key)
-        await self._session.commit()
+        try:
+            await self._session.commit()
+        except IntegrityError as exc:
+            await self._session.rollback()
+            raise DuplicateKeyError(provider=provider.value) from exc
         await self._session.refresh(key)
         return key
+
+    async def create_many(self, items: list[dict]) -> list[APIKey]:
+        keys = [self._build(**item) for item in items]
+        self._session.add_all(keys)
+        try:
+            await self._session.commit()
+        except IntegrityError:
+            await self._session.rollback()
+            raise
+        for key in keys:
+            await self._session.refresh(key)
+        return keys
+
+    @staticmethod
+    def _build(
+        *,
+        user_id: int,
+        label: str,
+        provider: ProviderType,
+        key_encrypted: str,
+        daily_limit: int,
+        model: str | None = None,
+        key_hash: str | None = None,
+    ) -> APIKey:
+        return APIKey(
+            user_id=user_id,
+            label=label,
+            provider=provider,
+            key_encrypted=key_encrypted,
+            key_hash=key_hash,
+            daily_limit=daily_limit,
+            model=model,
+            status=KeyStatus.ACTIVE,
+        )
 
     async def get(self, key_id: int, user_id: int) -> APIKey:
         result = await self._session.execute(

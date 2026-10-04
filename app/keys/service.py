@@ -5,6 +5,9 @@ import re
 from collections.abc import Collection, Sequence
 from datetime import UTC, datetime, timedelta
 
+from sqlalchemy.exc import IntegrityError
+
+from app.core.exceptions import DuplicateKeyError
 from app.core.security import decrypt_key, encrypt_key
 from app.keys.cache import KeyStatusCache
 from app.keys.enums import KeyStatus, ProviderType
@@ -49,6 +52,7 @@ class KeyPoolService:
             label=payload.label,
             provider=payload.provider,
             key_encrypted=encrypted,
+            key_hash=self._fingerprint(payload.raw_key),
             daily_limit=payload.daily_limit,
             model=payload.model,
         )
@@ -58,41 +62,53 @@ class KeyPoolService:
     async def create_keys_bulk(self, user_id: int, payload: APIKeyBulkCreate) -> APIKeyBulkCreateResult:
         raw_candidates = [c.strip() for c in re.split(r"[\s,]+", payload.raw_keys) if c.strip()]
 
-        seen_in_batch: set[str] = set()
         existing = await self._repo.list_all(user_id=user_id, provider=payload.provider)
-        existing_raw_by_hash = {self._fingerprint(decrypt_key(k.key_encrypted)) for k in existing}
+        known_hashes = {k.key_hash for k in existing if k.key_hash is not None}
 
-        created = []
-        errors: list[APIKeyBulkCreateError] = []
         skipped_duplicates = 0
-        seq = len(existing) + 1
-
+        pending: list[tuple[str, str]] = []
         for raw_key in raw_candidates:
-            fp = self._fingerprint(raw_key)
-            if fp in seen_in_batch or fp in existing_raw_by_hash:
+            fingerprint = self._fingerprint(raw_key)
+            if fingerprint in known_hashes:
                 skipped_duplicates += 1
                 continue
-            seen_in_batch.add(fp)
+            known_hashes.add(fingerprint)
+            pending.append((raw_key, fingerprint))
 
+        def build_item(raw_key: str, fingerprint: str, seq: int) -> dict:
+            return {
+                "user_id": user_id,
+                "label": f"{payload.label_prefix} {seq}",
+                "provider": payload.provider,
+                "key_encrypted": encrypt_key(raw_key),
+                "key_hash": fingerprint,
+                "daily_limit": payload.daily_limit,
+                "model": payload.model,
+            }
+
+        first_seq = len(existing) + 1
+        created = []
+        errors: list[APIKeyBulkCreateError] = []
+
+        if pending:
             try:
-                key = await self._repo.create(
-                    user_id=user_id,
-                    label=f"{payload.label_prefix} {seq}",
-                    provider=payload.provider,
-                    key_encrypted=encrypt_key(raw_key),
-                    daily_limit=payload.daily_limit,
-                    model=payload.model,
+                created = await self._repo.create_many(
+                    [build_item(raw, fp, first_seq + i) for i, (raw, fp) in enumerate(pending)]
                 )
-                created.append(key)
-                seq += 1
-            except Exception as exc:
-                logger.warning("bulk key create failed: %s", exc)
-                errors.append(
-                    APIKeyBulkCreateError(
-                        raw_key_preview=self._preview(raw_key),
-                        detail=str(exc),
-                    )
-                )
+            except IntegrityError:
+                logger.info("bulk key insert hit a concurrent duplicate, falling back to per-key inserts")
+                seq = first_seq
+                for raw_key, fingerprint in pending:
+                    try:
+                        created.append(await self._repo.create(**build_item(raw_key, fingerprint, seq)))
+                        seq += 1
+                    except DuplicateKeyError:
+                        skipped_duplicates += 1
+                    except Exception as exc:
+                        logger.warning("bulk key create failed: %s", exc)
+                        errors.append(
+                            APIKeyBulkCreateError(raw_key_preview=self._preview(raw_key), detail=str(exc))
+                        )
 
         if created:
             await self._cache.invalidate(user_id, payload.provider.value)
@@ -166,14 +182,7 @@ class KeyPoolService:
     async def reset_daily_counters(self, provider: ProviderType | None = None):
         return await self._repo.reset_daily_counters(provider=provider)
 
-    async def get_candidate_keys(
-        self,
-        user_id: int,
-        provider: ProviderType,
-        *,
-        model: str | None = None,
-        exclude_ids: Collection[int] = (),
-    ) -> list[APIKeyDTO]:
+    async def _active_keys(self, user_id: int, provider: ProviderType) -> list[APIKeyDTO]:
         active = await self._cache.get_active(user_id, provider.value)
         if active is None:
             rows = await self._repo.list_active(user_id=user_id, provider=provider)
@@ -192,8 +201,21 @@ class KeyPoolService:
                 for row in rows
             ]
             await self._cache.set_active(user_id, provider.value, active)
+        return active
 
-        candidates = active
+    async def get_candidate_keys(
+        self,
+        user_id: int,
+        provider: ProviderType | None,
+        *,
+        model: str | None = None,
+        exclude_ids: Collection[int] = (),
+    ) -> list[APIKeyDTO]:
+        providers = [provider] if provider is not None else list(ProviderType)
+        candidates: list[APIKeyDTO] = []
+        for item in providers:
+            candidates.extend(await self._active_keys(user_id, item))
+
         if model is not None:
             candidates = [dto for dto in candidates if dto.model is None or dto.model == model]
         if exclude_ids:
@@ -203,7 +225,7 @@ class KeyPoolService:
     async def select_key(
         self,
         user_id: int,
-        provider: ProviderType,
+        provider: ProviderType | None,
         *,
         model: str | None = None,
         exclude_ids: Collection[int] = (),
@@ -211,7 +233,8 @@ class KeyPoolService:
         candidates = await self.get_candidate_keys(
             user_id, provider, model=model, exclude_ids=exclude_ids
         )
-        return await self._selector.select(user_id, provider.value, candidates)
+        scope = provider.value if provider is not None else "any"
+        return await self._selector.select(user_id, scope, candidates)
 
     async def record_success(self, key_id: int, user_id: int, provider: ProviderType) -> bool:
         key = await self._repo.increment_usage(key_id, user_id=user_id)

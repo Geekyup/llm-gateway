@@ -21,6 +21,7 @@ class APIKey(TimestampMixin, Base):
         index=True,
     )
     key_encrypted: Mapped[str] = mapped_column(String(512), nullable=False)
+    key_hash: Mapped[str | None] = mapped_column(String(64), nullable=True)
     model: Mapped[str | None] = mapped_column(String(128), nullable=True)
     status: Mapped[KeyStatus] = mapped_column(
         Enum(KeyStatus, name="key_status", native_enum=False, length=32),
@@ -38,6 +39,7 @@ class APIKey(TimestampMixin, Base):
 
     __table_args__ = (
         Index("ix_api_keys_user_provider_status", "user_id", "provider", "status"),
+        Index("uq_api_keys_user_provider_hash", "user_id", "provider", "key_hash", unique=True),
     )
 
     def __repr__(self) -> str:  # pragma: no cover - debug convenience only
