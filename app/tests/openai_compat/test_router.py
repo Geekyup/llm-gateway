@@ -297,3 +297,79 @@ async def test_stream_upstream_error_does_not_record_tokens():
 
     assert response.status_code == 429
     assert gateway.recorded_tokens == []
+
+class _FakeUpstream:
+    def __init__(self, lines: list[str]) -> None:
+        self.status_code = 200
+        self._lines = lines
+
+    async def aiter_lines(self):
+        for line in self._lines:
+            yield line
+
+
+class _StreamingGateway:
+    def __init__(self, lines: list[str]) -> None:
+        self._upstream = _FakeUpstream(lines)
+        self.recorded: list[tuple] = []
+
+    def proxy_stream_request(self, **kwargs):
+        from contextlib import asynccontextmanager
+
+        @asynccontextmanager
+        async def ctx():
+            async def record_tokens(prompt, completion, total):
+                self.recorded.append((prompt, completion, total))
+
+            yield self._upstream, record_tokens, ProviderType.GROQ
+
+        return ctx()
+
+
+@pytest.mark.asyncio
+async def test_stream_records_event_when_client_disconnects_midway():
+    from app.openai_compat.router import _open_and_relay_stream
+
+    lines = [
+        'data: {"choices": []}',
+        'data: {"usage": {"prompt_tokens": 3, "completion_tokens": 4, "total_tokens": 7}}',
+        "data: [DONE]",
+    ]
+    gateway = _StreamingGateway(lines)
+    generator = _open_and_relay_stream(
+        gateway,
+        user_id=1,
+        provider_type=ProviderType.GROQ,
+        requested_model=None,
+        default_gemini_model="g",
+        build_request=lambda dto: None,
+    )
+
+    await generator.__anext__()
+    await generator.aclose()
+
+    assert gateway.recorded == [(None, None, None)]
+
+
+@pytest.mark.asyncio
+async def test_stream_records_usage_after_full_consumption():
+    from app.openai_compat.router import _open_and_relay_stream
+
+    lines = [
+        'data: {"usage": {"prompt_tokens": 3, "completion_tokens": 4, "total_tokens": 7}}',
+        "data: [DONE]",
+    ]
+    gateway = _StreamingGateway(lines)
+    generator = _open_and_relay_stream(
+        gateway,
+        user_id=1,
+        provider_type=ProviderType.GROQ,
+        requested_model=None,
+        default_gemini_model="g",
+        build_request=lambda dto: None,
+    )
+
+    chunks = [chunk async for chunk in generator]
+
+    assert len(chunks) == 2
+    assert gateway.recorded == [(3, 4, 7)]

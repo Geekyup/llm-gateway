@@ -1,7 +1,10 @@
 import json
 import logging
 import uuid
+from collections.abc import AsyncIterator
 
+import anyio
+import httpx
 from fastapi import APIRouter, Depends
 from fastapi.responses import JSONResponse, StreamingResponse
 
@@ -13,7 +16,7 @@ from app.core.exceptions import (
     UpstreamExhaustedError,
 )
 from app.gateway.dependencies import require_gateway_token
-from app.gateway.proxy_service import GatewayService, UpstreamRequestSpec
+from app.gateway.proxy_service import GatewayService, RequestSpecBuilder, UpstreamRequestSpec
 from app.keys.enums import ProviderType
 from app.keys.schemas import APIKeyDTO
 from app.openai_compat.schemas import (
@@ -126,8 +129,8 @@ async def _handle_non_streaming(
     provider_type: ProviderType | None,
     requested_model: str | None,
     default_gemini_model: str,
-    build_request,
-):
+    build_request: RequestSpecBuilder,
+) -> JSONResponse:
     try:
         upstream_response, answered_by = await gateway.proxy_request(
             user_id=user_id,
@@ -177,8 +180,8 @@ async def _handle_streaming(
     provider_type: ProviderType | None,
     requested_model: str | None,
     default_gemini_model: str,
-    build_request,
-):
+    build_request: RequestSpecBuilder,
+) -> JSONResponse | StreamingResponse:
     generator = _open_and_relay_stream(
         gateway,
         user_id=user_id,
@@ -220,8 +223,8 @@ async def _open_and_relay_stream(
     provider_type: ProviderType | None,
     requested_model: str | None,
     default_gemini_model: str,
-    build_request,
-):
+    build_request: RequestSpecBuilder,
+) -> AsyncIterator[str]:
     async with gateway.proxy_stream_request(
         user_id=user_id,
         build_request=build_request,
@@ -245,13 +248,17 @@ async def _open_and_relay_stream(
         else:
             relay = _relay_openai_stream(upstream_response, usage=usage)
 
-        async for chunk in relay:
-            yield chunk
+        try:
+            async for chunk in relay:
+                yield chunk
+        finally:
+            with anyio.CancelScope(shield=True):
+                await record_tokens(
+                    usage["prompt_tokens"], usage["completion_tokens"], usage["total_tokens"]
+                )
 
-        await record_tokens(usage["prompt_tokens"], usage["completion_tokens"], usage["total_tokens"])
 
-
-async def _relay_openai_stream(upstream_response, *, usage: dict[str, int | None]):
+async def _relay_openai_stream(upstream_response: httpx.Response, *, usage: dict[str, int | None]):
     async for line in upstream_response.aiter_lines():
         if not line:
             continue
@@ -271,7 +278,7 @@ async def _relay_openai_stream(upstream_response, *, usage: dict[str, int | None
         yield f"{line}\n\n"
 
 
-async def _relay_gemini_stream(upstream_response, *, model: str, usage: dict[str, int | None]):
+async def _relay_gemini_stream(upstream_response: httpx.Response, *, model: str, usage: dict[str, int | None]):
     completion_id = f"chatcmpl-{uuid.uuid4().hex}"
 
     def chunk(delta: ChatCompletionChunkDelta, finish_reason: str | None = None) -> str:
