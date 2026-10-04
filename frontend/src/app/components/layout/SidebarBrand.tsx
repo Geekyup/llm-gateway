@@ -1,6 +1,6 @@
 export function SidebarBrand() {
   return (
-    <div className="flex items-center px-5 h-14 shrink-0" style={{ borderBottom: "1px solid color-mix(in srgb, var(--ink) 6%, transparent)" }}>
+    <div className="flex items-center px-5 h-14 shrink-0" style={{ borderBottom: "1px solid var(--line)" }}>
       <span
         className="font-mono font-semibold"
         style={{ fontSize: "20px", letterSpacing: "0.01em", lineHeight: 1 }}

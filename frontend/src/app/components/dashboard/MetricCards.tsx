@@ -1,6 +1,18 @@
-import { KeyRound, CheckCircle2, Clock } from "lucide-react";
+import { Activity, CheckCircle2, Clock } from "lucide-react";
 import type { AK } from "../../types";
-import { alpha } from "../../lib/domain";
+
+const CARD_STYLE = { background: "var(--card)", border: "1px solid var(--line)" } as const;
+
+function IconBox({ children }: { children: React.ReactNode }) {
+  return (
+    <div
+      className="w-7 h-7 rounded-md flex items-center justify-center"
+      style={{ background: "color-mix(in srgb, var(--ink) 6%, transparent)" }}
+    >
+      {children}
+    </div>
+  );
+}
 
 export function MetricCards({ keys }: { keys: AK[] }) {
   const total = keys.length;
@@ -9,55 +21,47 @@ export function MetricCards({ keys }: { keys: AK[] }) {
   const req = keys.reduce((a, k) => a + k.used, 0);
   const capacity = keys.reduce((a, k) => a + k.limit, 0);
   const pct = capacity > 0 ? Math.min(100, (req / capacity) * 100) : 0;
-  const usageColor = pct >= 90 ? "var(--bad)" : pct >= 70 ? "var(--warn)" : "var(--accent)";
+  const pctLabel = pct > 0 && pct < 1 ? "<1%" : `${Math.round(pct)}%`;
 
-  const smallCards = [
-    { label: "Active Keys",      val: `${active}/${total}`, color: "var(--accent)", Icon: CheckCircle2 },
-    { label: "In Cooldown",      val: String(cool),         color: "var(--warn)", Icon: Clock        },
-  ] as const;
+  // Цвет — только когда есть что сигнализировать.
+  const usageColor = pct >= 90 ? "var(--bad)" : pct >= 70 ? "var(--warn)" : "var(--ink)";
+  const barColor = pct >= 90 ? "var(--bad)" : pct >= 70 ? "var(--warn)" : "var(--accent)";
+  const activeColor = total > 0 && active === 0 ? "var(--bad)" : active < total ? "var(--warn)" : "var(--ink)";
 
   return (
-    <div className="grid grid-cols-1 sm:grid-cols-[1.6fr_1fr_1fr] gap-3">
-      <div
-        className="rounded-lg p-4 duration-300"
-        style={{ background: "var(--card)", border: "1px solid color-mix(in srgb, var(--ink) 6%, transparent)" }}
-      >
-        <div className="flex items-center justify-between mb-3">
-          <span className="text-[12px] text-ink-3 font-medium">Today's Usage</span>
-          <div className="w-6 h-6 rounded-md flex items-center justify-center" style={{ background: alpha(usageColor, 8) }}>
-            <KeyRound size={12} color={usageColor} />
-          </div>
+    <div className="grid grid-cols-1 md:grid-cols-[2fr_1fr_1fr] gap-4">
+      <div className="rounded-lg p-5" style={CARD_STYLE}>
+        <div className="flex items-center justify-between mb-4">
+          <span className="text-[13px] text-ink-2 font-medium">Today's usage</span>
+          <IconBox><Activity size={14} color="var(--ink-3)" /></IconBox>
         </div>
-        <div className="flex items-baseline gap-1.5 mb-3">
-          <span className="text-2xl font-mono font-medium" style={{ color: usageColor }}>{req.toLocaleString()}</span>
-          <span className="text-xs font-mono text-ink-3">/ {capacity.toLocaleString()} requests</span>
+        <div className="flex items-baseline gap-2 mb-4">
+          <span className="text-3xl font-mono font-medium leading-none" style={{ color: usageColor }}>{req.toLocaleString()}</span>
+          <span className="text-[13px] font-mono text-ink-3">/ {capacity.toLocaleString()} requests</span>
+          <span className="ml-auto text-[13px] font-mono text-ink-3">{pctLabel}</span>
         </div>
-        <div className="h-[3px] rounded-full overflow-hidden" style={{ background: "color-mix(in srgb, var(--ink) 6%, transparent)" }}>
-          <div className="h-full rounded-full transition-all duration-500" style={{ width: `${pct}%`, background: usageColor }} />
+        <div className="h-1.5 rounded-full overflow-hidden" style={{ background: "color-mix(in srgb, var(--ink) 10%, transparent)" }}>
+          <div className="h-full rounded-full transition-all duration-500" style={{ width: `${pct}%`, background: barColor }} />
         </div>
       </div>
 
-      {smallCards.map((c, i) => (
-        <div
-          key={c.label}
-          className="rounded-lg p-4 transition-transform duration-200"
-          style={{
-            background: "var(--card)",
-            border: "1px solid color-mix(in srgb, var(--ink) 6%, transparent)",
-            animationDuration: "300ms",
-            animationDelay: `${(i + 1) * 40}ms`,
-            animationFillMode: "backwards",
-          }}
-        >
-          <div className="flex items-center justify-between mb-3">
-            <span className="text-[12px] text-ink-3 font-medium">{c.label}</span>
-            <div className="w-6 h-6 rounded-md flex items-center justify-center" style={{ background: alpha(c.color, 8) }}>
-              <c.Icon size={12} color={c.color} />
-            </div>
-          </div>
-          <span className="text-2xl font-mono font-medium" style={{ color: "var(--ink)" }}>{c.val}</span>
+      <div className="rounded-lg p-5" style={CARD_STYLE}>
+        <div className="flex items-center justify-between mb-4">
+          <span className="text-[13px] text-ink-2 font-medium">Active keys</span>
+          <IconBox><CheckCircle2 size={14} color="var(--ink-3)" /></IconBox>
         </div>
-      ))}
+        <div className="text-3xl font-mono font-medium leading-none mb-4" style={{ color: activeColor }}>{active}<span className="text-ink-3">/{total}</span></div>
+        <div className="text-[13px] text-ink-3">{total === 0 ? "No keys yet" : active === total ? "All keys healthy" : `${total - active} unavailable`}</div>
+      </div>
+
+      <div className="rounded-lg p-5" style={CARD_STYLE}>
+        <div className="flex items-center justify-between mb-4">
+          <span className="text-[13px] text-ink-2 font-medium">In cooldown</span>
+          <IconBox><Clock size={14} color="var(--ink-3)" /></IconBox>
+        </div>
+        <div className="text-3xl font-mono font-medium leading-none mb-4" style={{ color: cool > 0 ? "var(--warn)" : "var(--ink)" }}>{cool}</div>
+        <div className="text-[13px] text-ink-3">{cool === 0 ? "No rate limits hit" : "Waiting for reset"}</div>
+      </div>
     </div>
   );
 }

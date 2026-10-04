@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { Loader2, AlertTriangle, CheckCircle2 } from "lucide-react";
 import { api, ApiError, type UserRead } from "./lib/api";
-import { toAK } from "./lib/domain";
+import { toAK, PROVIDER_META } from "./lib/domain";
 import { usePolling } from "./lib/usePolling";
 import type { AK, FormState, PF, SF, View } from "./types";
 import { Sidebar } from "./components/layout/Sidebar";
@@ -15,6 +15,13 @@ import { KeyDetailDrawer } from "./components/dashboard/KeyDetailDrawer";
 import { ActivityPage } from "./components/activity/ActivityPage";
 import { ChatPlayground } from "./components/playground/ChatPlayground";
 import { GatewayAccessPanel } from "./components/access/GatewayAccessPanel";
+
+const VIEW_TITLES: Record<View, string> = {
+  dashboard: "Dashboard",
+  activity: "Activity",
+  playground: "Chat",
+  access: "Gateway Access",
+};
 
 export function Dashboard({ user, onLogout }: { user: UserRead | null; onLogout: () => void }) {
   const [keys, setKeys] = useState<AK[]>([]);
@@ -81,7 +88,7 @@ export function Dashboard({ user, onLogout }: { user: UserRead | null; onLogout:
           return;
         }
         await api.createKey({
-          label: form.label || "New Key",
+          label: form.label.trim() || form.model.trim() || `${PROVIDER_META[form.provider]?.name ?? form.provider} key`,
           provider: form.provider,
           raw_key: form.rawKey.trim(),
           daily_limit: Number(form.limit) || 15000,
@@ -162,9 +169,9 @@ export function Dashboard({ user, onLogout }: { user: UserRead | null; onLogout:
       {menuOpen && <MobileSidebarDrawer view={view} onView={setView} onClose={() => setMenuOpen(false)} />}
 
       <div className="flex-1 flex flex-col min-w-0">
-        <TopBar onAdd={() => setAddOpen(true)} onBulkAdd={() => setBulkAddOpen(true)} operational={operational} onLogout={onLogout} userEmail={user?.email} onMenu={() => setMenuOpen(true)} />
+        <TopBar onAdd={() => setAddOpen(true)} onBulkAdd={() => setBulkAddOpen(true)} operational={operational} onLogout={onLogout} userEmail={user?.email} onMenu={() => setMenuOpen(true)} title={VIEW_TITLES[view]} />
 
-        <main className="flex-1 px-3 sm:px-6 py-4 sm:py-5 w-full max-w-[1400px] mx-auto space-y-4">
+        <main className="flex-1 px-3 sm:px-6 lg:px-8 py-4 sm:py-6 w-full space-y-4">
           {loadError && (
             <div className="flex items-center gap-2 px-4 py-2.5 rounded-lg text-xs" style={{ background: "color-mix(in srgb, var(--bad) 8%, transparent)", color: "var(--destructive)", border: "1px solid color-mix(in srgb, var(--bad) 20%, transparent)" }}>
               <AlertTriangle size={13} className="shrink-0" />
@@ -179,7 +186,7 @@ export function Dashboard({ user, onLogout }: { user: UserRead | null; onLogout:
           ) : (
             <>
               {view === "dashboard" && (
-                <div key="dashboard" className="space-y-4 duration-300 ease-out">
+                <div key="dashboard" className="space-y-5 duration-300 ease-out">
                   <MetricCards keys={keys} />
                   <KeysTable
                     keys={keys}

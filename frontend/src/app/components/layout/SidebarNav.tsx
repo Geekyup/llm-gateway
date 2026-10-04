@@ -38,8 +38,8 @@ export function SidebarNav({ view, onView }: { view: View; onView: (v: View) => 
         ))}
       </div>
 
-      <div className="my-3 mx-3" style={{ borderTop: "1px solid color-mix(in srgb, var(--ink) 6%, transparent)" }} />
-      <div className="px-3 mb-1.5 text-[12px] font-semibold text-ink-4">Settings</div>
+      <div className="my-3 mx-3" style={{ borderTop: "1px solid var(--line)" }} />
+      <div className="px-3 mb-1.5 text-[13px] font-semibold text-ink-4">Settings</div>
 
       <div className="flex flex-col gap-0.5">
         {SETTINGS_ITEMS.map((item) => (

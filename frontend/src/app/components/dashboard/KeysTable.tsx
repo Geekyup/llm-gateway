@@ -72,17 +72,17 @@ export function KeysTable({
   const desktopFlipRef = useFlipAnimation<HTMLDivElement>(grouped);
 
   return (
-    <div className="rounded-lg overflow-hidden" style={{ border: "1px solid color-mix(in srgb, var(--ink) 6%, transparent)" }}>
-      <div className="flex flex-wrap items-center justify-between gap-x-2 gap-y-2 px-4 py-2.5" style={{ borderBottom: "1px solid color-mix(in srgb, var(--ink) 4.8%, transparent)", background: "var(--sidebar)" }}>
-        <span className="text-xs font-medium text-ink-2 shrink-0">API Keys</span>
-        <div className="flex items-end gap-2 sm:gap-3 min-w-0 flex-wrap sm:flex-nowrap">
-          <div className="relative hidden sm:block mb-[1px]">
+    <div className="rounded-lg overflow-hidden" style={{ border: "1px solid var(--line)" }}>
+      <div className="flex flex-wrap items-center justify-between gap-x-2 gap-y-2 px-4 py-3" style={{ borderBottom: "1px solid var(--line)", background: "var(--sidebar)" }}>
+        <span className="flex items-center gap-2 text-sm font-semibold text-ink shrink-0">API keys<span className="text-[12px] font-mono font-normal text-ink-3 px-1.5 py-0.5 rounded" style={{ background: "color-mix(in srgb, var(--ink) 7%, transparent)" }}>{keys.length}</span></span>
+        <div className="flex items-center gap-2 min-w-0 flex-wrap sm:flex-nowrap">
+          <div className="relative hidden sm:block">
             <Search size={12} color="var(--ink-4)" className="absolute left-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
             <input
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               placeholder="Search keys..."
-              className="text-[12px] rounded-md pl-7 pr-2.5 py-1 outline-none w-[150px] focus:w-[190px] transition-all"
+              className="text-[13px] rounded-md pl-7 pr-2.5 py-1.5 outline-none w-[170px] focus:w-[220px] transition-all"
               style={{ color: "var(--ink)", background: "color-mix(in srgb, var(--ink) 6%, transparent)", border: "1px solid color-mix(in srgb, var(--ink) 8.4%, transparent)" }}
             />
           </div>
@@ -90,7 +90,7 @@ export function KeysTable({
           <StatusFilterDropdown filter={statusFilter} onFilter={onStatusFilter} />
           <button
             onClick={() => setGrouped((g) => !g)}
-            className="flex items-center justify-center w-[26px] h-[26px] rounded-md transition-all mb-[1px]"
+            className="flex items-center justify-center gap-1.5 h-[30px] px-2 rounded-md transition-all text-[13px] font-medium"
             style={{
               background: grouped ? "color-mix(in srgb, var(--accent) 12%, transparent)" : "color-mix(in srgb, var(--ink) 6%, transparent)",
               border: `1px solid ${grouped ? "color-mix(in srgb, var(--accent) 28%, transparent)" : "color-mix(in srgb, var(--ink) 8.4%, transparent)"}`,
@@ -99,6 +99,7 @@ export function KeysTable({
             aria-label={grouped ? "Show flat list" : "Group by provider"}
           >
             <LayoutGrid size={13} color={grouped ? "var(--accent)" : "var(--ink-3)"} />
+            <span className="hidden sm:inline" style={{ color: grouped ? "var(--accent)" : "var(--ink-2)" }}>Group</span>
           </button>
         </div>
       </div>
@@ -106,11 +107,11 @@ export function KeysTable({
       {filtered.length === 0 ? (
         <div className="px-4 py-16 text-center" style={{ background: "var(--card)" }}>
           <div className="flex flex-col items-center gap-3">
-            <div className="w-10 h-10 rounded-lg flex items-center justify-center" style={{ background: "color-mix(in srgb, var(--ink) 3%, transparent)", border: "1px solid color-mix(in srgb, var(--ink) 6%, transparent)" }}>
+            <div className="w-10 h-10 rounded-lg flex items-center justify-center" style={{ background: "color-mix(in srgb, var(--ink) 3%, transparent)", border: "1px solid var(--line)" }}>
               <KeyRound size={18} color="var(--ink-4)" />
             </div>
             <p className="text-sm text-ink-3">No keys found</p>
-            <p className="text-xs text-ink-3">
+            <p className="text-[13px] text-ink-3">
               {keys.length === 0 ? "Add your first API key to get started" : "Try a different search or filter"}
             </p>
           </div>
@@ -122,9 +123,9 @@ export function KeysTable({
               ? (
                 <div className="flex flex-col gap-2 p-2.5">
                   {groups.map((g) => (
-                    <div key={g.provider} className="rounded-lg overflow-hidden" style={{ border: "1px solid color-mix(in srgb, var(--ink) 7.2%, transparent)", background: "var(--sidebar)" }}>
+                    <div key={g.provider} className="rounded-lg overflow-hidden" style={{ border: "1px solid var(--line)", background: "var(--sidebar)" }}>
                       <ProviderGroupHeader provider={g.provider} keys={g.items} />
-                      <div className="divide-y divide-ink/[0.03]" style={{ borderTop: "1px solid color-mix(in srgb, var(--ink) 4.8%, transparent)" }}>
+                      <div className="divide-y divide-ink/[0.03]" style={{ borderTop: "1px solid var(--line)" }}>
                         {g.items.map((k) => (
                           <MobileKeyRow key={k.id} k={k} now={now} checkingIds={checkingIds} onSelect={onSelect} onEdit={onEdit} onToggle={onToggle} onCheck={onCheck} />
                         ))}
@@ -146,9 +147,9 @@ export function KeysTable({
             {grouped ? (
               <div className="flex flex-col gap-2.5 p-2.5">
                 {groups.map((g) => (
-                  <div key={g.provider} className="rounded-lg overflow-hidden" style={{ border: "1px solid color-mix(in srgb, var(--ink) 7.2%, transparent)", background: "var(--sidebar)" }}>
+                  <div key={g.provider} className="rounded-lg overflow-hidden" style={{ border: "1px solid var(--line)", background: "var(--sidebar)" }}>
                     <ProviderGroupHeader provider={g.provider} keys={g.items} />
-                    <div className="overflow-x-auto" style={{ borderTop: "1px solid color-mix(in srgb, var(--ink) 4.8%, transparent)" }}>
+                    <div className="overflow-x-auto" style={{ borderTop: "1px solid var(--line)" }}>
                       <table className="w-full min-w-[760px]" style={{ tableLayout: "fixed" }}>
                         <ColumnWidths />
                         <tbody className="divide-y divide-ink/[0.03]">
@@ -168,7 +169,7 @@ export function KeysTable({
                   <thead>
                     <tr style={{ borderBottom: "1px solid color-mix(in srgb, var(--ink) 4.2%, transparent)" }}>
                       {["Label", "Provider", "Status", "Usage", "Ping", "Last Used", ""].map((h, i) => (
-                        <th key={i} className="px-4 py-2.5 text-left text-[12px] font-semibold text-ink-3">
+                        <th key={i} className="px-4 py-2.5 text-left text-[13px] font-medium text-ink-3">
                           {h}
                         </th>
                       ))}
@@ -213,10 +214,10 @@ function MobileKeyRow({
     <div data-flip-id={k.id} className="px-4 py-3.5 transition-colors active:bg-ink/[0.03] cursor-pointer" onClick={() => onSelect(k.id)}>
       <div className="flex items-start justify-between gap-2 mb-2">
         <div className="min-w-0">
-          <div className="text-sm font-medium text-ink leading-none truncate">{k.label}</div>
-          <div className="text-[12px] font-mono text-ink-3 mt-1 truncate">
+          <div className="text-sm font-medium text-ink leading-tight truncate">{k.label}</div>
+          <div className="text-[13px] font-mono text-ink-3 mt-1 truncate">
             {k.masked}
-            {k.model && <span className="text-ink-4"> · {k.model}</span>}
+            {k.model && <span className="text-ink-2"> · {k.model}</span>}
           </div>
         </div>
         <div className="flex items-center gap-1 shrink-0" onClick={(e) => e.stopPropagation()}>
@@ -237,13 +238,13 @@ function MobileKeyRow({
       </div>
       <UsageBar used={k.used} limit={k.limit} status={k.status} />
       <div className="flex items-center justify-between mt-2.5">
-        <span className="text-[12px] text-ink-3">
+        <span className="text-[13px] text-ink-3">
           Ping: <span className="font-mono" style={{ color: pingMeta(k.pingMs).color }}>{pingMeta(k.pingMs).text}</span>
           <span className="text-ink-4"> · </span>
           Last used: <span className="font-mono text-ink-3">{k.lastUsed ? rel(k.lastUsed, now) : "—"}</span>
         </span>
         {k.cooldownUntil ? (
-          <span className="text-[12px] font-mono" style={{ color: "var(--warn)" }}>
+          <span className="text-[13px] font-mono" style={{ color: "var(--warn)" }}>
             {cd(k.cooldownUntil, now)}
           </span>
         ) : null}
@@ -260,32 +261,32 @@ function DesktopKeyRow({
 }) {
   return (
     <tr data-flip-id={k.id} className="group cursor-pointer transition-colors hover:bg-ink/[0.02]" onClick={() => onSelect(k.id)}>
-      <td className="px-4 py-3 min-w-0">
-        <div className="text-sm font-medium text-ink leading-none truncate">{k.label}</div>
-        <div className="text-[12px] font-mono text-ink-3 mt-1 truncate">
+      <td className="px-4 py-3.5 min-w-0">
+        <div className="text-sm font-medium text-ink leading-tight truncate">{k.label}</div>
+        <div className="text-[13px] font-mono text-ink-3 mt-1 truncate">
           {k.masked}
-          {k.model && <span className="text-ink-4"> · {k.model}</span>}
+          {k.model && <span className="text-ink-2"> · {k.model}</span>}
         </div>
       </td>
-      <td className="px-4 py-3"><ProviderBadge provider={k.provider} /></td>
-      <td className="px-4 py-3">
+      <td className="px-4 py-3.5"><ProviderBadge provider={k.provider} /></td>
+      <td className="px-4 py-3.5">
         <StatusBadge status={k.status} cooldownText={k.cooldownUntil ? cd(k.cooldownUntil, now) : undefined} />
       </td>
-      <td className="px-4 py-3"><UsageBar used={k.used} limit={k.limit} status={k.status} /></td>
-      <td className="px-4 py-3">
+      <td className="px-4 py-3.5"><UsageBar used={k.used} limit={k.limit} status={k.status} /></td>
+      <td className="px-4 py-3.5">
         <span
-          className="text-xs font-mono"
+          className="text-[13px] font-mono"
           style={{ color: pingMeta(k.pingMs).color }}
           title={k.pingAt ? `Checked ${rel(k.pingAt, now)}` : "Not checked yet"}
         >
           {pingMeta(k.pingMs).text}
         </span>
       </td>
-      <td className="px-4 py-3">
-        <span className="text-xs font-mono text-ink-3">{k.lastUsed ? rel(k.lastUsed, now) : "—"}</span>
+      <td className="px-4 py-3.5">
+        <span className="text-[13px] font-mono text-ink-3">{k.lastUsed ? rel(k.lastUsed, now) : "—"}</span>
       </td>
-      <td className="px-4 py-3">
-        <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity" onClick={(e) => e.stopPropagation()}>
+      <td className="px-4 py-3.5">
+        <div className="flex items-center gap-1 opacity-50 group-hover:opacity-100 transition-opacity" onClick={(e) => e.stopPropagation()}>
           <button onClick={() => onCheck(k.id)} disabled={checkingIds.has(k.id)} className="p-1.5 rounded-md transition-colors hover:bg-ink/5 disabled:opacity-50" title="Test key">
             {checkingIds.has(k.id) ? <Loader2 size={13} color="var(--ink-3)" className="animate-spin" /> : <Stethoscope size={13} color="var(--ink-3)" />}
           </button>

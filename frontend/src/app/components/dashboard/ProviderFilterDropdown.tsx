@@ -29,10 +29,9 @@ export function ProviderFilterDropdown({ filter, onFilter }: { filter: PF; onFil
 
   return (
     <div className="relative" ref={ref}>
-      <div className="text-[12px] text-ink-3 mb-1">Provider</div>
       <button
         onClick={() => setOpen((o) => !o)}
-        className="flex items-center gap-1 sm:gap-1.5 px-2 sm:px-2.5 py-1 rounded-md text-[12px] font-medium transition-all whitespace-nowrap hover:brightness-125"
+        className="flex items-center gap-1 sm:gap-1.5 px-2 sm:px-2.5 py-1.5 rounded-md text-[13px] font-medium transition-all whitespace-nowrap hover:brightness-125"
         style={{
           color: "var(--ink)",
           background: active ? PROVIDER_META[filter].bg : "color-mix(in srgb, var(--ink) 6%, transparent)",
@@ -58,7 +57,7 @@ export function ProviderFilterDropdown({ filter, onFilter }: { filter: PF; onFil
               <button
                 key={f}
                 onClick={() => { onFilter(f); setOpen(false); }}
-                className="group w-full flex items-center justify-between gap-2 text-left px-3 py-2 text-xs transition-colors hover:bg-ink/10"
+                className="group w-full flex items-center justify-between gap-2 text-left px-3 py-2 text-[13px] transition-colors hover:bg-ink/10"
                 style={{ background: isSelected ? "color-mix(in srgb, var(--ink) 4.2%, transparent)" : "transparent" }}
               >
                 <span className="flex items-center gap-1.5">

@@ -7,7 +7,7 @@
   --font-mono: "Geist Mono", ui-monospace, SFMono-Regular, monospace;
   --background: #131311;
   --foreground: #ECE9E1;
-  --card: #1A1A17;
+  --card: #1D1D1A;
   --card-foreground: #ECE9E1;
   --popover: #1F1F1B;
   --popover-foreground: #ECE9E1;
@@ -25,13 +25,14 @@
   --destructive-foreground: #FFFFFF;
   --ink: #ECE9E1;
   --ink-2: #C2BFB5;
-  --ink-3: #8D8A80;
-  --ink-4: #5F5D55;
+  --ink-3: #A3A097;
+  --ink-4: #7C7970;
   --field: #24241F;
   --ok: #00D68F;
   --warn: #E0A04A;
   --bad: #EF6B55;
   --border: rgba(236, 233, 225, 0.12);
+  --line: rgba(236, 233, 225, 0.11);
   --input: rgba(236, 233, 225, 0.06);
   --input-background: #1F1F1B;
   --switch-background: #5F5D55;
