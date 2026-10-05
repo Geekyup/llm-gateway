@@ -6,12 +6,14 @@ export function ChartCard({
   unit,
   children,
   footer,
+  heightClass = "h-[220px] sm:h-[240px]",
 }: {
   title: string;
   value: string | number;
   unit?: string;
   children: ReactNode;
   footer?: ReactNode;
+  heightClass?: string;
 }) {
   return (
     <div
@@ -25,7 +27,7 @@ export function ChartCard({
           {unit && <span className="text-[12px] text-ink-3 font-normal"> {unit}</span>}
         </span>
       </div>
-      <div className="h-[220px] sm:h-[240px]">{children}</div>
+      <div className={heightClass}>{children}</div>
       {footer && <div className="flex justify-end mt-2.5">{footer}</div>}
     </div>
   );

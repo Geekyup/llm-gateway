@@ -34,7 +34,7 @@ export function alpha(color: string, percent: number): string {
 export function pingMeta(ms: number | undefined): { text: string; color: string } {
   if (ms === undefined) return { text: "—", color: "var(--ink-4)" };
   const text = `${ms} ms`;
-  if (ms < 300) return { text, color: "var(--ok)" };
+  if (ms < 300) return { text, color: "var(--ink-2)" };
   if (ms < 1000) return { text, color: "var(--warn)" };
   return { text, color: "var(--bad)" };
 }
@@ -54,6 +54,12 @@ export const PROVIDER_NAMES: Record<Provider, { name: string }> = {
   openrouter: { name: "OpenRouter" },
   groq:       { name: "Groq"       },
 };
+
+export function defaultKeyLabel(provider: Provider, model: string | null | undefined): string {
+  const name = PROVIDER_NAMES[provider].name;
+  const trimmed = model?.trim();
+  return trimmed ? `${name} · ${trimmed}` : name;
+}
 
 export const OUTCOME_META: Record<string, { text: string; color: string; bg: string }> = {
   success:            { text: "success",            color: "var(--ok)", bg: "color-mix(in srgb, var(--ok) 10%, transparent)" },

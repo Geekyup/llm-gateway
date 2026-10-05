@@ -3,7 +3,7 @@ import {
   X, Eye, EyeOff, Shield, AlertTriangle, ChevronDown, CheckCircle2, Search, Loader2,
 } from "lucide-react";
 import { api, ApiError, type ModelOption } from "../../lib/api";
-import { PROVIDER_NAMES } from "../../lib/domain";
+import { PROVIDER_NAMES, defaultKeyLabel } from "../../lib/domain";
 import { ProviderIcon } from "../shared/ProviderIcon";
 import type { AK, FormState, Provider } from "../../types";
 
@@ -119,7 +119,7 @@ export function AddEditModal({
             <input
               className="w-full px-3 py-2 rounded-lg text-sm outline-none transition-all"
               style={baseInp}
-              placeholder="Production Primary"
+              placeholder={editKey ? "Label" : defaultKeyLabel(form.provider, form.model)}
               value={form.label}
               onChange={(e) => setForm({ ...form, label: e.target.value })}
               onFocus={focus}

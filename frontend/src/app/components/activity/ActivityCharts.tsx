@@ -38,13 +38,23 @@ function shortDate(iso: string): string {
   return new Intl.DateTimeFormat("ru-RU", { day: "2-digit", month: "2-digit", timeZone: "UTC" }).format(d);
 }
 
-export function RequestsByOutcomeChart({ buckets, loading }: { buckets: DailyOutcomeBucket[]; loading: boolean }) {
+export function RequestsByOutcomeChart({
+  buckets,
+  loading,
+  title = "Requests by day",
+  heightClass,
+}: {
+  buckets: DailyOutcomeBucket[];
+  loading: boolean;
+  title?: string;
+  heightClass?: string;
+}) {
   const data = buckets.map((b) => ({ ...b, label: shortDate(b.date) }));
   const total = buckets.reduce((a, b) => a + b.success + b.rate_limited + b.error, 0);
   const hasData = total > 0;
 
   return (
-    <ChartCard title="Requests by day" value={total.toLocaleString()} unit="total">
+    <ChartCard title={title} value={total.toLocaleString()} unit="total" heightClass={heightClass}>
       {loading ? (
         <LoadingChart />
       ) : hasData ? (

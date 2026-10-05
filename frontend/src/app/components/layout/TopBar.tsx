@@ -7,7 +7,6 @@ export function TopBar({
   onLogout,
   userEmail,
   onMenu,
-  title,
 }: {
   onAdd: () => void;
   onBulkAdd: () => void;
@@ -15,34 +14,32 @@ export function TopBar({
   onLogout: () => void;
   userEmail?: string | null;
   onMenu: () => void;
-  title: string;
 }) {
   return (
     <header
-      className="flex items-center justify-between h-14 shrink-0 px-3 sm:px-6 gap-3"
+      className="h-14 shrink-0"
       style={{ borderBottom: "1px solid var(--border)", background: "var(--background)" }}
     >
+      <div className="flex items-center justify-between h-full w-full max-w-[1400px] mx-auto px-3 sm:px-6 gap-3">
       <div className="flex items-center gap-2">
         <button onClick={onMenu} className="md:hidden p-1.5 -ml-1.5 rounded-lg transition-colors hover:bg-ink/5 shrink-0">
           <Menu size={18} color="var(--ink-2)" />
         </button>
-        <h1 className="text-[15px] font-semibold text-ink leading-none">{title}</h1>
         <span
-          className="inline-flex items-center gap-1.5 ml-2 px-2 py-1 rounded-full text-[12px] font-mono leading-none"
+          className="w-2 h-2 rounded-full shrink-0"
           style={{
-            color: operational ? "var(--ok)" : "var(--bad)",
-            background: `color-mix(in srgb, ${operational ? "var(--ok)" : "var(--bad)"} 10%, transparent)`,
+            background: operational ? "var(--ok)" : "var(--bad)",
           }}
-        >
-          <span className="w-1.5 h-1.5 rounded-full" style={{ background: operational ? "var(--ok)" : "var(--bad)" }} />
-          <span className="hidden sm:inline">{operational ? "Operational" : "Degraded"}</span>
+        />
+        <span className="hidden sm:inline text-xs font-mono" style={{ color: operational ? "var(--ink-3)" : "var(--bad)" }}>
+          {operational ? "Operational" : "Degraded"}
         </span>
       </div>
 
       <div className="flex items-center gap-3 sm:gap-4">
         <button
           onClick={onBulkAdd}
-          className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[13px] font-semibold transition-all active:scale-95"
+          className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all active:scale-95"
           style={{ background: "color-mix(in srgb, var(--ink) 4.2%, transparent)", color: "var(--ink)", border: "1px solid color-mix(in srgb, var(--ink) 8.4%, transparent)" }}
           onMouseEnter={(e) => {
             e.currentTarget.style.background = "color-mix(in srgb, var(--ink) 8.4%, transparent)";
@@ -57,19 +54,20 @@ export function TopBar({
         </button>
         <button
           onClick={onAdd}
-          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[13px] font-semibold transition-all active:scale-95"
+          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all active:scale-95"
           style={{ background: "var(--accent)", color: "var(--on-accent)", boxShadow: "none" }}
         >
           <Plus size={13} /> Add Key
         </button>
         {userEmail && (
-          <span className="hidden lg:inline text-[13px] font-mono truncate max-w-[160px]" style={{ color: "var(--ink-3)" }}>
+          <span className="hidden lg:inline text-[12px] font-mono truncate max-w-[160px]" style={{ color: "var(--ink-4)" }}>
             {userEmail}
           </span>
         )}
         <button onClick={onLogout} title="Sign out" className="p-1.5 rounded-lg transition-colors hover:bg-ink/5">
-          <LogOut size={14} color="var(--ink-3)" />
+          <LogOut size={14} color="var(--ink-4)" />
         </button>
+      </div>
       </div>
     </header>
   );
