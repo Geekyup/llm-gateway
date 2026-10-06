@@ -27,8 +27,28 @@ const RANGE_OPTIONS: { value: ActivityRange; label: string }[] = [
 
 const POLL_INTERVAL_MS = 20000;
 
+const RANGE_STORAGE_KEY = "keypool.activity.range";
+const DEFAULT_RANGE: ActivityRange = "7d";
+
+function loadStoredRange(): ActivityRange {
+  try {
+    const stored = localStorage.getItem(RANGE_STORAGE_KEY);
+    return RANGE_OPTIONS.some((o) => o.value === stored) ? (stored as ActivityRange) : DEFAULT_RANGE;
+  } catch {
+    return DEFAULT_RANGE;
+  }
+}
+
+function storeRange(range: ActivityRange): void {
+  try {
+    localStorage.setItem(RANGE_STORAGE_KEY, range);
+  } catch {
+    return;
+  }
+}
+
 export function ActivityPage() {
-  const [range, setRange] = useState<ActivityRange>("7d");
+  const [range, setRange] = useState<ActivityRange>(loadStoredRange);
 
   const [summary, setSummary] = useState<ActivitySummary | null>(null);
   const [dailyBuckets, setDailyBuckets] = useState<DailyOutcomeBucket[]>([]);
@@ -37,6 +57,11 @@ export function ActivityPage() {
   const [topModels, setTopModels] = useState<TopModelEntry[]>([]);
   const [loadingCharts, setLoadingCharts] = useState(true);
   const [logRefreshTick, setLogRefreshTick] = useState(0);
+
+  const handleRangeChange = useCallback((next: ActivityRange) => {
+    setRange(next);
+    storeRange(next);
+  }, []);
 
   const rangeRef = useRef(range);
   rangeRef.current = range;
@@ -75,7 +100,7 @@ export function ActivityPage() {
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <h2 className="text-sm font-medium text-ink-2">Activity</h2>
-        <RangeSwitch value={range} onChange={setRange} options={RANGE_OPTIONS} label="Activity time range" />
+        <RangeSwitch value={range} onChange={handleRangeChange} options={RANGE_OPTIONS} label="Activity time range" />
       </div>
 
       <ActivitySummaryCards summary={summary} />
@@ -91,4 +116,3 @@ export function ActivityPage() {
     </div>
   );
 }
-
