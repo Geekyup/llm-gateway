@@ -39,6 +39,9 @@ packages = ["app"]
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
 testpaths = ["app/tests"]
+markers = [
+    "integration: needs real PostgreSQL and Redis (TEST_DATABASE_URL, TEST_REDIS_URL)",
+]
 
 [tool.ruff]
 line-length = 100

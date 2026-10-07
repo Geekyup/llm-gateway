@@ -50,6 +50,8 @@ jobs:
       JWT_SECRET_KEY: "test-jwt-secret-key-0123456789abcdef0123456789"
       SESSION_SECRET_KEY: "test-session-secret-key-0123456789abcdef0123456789"
       REDIS_URL: "redis://localhost:6379/0"
+      TEST_DATABASE_URL: "postgresql+asyncpg://test:test@localhost:5432/test"
+      TEST_REDIS_URL: "redis://localhost:6379/1"
 
     steps:
       - uses: actions/checkout@v4
@@ -67,5 +69,11 @@ jobs:
       - name: Lint with ruff
         run: ruff check app
 
-      - name: Run tests
+      - name: Run tests on PostgreSQL and Redis
         run: pytest -v
+
+      - name: Run tests on SQLite without external services
+        env:
+          TEST_DATABASE_URL: ""
+          TEST_REDIS_URL: ""
+        run: pytest -q

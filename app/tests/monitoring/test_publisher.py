@@ -1,9 +1,13 @@
 from datetime import UTC, datetime, timedelta
 
 import pytest
+import pytest_asyncio
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.auth.models import User
+from app.keys.enums import KeyStatus, ProviderType
+from app.keys.models import APIKey
 from app.monitoring.models import RequestEventRecord
 from app.monitoring.publisher import (
     EVENTS_QUEUE_KEY,
@@ -13,6 +17,34 @@ from app.monitoring.publisher import (
     purge_old_request_events,
 )
 from app.monitoring.schemas import RequestEvent
+
+
+@pytest_asyncio.fixture
+async def db_session(db_session: AsyncSession) -> AsyncSession:
+    for user_id in (1, 2):
+        db_session.add(
+            User(
+                id=user_id,
+                google_sub=f"publisher-sub-{user_id}",
+                email=f"publisher-{user_id}@example.com",
+                display_name=f"Publisher {user_id}",
+            )
+        )
+    await db_session.flush()
+    for key_id in (1, 2):
+        db_session.add(
+            APIKey(
+                id=key_id,
+                user_id=1,
+                label=f"k{key_id}",
+                provider=ProviderType.GEMINI,
+                key_encrypted="ciphertext",
+                daily_limit=100,
+                status=KeyStatus.ACTIVE,
+            )
+        )
+    await db_session.commit()
+    return db_session
 
 
 def _event(

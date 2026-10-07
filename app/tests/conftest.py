@@ -9,14 +9,26 @@ os.environ.setdefault("SESSION_SECRET_KEY", "test-session-secret-key-0123456789a
 
 import pytest
 import pytest_asyncio
-from sqlalchemy import event
+from sqlalchemy import event, text
+from sqlalchemy.engine import make_url
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
+from sqlalchemy.pool import NullPool
 
 from app.auth.models import User
 from app.auth.repository import RefreshTokenRepository, UserRepository
 from app.db.base import Base
 from app.keys.repository import APIKeyRepository
+from app.monitoring.models import RequestEventRecord  # noqa: F401
 from app.tokens.repository import GatewayTokenRepository
+
+TEST_DATABASE_URL = os.environ.get("TEST_DATABASE_URL") or "sqlite+aiosqlite:///:memory:"
+USING_SQLITE = TEST_DATABASE_URL.startswith("sqlite")
+
+if not USING_SQLITE and "test" not in (make_url(TEST_DATABASE_URL).database or ""):
+    raise RuntimeError(
+        "TEST_DATABASE_URL must point to a database whose name contains 'test': "
+        "the test suite drops and recreates the whole public schema"
+    )
 
 
 def _register_date_trunc(dbapi_connection, connection_record) -> None:
@@ -45,18 +57,29 @@ def _register_date_trunc(dbapi_connection, connection_record) -> None:
 
 
 @pytest_asyncio.fixture
-async def db_session() -> AsyncSession:
-    engine = create_async_engine("sqlite+aiosqlite:///:memory:")
-    event.listen(engine.sync_engine, "connect", _register_date_trunc)
+async def db_engine():
+    if USING_SQLITE:
+        engine = create_async_engine(TEST_DATABASE_URL)
+        event.listen(engine.sync_engine, "connect", _register_date_trunc)
+    else:
+        engine = create_async_engine(TEST_DATABASE_URL, poolclass=NullPool)
 
     async with engine.begin() as conn:
+        if not USING_SQLITE:
+            await conn.execute(text("DROP SCHEMA public CASCADE"))
+            await conn.execute(text("CREATE SCHEMA public"))
         await conn.run_sync(Base.metadata.create_all)
 
-    session_factory = async_sessionmaker(engine, expire_on_commit=False)
-    async with session_factory() as session:
-        yield session
+    yield engine
 
     await engine.dispose()
+
+
+@pytest_asyncio.fixture
+async def db_session(db_engine) -> AsyncSession:
+    session_factory = async_sessionmaker(db_engine, expire_on_commit=False)
+    async with session_factory() as session:
+        yield session
 
 
 @pytest_asyncio.fixture
