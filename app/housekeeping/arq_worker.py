@@ -20,7 +20,7 @@ from app.housekeeping.tasks import (
 
 async def startup(ctx: dict) -> None:
     settings = get_settings()
-    configure_logging(debug=settings.DEBUG)
+    configure_logging(debug=settings.DEBUG, fmt=settings.LOG_FORMAT)
 
 
 async def shutdown(ctx: dict) -> None:

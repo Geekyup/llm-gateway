@@ -19,6 +19,7 @@ dependencies = [
     "PyJWT>=2.15.1",
     "Authlib>=1.8.0",
     "itsdangerous>=2.2.0",
+    "prometheus-client>=0.21.0",
 ]
 
 [project.optional-dependencies]
@@ -60,3 +61,4 @@ ignore = [
 
 "app/tests/**" = ["S101"]
 "app/keys/service.py" = ["BLE001"]
+"app/core/system_router.py" = ["BLE001"]

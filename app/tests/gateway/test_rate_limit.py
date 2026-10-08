@@ -1,6 +1,7 @@
 import pytest
 from fastapi import Depends, FastAPI, HTTPException
 from fastapi.testclient import TestClient
+from prometheus_client import REGISTRY
 
 from app.api.deps import get_gateway_token_service
 from app.config import Settings, get_settings
@@ -71,3 +72,14 @@ def test_invalid_token_does_not_consume_the_limit(fake_redis):
 
     assert client.get("/ping", headers={"authorization": "Bearer bad"}).status_code == 401
     assert client.get("/ping", headers={"authorization": "Bearer good"}).status_code == 200
+
+
+@pytest.mark.asyncio
+async def test_rejections_are_counted_in_metrics(fake_redis):
+    before = REGISTRY.get_sample_value("gateway_rate_limit_rejections_total") or 0.0
+    await _enforce_rate_limit(fake_redis, user_id=9, limit=1)
+
+    with pytest.raises(HTTPException):
+        await _enforce_rate_limit(fake_redis, user_id=9, limit=1)
+
+    assert (REGISTRY.get_sample_value("gateway_rate_limit_rejections_total") or 0.0) - before == 1

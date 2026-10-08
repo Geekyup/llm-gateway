@@ -12,6 +12,7 @@ from app.keys.enums import ProviderType
 from app.keys.factory import build_key_pool_service
 from app.keys.repository import APIKeyRepository
 from app.keys.service import KeyPoolService
+from app.monitoring.cache import ActivityCache
 from app.monitoring.publisher import RequestEventPublisher
 from app.tokens.repository import GatewayTokenRepository
 from app.tokens.service import GatewayTokenService
@@ -44,6 +45,13 @@ def get_event_publisher(
     redis: Annotated[Redis, Depends(get_redis)],
 ) -> RequestEventPublisher:
     return RequestEventPublisher(session=session, redis=redis)
+
+
+def get_activity_cache(
+    redis: Annotated[Redis, Depends(get_redis)],
+    settings: Annotated[Settings, Depends(get_settings)],
+) -> ActivityCache:
+    return ActivityCache(redis, settings.ACTIVITY_CACHE_TTL_SECONDS)
 
 
 def get_gateway_service(

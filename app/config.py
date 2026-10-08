@@ -1,4 +1,5 @@
 from functools import lru_cache
+from typing import Literal
 
 from cryptography.fernet import Fernet
 from pydantic import Field, PostgresDsn, RedisDsn, field_validator
@@ -15,6 +16,10 @@ class Settings(BaseSettings):
     APP_NAME: str = "llm-gateway"
     ENV: str = "local"
     DEBUG: bool = False
+    LOG_FORMAT: Literal["text", "json"] = "text"
+    METRICS_TOKEN: str = ""
+    READINESS_TIMEOUT_SECONDS: float = Field(default=2.0, gt=0)
+    ACTIVITY_CACHE_TTL_SECONDS: int = Field(default=30, ge=0)
 
     CORS_ORIGINS_RAW: str = Field(default="http://localhost:5173", alias="CORS_ORIGINS")
 

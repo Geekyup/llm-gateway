@@ -9,6 +9,8 @@ from datetime import UTC, datetime
 import httpx
 
 from app.core.exceptions import NoAvailableKeysError, UpstreamExhaustedError
+from app.core.metrics import observe_attempt
+from app.core.request_context import get_request_id
 from app.keys.enums import ProviderType
 from app.keys.schemas import APIKeyDTO
 from app.keys.service import KeyPoolService
@@ -84,6 +86,13 @@ class GatewayService:
         total_tokens: int | None = None,
         model: str | None = None,
     ) -> None:
+        observe_attempt(
+            provider=provider_type.value if provider_type is not None else "any",
+            outcome=outcome,
+            latency_ms=latency_ms,
+            prompt_tokens=prompt_tokens,
+            completion_tokens=completion_tokens,
+        )
         if self._events is None:
             return
         await self._events.publish(
@@ -322,7 +331,7 @@ class GatewayService:
         provider_type: ProviderType | None = None,
         model: str | None = None,
     ) -> tuple[httpx.Response, ProviderType]:
-        request_id = uuid.uuid4().hex
+        request_id = get_request_id() or uuid.uuid4().hex
         tried_key_ids: set[int] = set()
         last_provider_type: ProviderType | None = provider_type
 
@@ -386,7 +395,7 @@ class GatewayService:
         provider_type: ProviderType | None = None,
         model: str | None = None,
     ) -> AsyncIterator[tuple[httpx.Response, TokenRecorder, ProviderType]]:
-        request_id = uuid.uuid4().hex
+        request_id = get_request_id() or uuid.uuid4().hex
         tried_key_ids: set[int] = set()
         last_provider_type: ProviderType | None = provider_type
 

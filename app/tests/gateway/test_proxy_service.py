@@ -1,8 +1,10 @@
 import httpx
 import pytest
+from prometheus_client import REGISTRY
 from sqlalchemy import select
 
 from app.core.exceptions import NoAvailableKeysError, UpstreamExhaustedError
+from app.core.request_context import request_id_var
 from app.core.security import encrypt_key
 from app.gateway.proxy_service import GatewayService, UpstreamRequestSpec
 from app.keys.cache import KeyStatusCache
@@ -713,3 +715,76 @@ async def test_stream_error_raised_by_consumer_does_not_trigger_failover(key_poo
             raise httpx.ReadError("mid-stream")
 
     assert len(provider.calls) == 1
+
+
+def _sample(name: str, **labels) -> float:
+    return REGISTRY.get_sample_value(name, labels) or 0.0
+
+
+@pytest.mark.asyncio
+async def test_events_reuse_the_http_request_id_when_one_is_set(key_pool, db_session, fake_redis, test_user, _patch_registry):
+    await _create_active_key(key_pool, test_user.id, "k1")
+    await _create_active_key(key_pool, test_user.id, "k2")
+    _patch_registry(ScriptedProvider([429, 200]))
+    publisher = RequestEventPublisher(redis=fake_redis)
+    gateway = GatewayService(key_pool, max_attempts=3, event_publisher=publisher)
+
+    token = request_id_var.set("http-request-42")
+    try:
+        await gateway.proxy_request(
+            user_id=test_user.id, build_request=_build_request(), provider_type=ProviderType.GEMINI
+        )
+    finally:
+        request_id_var.reset(token)
+
+    events = await _recent_events(db_session, fake_redis, test_user.id)
+    assert {e.request_id for e in events} == {"http-request-42"}
+    assert sorted(e.attempt for e in events) == [1, 2]
+
+
+@pytest.mark.asyncio
+async def test_events_get_a_generated_request_id_outside_an_http_request(key_pool, db_session, fake_redis, test_user, _patch_registry):
+    await _create_active_key(key_pool, test_user.id, "k1")
+    _patch_registry(ScriptedProvider([200]))
+    publisher = RequestEventPublisher(redis=fake_redis)
+    gateway = GatewayService(key_pool, max_attempts=3, event_publisher=publisher)
+
+    await gateway.proxy_request(
+        user_id=test_user.id, build_request=_build_request(), provider_type=ProviderType.GEMINI
+    )
+
+    events = await _recent_events(db_session, fake_redis, test_user.id)
+    assert len(events) == 1
+    assert len(events[0].request_id) == 32
+
+
+@pytest.mark.asyncio
+async def test_attempt_metrics_are_recorded_per_outcome_even_without_an_event_publisher(key_pool, test_user, _patch_registry):
+    await _create_active_key(key_pool, test_user.id, "k1")
+    await _create_active_key(key_pool, test_user.id, "k2")
+    _patch_registry(ScriptedProvider([429, 200]))
+    gateway = GatewayService(key_pool, max_attempts=3)
+    limited = _sample("gateway_upstream_attempts_total", provider="gemini", outcome="rate_limited")
+    succeeded = _sample("gateway_upstream_attempts_total", provider="gemini", outcome="success")
+    latency_samples = _sample("gateway_upstream_latency_seconds_count", provider="gemini", outcome="success")
+
+    await gateway.proxy_request(
+        user_id=test_user.id, build_request=_build_request(), provider_type=ProviderType.GEMINI
+    )
+
+    assert _sample("gateway_upstream_attempts_total", provider="gemini", outcome="rate_limited") - limited == 1
+    assert _sample("gateway_upstream_attempts_total", provider="gemini", outcome="success") - succeeded == 1
+    assert _sample("gateway_upstream_latency_seconds_count", provider="gemini", outcome="success") - latency_samples == 1
+
+
+@pytest.mark.asyncio
+async def test_exhausted_pool_is_counted_as_an_attempt_without_latency(key_pool, test_user, _patch_registry):
+    gateway = GatewayService(key_pool, max_attempts=3)
+    before = _sample("gateway_upstream_attempts_total", provider="gemini", outcome="no_keys")
+
+    with pytest.raises(NoAvailableKeysError):
+        await gateway.proxy_request(
+            user_id=test_user.id, build_request=_build_request(), provider_type=ProviderType.GEMINI
+        )
+
+    assert _sample("gateway_upstream_attempts_total", provider="gemini", outcome="no_keys") - before == 1

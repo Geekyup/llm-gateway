@@ -80,7 +80,6 @@ pip install -e ".[dev]"
 alembic upgrade head
 uvicorn app.main:app --reload
 
-# в отдельном терминале — воркер
 arq app.housekeeping.arq_worker.WorkerSettings
 ```
 
@@ -102,7 +101,7 @@ from openai import OpenAI
 
 client = OpenAI(
     base_url="http://localhost:8000/v1",
-    api_key="<gateway-access-token>",  # создаётся в дашборде
+    api_key="<gateway-access-token>",  
 )
 
 response = client.chat.completions.create(
@@ -127,12 +126,6 @@ app/
 ├── auth/               Google OAuth, JWT-сессии
 ├── monitoring/        live-события через SSE, история активности
 └── housekeeping/       ARQ-воркер: сброс лимитов, снятие cooldown
-
-frontend/src/app/
-├── components/playground/   чат-плейграунд с реальным SSE-стримингом
-├── components/dashboard/    графики usage, статус ключей
-└── LandingPage.tsx           публичная страница для неавторизованных
-```
 
 ## Тесты
 

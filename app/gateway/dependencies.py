@@ -6,6 +6,7 @@ from redis.asyncio import Redis
 
 from app.api.deps import get_gateway_token_service
 from app.config import Settings, get_settings
+from app.core.metrics import RATE_LIMIT_REJECTIONS
 from app.db.redis import get_redis
 from app.tokens.service import GatewayTokenService
 
@@ -24,6 +25,7 @@ async def _enforce_rate_limit(redis: Redis, user_id: int, limit: int) -> None:
     if count == 1:
         await redis.expire(key, _WINDOW_SECONDS * 2)
     if count > limit:
+        RATE_LIMIT_REJECTIONS.inc()
         retry_after = _WINDOW_SECONDS - (now % _WINDOW_SECONDS)
         raise HTTPException(
             status_code=status.HTTP_429_TOO_MANY_REQUESTS,

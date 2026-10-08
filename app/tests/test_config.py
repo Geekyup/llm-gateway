@@ -38,3 +38,29 @@ def test_database_url_has_no_default_credentials(monkeypatch):
 
     with pytest.raises(ValidationError):
         Settings(_env_file=None, **values)
+
+
+def test_observability_defaults():
+    settings = _build()
+
+    assert settings.LOG_FORMAT == "text"
+    assert settings.METRICS_TOKEN == ""
+    assert settings.READINESS_TIMEOUT_SECONDS == 2.0
+    assert settings.ACTIVITY_CACHE_TTL_SECONDS == 30
+
+
+def test_log_format_only_accepts_text_or_json():
+    assert _build(LOG_FORMAT="json").LOG_FORMAT == "json"
+    with pytest.raises(ValidationError):
+        _build(LOG_FORMAT="xml")
+
+
+def test_cache_ttl_can_be_zero_but_not_negative():
+    assert _build(ACTIVITY_CACHE_TTL_SECONDS=0).ACTIVITY_CACHE_TTL_SECONDS == 0
+    with pytest.raises(ValidationError):
+        _build(ACTIVITY_CACHE_TTL_SECONDS=-1)
+
+
+def test_readiness_timeout_must_be_positive():
+    with pytest.raises(ValidationError):
+        _build(READINESS_TIMEOUT_SECONDS=0)

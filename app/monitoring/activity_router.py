@@ -5,9 +5,10 @@ import logging
 from fastapi import APIRouter, Depends, Query
 from fastapi.responses import StreamingResponse
 
-from app.api.deps import get_event_publisher
+from app.api.deps import get_activity_cache, get_event_publisher
 from app.auth.deps import get_current_user
 from app.auth.models import User
+from app.monitoring.cache import ActivityCache
 from app.monitoring.publisher import RequestEventPublisher
 from app.monitoring.schemas import (
     ActivityLogResponse,
@@ -30,8 +31,15 @@ async def summary(
     range: ActivityRange = Query(default="7d"),
     user: User = Depends(get_current_user),
     publisher: RequestEventPublisher = Depends(get_event_publisher),
+    cache: ActivityCache = Depends(get_activity_cache),
 ) -> ActivitySummary:
-    return await publisher.activity_summary(user.id, range)
+    return await cache.get_or_load(
+        user_id=user.id,
+        endpoint="summary",
+        params=range,
+        model=ActivitySummary,
+        loader=lambda: publisher.activity_summary(user.id, range),
+    )
 
 
 @router.get("/daily-timeseries", response_model=DailyTimeseriesResponse)
@@ -39,9 +47,18 @@ async def daily_timeseries(
     range: ActivityRange = Query(default="7d"),
     user: User = Depends(get_current_user),
     publisher: RequestEventPublisher = Depends(get_event_publisher),
+    cache: ActivityCache = Depends(get_activity_cache),
 ) -> DailyTimeseriesResponse:
-    buckets = await publisher.daily_timeseries(user.id, range)
-    return DailyTimeseriesResponse(range=range, buckets=buckets)
+    async def load() -> DailyTimeseriesResponse:
+        return DailyTimeseriesResponse(range=range, buckets=await publisher.daily_timeseries(user.id, range))
+
+    return await cache.get_or_load(
+        user_id=user.id,
+        endpoint="daily-timeseries",
+        params=range,
+        model=DailyTimeseriesResponse,
+        loader=load,
+    )
 
 
 @router.get("/latency-percentiles", response_model=LatencyPercentilesResponse)
@@ -49,9 +66,20 @@ async def latency_percentiles(
     range: ActivityRange = Query(default="7d"),
     user: User = Depends(get_current_user),
     publisher: RequestEventPublisher = Depends(get_event_publisher),
+    cache: ActivityCache = Depends(get_activity_cache),
 ) -> LatencyPercentilesResponse:
-    buckets = await publisher.latency_percentiles_daily(user.id, range)
-    return LatencyPercentilesResponse(range=range, buckets=buckets)
+    async def load() -> LatencyPercentilesResponse:
+        return LatencyPercentilesResponse(
+            range=range, buckets=await publisher.latency_percentiles_daily(user.id, range)
+        )
+
+    return await cache.get_or_load(
+        user_id=user.id,
+        endpoint="latency-percentiles",
+        params=range,
+        model=LatencyPercentilesResponse,
+        loader=load,
+    )
 
 
 @router.get("/tokens-by-provider", response_model=TokensByProviderResponse)
@@ -59,9 +87,20 @@ async def tokens_by_provider(
     range: ActivityRange = Query(default="7d"),
     user: User = Depends(get_current_user),
     publisher: RequestEventPublisher = Depends(get_event_publisher),
+    cache: ActivityCache = Depends(get_activity_cache),
 ) -> TokensByProviderResponse:
-    buckets = await publisher.tokens_by_provider_daily(user.id, range)
-    return TokensByProviderResponse(range=range, buckets=buckets)
+    async def load() -> TokensByProviderResponse:
+        return TokensByProviderResponse(
+            range=range, buckets=await publisher.tokens_by_provider_daily(user.id, range)
+        )
+
+    return await cache.get_or_load(
+        user_id=user.id,
+        endpoint="tokens-by-provider",
+        params=range,
+        model=TokensByProviderResponse,
+        loader=load,
+    )
 
 
 @router.get("/top-models", response_model=TopModelsResponse)
@@ -70,9 +109,18 @@ async def top_models(
     limit: int = Query(default=10, ge=1, le=50),
     user: User = Depends(get_current_user),
     publisher: RequestEventPublisher = Depends(get_event_publisher),
+    cache: ActivityCache = Depends(get_activity_cache),
 ) -> TopModelsResponse:
-    models = await publisher.top_models(user.id, range, limit=limit)
-    return TopModelsResponse(range=range, models=models)
+    async def load() -> TopModelsResponse:
+        return TopModelsResponse(range=range, models=await publisher.top_models(user.id, range, limit=limit))
+
+    return await cache.get_or_load(
+        user_id=user.id,
+        endpoint="top-models",
+        params=f"{range}:{limit}",
+        model=TopModelsResponse,
+        loader=load,
+    )
 
 
 @router.get("/log", response_model=ActivityLogResponse)
