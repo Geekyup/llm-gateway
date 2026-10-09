@@ -127,9 +127,10 @@ app/
 ├── monitoring/        live-события через SSE, история активности
 └── housekeeping/       ARQ-воркер: сброс лимитов, снятие cooldown
 
+```
+
 ## Тесты
 
 ```bash
 python -m pytest -v
 python -m ruff check app
-```
