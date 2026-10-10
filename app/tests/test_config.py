@@ -64,3 +64,38 @@ def test_cache_ttl_can_be_zero_but_not_negative():
 def test_readiness_timeout_must_be_positive():
     with pytest.raises(ValidationError):
         _build(READINESS_TIMEOUT_SECONDS=0)
+
+
+_PROD_OK = {
+    "ENV": "production",
+    "METRICS_TOKEN": "m" * 16,
+    "CORS_ORIGINS": "https://app.example.com",
+    "FRONTEND_URL": "https://app.example.com",
+    "GOOGLE_REDIRECT_URI": "https://api.example.com/auth/google/callback",
+    "GOOGLE_CLIENT_ID": "id",
+    "GOOGLE_CLIENT_SECRET": "secret",
+}
+
+
+def test_production_accepts_safe_config():
+    assert _build(**_PROD_OK).ENV == "production"
+
+
+@pytest.mark.parametrize(
+    "override",
+    [
+        {"DEBUG": True},
+        {"METRICS_TOKEN": ""},
+        {"CORS_ORIGINS": "http://localhost:5173"},
+        {"FRONTEND_URL": "http://localhost:5173"},
+        {"GOOGLE_REDIRECT_URI": "http://localhost:8000/auth/google/callback"},
+        {"GOOGLE_CLIENT_ID": ""},
+    ],
+)
+def test_production_rejects_unsafe_config(override):
+    with pytest.raises(ValidationError):
+        _build(**{**_PROD_OK, **override})
+
+
+def test_local_env_keeps_dev_defaults():
+    assert _build().ENV == "local"

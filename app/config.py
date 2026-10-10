@@ -2,7 +2,7 @@ from functools import lru_cache
 from typing import Literal
 
 from cryptography.fernet import Fernet
-from pydantic import Field, PostgresDsn, RedisDsn, field_validator
+from pydantic import Field, PostgresDsn, RedisDsn, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -14,7 +14,7 @@ class Settings(BaseSettings):
     )
 
     APP_NAME: str = "llm-gateway"
-    ENV: str = "local"
+    ENV: Literal["local", "staging", "production"] = "local"
     DEBUG: bool = False
     LOG_FORMAT: Literal["text", "json"] = "text"
     METRICS_TOKEN: str = ""
@@ -47,6 +47,28 @@ class Settings(BaseSettings):
         except ValueError as exc:
             raise ValueError("ENCRYPTION_KEY must be a valid Fernet key (32 url-safe base64-encoded bytes)") from exc
         return value
+
+    @model_validator(mode="after")
+    def _validate_production(self) -> "Settings":
+        if self.ENV != "production":
+            return self
+        problems: list[str] = []
+        if self.DEBUG:
+            problems.append("DEBUG must be false")
+        if not self.METRICS_TOKEN:
+            problems.append("METRICS_TOKEN must be set (/metrics would be public)")
+        local_markers = ("localhost", "127.0.0.1")
+        if any(m in o for o in self.CORS_ORIGINS for m in local_markers):
+            problems.append("CORS_ORIGINS must not contain localhost")
+        if any(m in self.FRONTEND_URL for m in local_markers):
+            problems.append("FRONTEND_URL must not point to localhost")
+        if any(m in self.GOOGLE_REDIRECT_URI for m in local_markers):
+            problems.append("GOOGLE_REDIRECT_URI must not point to localhost")
+        if not self.GOOGLE_CLIENT_ID or not self.GOOGLE_CLIENT_SECRET:
+            problems.append("GOOGLE_CLIENT_ID/GOOGLE_CLIENT_SECRET must be set")
+        if problems:
+            raise ValueError("Unsafe production configuration: " + "; ".join(problems))
+        return self
 
     KEY_STATUS_CACHE_TTL_SECONDS: int = 30
     GATEWAY_MAX_RETRY_ATTEMPTS: int = 3
