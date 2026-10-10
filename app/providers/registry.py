@@ -13,7 +13,17 @@ from app.providers.openrouter import OpenRouterProvider
 @lru_cache
 def _shared_client() -> httpx.AsyncClient:
     settings = get_settings()
-    return httpx.AsyncClient(timeout=settings.UPSTREAM_TIMEOUT_SECONDS)
+    return httpx.AsyncClient(
+        timeout=httpx.Timeout(settings.UPSTREAM_TIMEOUT_SECONDS, connect=5.0),
+        limits=httpx.Limits(max_connections=200, max_keepalive_connections=50),
+    )
+
+
+async def close_shared_client() -> None:
+    if _shared_client.cache_info().currsize:
+        await _shared_client().aclose()
+        _shared_client.cache_clear()
+        _registry.cache_clear()
 
 
 @lru_cache

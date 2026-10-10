@@ -1,3 +1,5 @@
+from contextlib import asynccontextmanager
+
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
@@ -13,15 +15,32 @@ from app.core.exceptions import LLMGatewayError
 from app.core.logging import configure_logging
 from app.core.middleware import REQUEST_ID_HEADER, RequestContextMiddleware
 from app.core.system_router import router as system_router
+from app.db.redis import get_redis_pool
+from app.db.session import get_engine
 from app.gateway.router import router as gateway_router
 from app.gateway.schemas import GatewayErrorBody
 from app.monitoring.activity_router import router as activity_router
 from app.openai_compat.router import router as openai_compat_router
+from app.providers.registry import close_shared_client
 
 settings = get_settings()
 configure_logging(debug=settings.DEBUG, fmt=settings.LOG_FORMAT)
 
+@asynccontextmanager
+async def lifespan(_: FastAPI):
+    yield
+    await close_shared_client()
+    await get_redis_pool().disconnect()
+    await get_engine().dispose()
+
+
+_is_prod = settings.ENV == "production"
+
 app = FastAPI(
+    lifespan=lifespan,
+    docs_url=None if _is_prod else "/docs",
+    redoc_url=None if _is_prod else "/redoc",
+    openapi_url=None if _is_prod else "/openapi.json",
     title=settings.APP_NAME,
     description=(
         "Gateway API with a rotating pool of API keys across multiple providers "
