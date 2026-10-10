@@ -407,8 +407,26 @@ async def drain_event_queue(redis: Redis, session: AsyncSession, batch_size: int
         return 0
 
     session.add_all(records)
-    await session.commit()
+    try:
+        await session.commit()
+    except Exception:
+        await session.rollback()
+        valid_raw = [raw for raw in raw_items if raw is not None]
+        if valid_raw:
+            await redis.rpush(EVENTS_QUEUE_KEY, *reversed(valid_raw))
+        raise
     return len(records)
+
+
+async def drain_event_queue_fully(
+    redis: Redis, session: AsyncSession, batch_size: int = 1000, max_batches: int = 100
+) -> int:
+    total = 0
+    for _ in range(max_batches):
+        total += await drain_event_queue(redis, session, batch_size=batch_size)
+        if await redis.llen(EVENTS_QUEUE_KEY) == 0:
+            break
+    return total
 
 
 def _today_range_utc() -> tuple[datetime, datetime]:

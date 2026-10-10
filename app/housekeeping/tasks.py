@@ -7,7 +7,7 @@ from app.db.redis import get_redis
 from app.db.session import get_sessionmaker
 from app.keys.enums import KeyStatus
 from app.keys.factory import build_key_pool_service
-from app.monitoring.publisher import drain_event_queue, purge_old_request_events
+from app.monitoring.publisher import drain_event_queue_fully, purge_old_request_events
 
 logger = logging.getLogger(__name__)
 
@@ -58,7 +58,7 @@ async def flush_monitoring_events(ctx: dict) -> None:
     session_factory = get_sessionmaker()
 
     async with session_factory() as session:
-        inserted = await drain_event_queue(redis, session)
+        inserted = await drain_event_queue_fully(redis, session)
 
     if inserted:
         logger.info("flush_monitoring_events: inserted %d event(s)", inserted)

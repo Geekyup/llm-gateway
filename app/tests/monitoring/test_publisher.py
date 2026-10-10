@@ -531,3 +531,41 @@ async def test_daily_timeseries_excludes_other_users(db_session: AsyncSession):
     buckets = await publisher.daily_timeseries(1, "7d")
 
     assert sum(b.success for b in buckets) == 0
+
+@pytest.mark.asyncio
+async def test_drain_event_queue_fully_empties_queue(db_session: AsyncSession, fake_redis):
+    from app.monitoring.publisher import drain_event_queue_fully
+
+    publisher = RequestEventPublisher(redis=fake_redis)
+    for i in range(25):
+        await publisher.publish(_event(request_id=f"r{i}"))
+
+    inserted = await drain_event_queue_fully(fake_redis, db_session, batch_size=10)
+
+    assert inserted == 25
+    assert await fake_redis.llen(EVENTS_QUEUE_KEY) == 0
+
+
+@pytest.mark.asyncio
+async def test_drain_event_queue_requeues_on_db_failure(db_session: AsyncSession, fake_redis):
+    from unittest.mock import AsyncMock, patch
+
+    publisher = RequestEventPublisher(redis=fake_redis)
+    for name in ("a", "b", "c"):
+        await publisher.publish(_event(request_id=name))
+
+    failing_commit = patch.object(
+        db_session, "commit", AsyncMock(side_effect=RuntimeError("db down"))
+    )
+    with failing_commit, pytest.raises(RuntimeError):
+        await drain_event_queue(fake_redis, db_session, batch_size=10)
+
+    assert await fake_redis.llen(EVENTS_QUEUE_KEY) == 3
+    inserted = await drain_event_queue(fake_redis, db_session, batch_size=10)
+    assert inserted == 3
+    rows = (
+        (await db_session.execute(select(RequestEventRecord).order_by(RequestEventRecord.id)))
+        .scalars()
+        .all()
+    )
+    assert [r.request_id for r in rows] == ["a", "b", "c"]

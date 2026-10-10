@@ -189,6 +189,12 @@ class FakeRedis:
             return items[start:]
         return items[start : end + 1]
 
+    async def rpush(self, key: str, *values: str) -> None:
+        self._lists.setdefault(key, []).extend(values)
+
+    async def llen(self, key: str) -> int:
+        return len(self._lists.get(key, []))
+
     async def rpop(self, key: str) -> str | None:
         items = self._lists.get(key)
         if not items:
