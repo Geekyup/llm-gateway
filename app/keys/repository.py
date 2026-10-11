@@ -1,6 +1,6 @@
 from datetime import UTC, datetime
 
-from sqlalchemy import select, update
+from sqlalchemy import func, select, update
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -227,16 +227,39 @@ class APIKeyRepository:
             statement = statement.where(APIKey.provider == provider)
         return await self._execute_bulk_update(statement)
 
-    async def clear_expired_cooldowns(self, now: datetime | None = None) -> list[APIKey]:
+    async def clear_expired_cooldowns(
+        self,
+        now: datetime | None = None,
+        *,
+        user_id: int | None = None,
+        provider: ProviderType | None = None,
+    ) -> list[APIKey]:
         now = now or datetime.now(UTC)
+        statement = update(APIKey).where(APIKey.status == KeyStatus.COOLDOWN, APIKey.cooldown_until <= now)
+        if user_id is not None:
+            statement = statement.where(APIKey.user_id == user_id)
+        if provider is not None:
+            statement = statement.where(APIKey.provider == provider)
         statement = (
-            update(APIKey)
-            .where(APIKey.status == KeyStatus.COOLDOWN, APIKey.cooldown_until <= now)
-            .values(status=KeyStatus.ACTIVE, cooldown_until=None)
+            statement.values(status=KeyStatus.ACTIVE, cooldown_until=None)
             .returning(APIKey)
             .execution_options(synchronize_session="fetch")
         )
         return await self._execute_bulk_update(statement)
+
+    async def next_cooldown_expiry(
+        self, *, user_id: int, provider: ProviderType, now: datetime | None = None
+    ) -> datetime | None:
+        now = now or datetime.now(UTC)
+        result = await self._session.execute(
+            select(func.min(APIKey.cooldown_until)).where(
+                APIKey.user_id == user_id,
+                APIKey.provider == provider,
+                APIKey.status == KeyStatus.COOLDOWN,
+                APIKey.cooldown_until > now,
+            )
+        )
+        return result.scalar_one_or_none()
 
     async def _execute_bulk_update(self, statement) -> list[APIKey]:
         result = await self._session.execute(statement)

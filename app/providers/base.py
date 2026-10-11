@@ -1,9 +1,12 @@
 import logging
+import math
 import re
 import time
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from dataclasses import dataclass
+from datetime import UTC, datetime
+from email.utils import parsedate_to_datetime
 from typing import Any, ClassVar
 
 import httpx
@@ -13,6 +16,26 @@ from app.core.exceptions import ProviderRequestError
 logger = logging.getLogger(__name__)
 
 _SAFE_SEGMENT = re.compile(r"^[A-Za-z0-9._:\-]+$")
+
+
+def parse_retry_after(response: httpx.Response) -> int | None:
+    value = response.headers.get("retry-after")
+    if value is None:
+        return None
+    value = value.strip()
+    try:
+        seconds = float(value)
+    except ValueError:
+        try:
+            moment = parsedate_to_datetime(value)
+        except (TypeError, ValueError):
+            return None
+        if moment.tzinfo is None:
+            moment = moment.replace(tzinfo=UTC)
+        return max(0, math.ceil((moment - datetime.now(UTC)).total_seconds()))
+    if not math.isfinite(seconds) or seconds < 0:
+        return None
+    return math.ceil(seconds)
 
 OPENAI_COMPATIBLE_ROUTES: tuple[tuple[str, re.Pattern[str]], ...] = (
     ("POST", re.compile(r"v1/(?:chat/completions|completions|embeddings)")),

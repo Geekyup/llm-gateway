@@ -362,3 +362,50 @@ async def test_list_active_excludes_keys_at_daily_limit(key_repo, test_user):
     active = await key_repo.list_active(user_id=test_user.id)
 
     assert [k.id for k in active] == [room.id]
+
+
+@pytest.mark.asyncio
+async def test_clear_expired_cooldowns_can_be_scoped_to_a_user_and_provider(key_repo, test_user, other_user):
+    past = datetime.now(UTC) - timedelta(minutes=1)
+    mine = await key_repo.create(
+        user_id=test_user.id, label="mine", provider=ProviderType.GEMINI, key_encrypted="c", daily_limit=10
+    )
+    other_provider = await key_repo.create(
+        user_id=test_user.id, label="grq", provider=ProviderType.GROQ, key_encrypted="c", daily_limit=10
+    )
+    theirs = await key_repo.create(
+        user_id=other_user.id, label="theirs", provider=ProviderType.GEMINI, key_encrypted="c", daily_limit=10
+    )
+    for key in (mine, other_provider, theirs):
+        await key_repo.mark_status(key.id, KeyStatus.COOLDOWN, user_id=key.user_id, cooldown_until=past)
+
+    revived = await key_repo.clear_expired_cooldowns(user_id=test_user.id, provider=ProviderType.GEMINI)
+
+    assert [k.id for k in revived] == [mine.id]
+    assert (await key_repo.get(other_provider.id, user_id=test_user.id)).status == KeyStatus.COOLDOWN
+    assert (await key_repo.get(theirs.id, user_id=other_user.id)).status == KeyStatus.COOLDOWN
+
+
+@pytest.mark.asyncio
+async def test_next_cooldown_expiry_is_the_earliest_future_deadline(key_repo, test_user):
+    now = datetime.now(UTC)
+    soon = now + timedelta(seconds=20)
+    for label, until in (("past", now - timedelta(seconds=5)), ("soon", soon), ("later", now + timedelta(minutes=10))):
+        key = await key_repo.create(
+            user_id=test_user.id, label=label, provider=ProviderType.GEMINI, key_encrypted="c", daily_limit=10
+        )
+        await key_repo.mark_status(key.id, KeyStatus.COOLDOWN, user_id=test_user.id, cooldown_until=until)
+
+    result = await key_repo.next_cooldown_expiry(user_id=test_user.id, provider=ProviderType.GEMINI, now=now)
+
+    assert result is not None
+    assert abs((result.replace(tzinfo=UTC) - soon).total_seconds()) < 1
+
+
+@pytest.mark.asyncio
+async def test_next_cooldown_expiry_is_none_without_cooling_keys(key_repo, test_user):
+    await key_repo.create(
+        user_id=test_user.id, label="k", provider=ProviderType.GEMINI, key_encrypted="c", daily_limit=10
+    )
+
+    assert await key_repo.next_cooldown_expiry(user_id=test_user.id, provider=ProviderType.GEMINI) is None

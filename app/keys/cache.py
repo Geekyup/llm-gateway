@@ -20,9 +20,12 @@ class KeyStatusCache:
         data = json.loads(raw)
         return [APIKeyDTO.model_validate(item) for item in data]
 
-    async def set_active(self, user_id: int, provider: str, keys: list[APIKeyDTO]) -> None:
+    async def set_active(
+        self, user_id: int, provider: str, keys: list[APIKeyDTO], *, ttl_seconds: int | None = None
+    ) -> None:
+        ttl = self._ttl if ttl_seconds is None else max(1, min(self._ttl, ttl_seconds))
         payload = json.dumps([key.model_dump(mode="json") for key in keys])
-        await self._redis.set(self._cache_key(user_id, provider), payload, ex=self._ttl)
+        await self._redis.set(self._cache_key(user_id, provider), payload, ex=ttl)
 
     async def invalidate(self, user_id: int, provider: str) -> None:
         await self._redis.delete(self._cache_key(user_id, provider))

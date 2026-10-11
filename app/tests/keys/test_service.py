@@ -1,3 +1,5 @@
+from datetime import UTC, datetime, timedelta
+
 import pytest
 
 from app.core.exceptions import DuplicateKeyError
@@ -312,3 +314,119 @@ async def test_select_key_without_provider_round_robins_across_providers(key_poo
     picked = {(await key_pool.select_key(test_user.id, None)).provider for _ in range(4)}
 
     assert picked == {ProviderType.GEMINI, ProviderType.GROQ}
+
+
+async def _cool_down(key_repo, key, user_id: int, seconds: float):
+    await key_repo.mark_status(
+        key.id,
+        KeyStatus.COOLDOWN,
+        user_id=user_id,
+        cooldown_until=datetime.now(UTC) + timedelta(seconds=seconds),
+    )
+
+
+@pytest.mark.asyncio
+async def test_key_whose_cooldown_expired_is_a_candidate_again_without_the_cron(key_pool, key_repo, test_user):
+    key = await _create_key(key_pool, test_user.id, "k1")
+    await _cool_down(key_repo, key, test_user.id, seconds=-1)
+
+    candidates = await key_pool.get_candidate_keys(test_user.id, ProviderType.GEMINI)
+
+    assert [c.id for c in candidates] == [key.id]
+    assert (await key_repo.get(key.id, user_id=test_user.id)).status == KeyStatus.ACTIVE
+
+
+@pytest.mark.asyncio
+async def test_key_still_cooling_down_stays_out_of_the_pool(key_pool, key_repo, test_user):
+    key = await _create_key(key_pool, test_user.id, "k1")
+    await _cool_down(key_repo, key, test_user.id, seconds=300)
+
+    assert await key_pool.get_candidate_keys(test_user.id, ProviderType.GEMINI) == []
+    assert (await key_repo.get(key.id, user_id=test_user.id)).status == KeyStatus.COOLDOWN
+
+
+class _RecordingRedis:
+    def __init__(self) -> None:
+        self.writes: list[int | None] = []
+
+    async def get(self, key: str):
+        return None
+
+    async def set(self, key: str, value: str, ex: int | None = None):
+        self.writes.append(ex)
+
+    async def delete(self, key: str):
+        return None
+
+
+def _pool_with(redis, key_repo, fake_redis) -> KeyPoolService:
+    return KeyPoolService(key_repo, KeyStatusCache(redis, ttl_seconds=30), RoundRobinSelector(fake_redis))
+
+
+@pytest.mark.asyncio
+async def test_cache_expires_exactly_when_the_next_cooldown_ends(key_pool, key_repo, fake_redis, test_user):
+    key = await _create_key(key_pool, test_user.id, "k1")
+    await _create_key(key_pool, test_user.id, "k2")
+    await _cool_down(key_repo, key, test_user.id, seconds=10)
+    redis = _RecordingRedis()
+
+    await _pool_with(redis, key_repo, fake_redis).get_candidate_keys(test_user.id, ProviderType.GEMINI)
+
+    assert redis.writes[0] is not None
+    assert 9 <= redis.writes[0] <= 10
+
+
+@pytest.mark.asyncio
+async def test_cache_ttl_is_not_extended_by_a_long_cooldown(key_pool, key_repo, fake_redis, test_user):
+    key = await _create_key(key_pool, test_user.id, "k1")
+    await _cool_down(key_repo, key, test_user.id, seconds=600)
+    redis = _RecordingRedis()
+
+    await _pool_with(redis, key_repo, fake_redis).get_candidate_keys(test_user.id, ProviderType.GEMINI)
+
+    assert redis.writes == [30]
+
+
+@pytest.mark.asyncio
+async def test_cache_uses_the_default_ttl_when_nothing_is_cooling_down(key_pool, key_repo, fake_redis, test_user):
+    await _create_key(key_pool, test_user.id, "k1")
+    redis = _RecordingRedis()
+
+    await _pool_with(redis, key_repo, fake_redis).get_candidate_keys(test_user.id, ProviderType.GEMINI)
+
+    assert redis.writes == [30]
+
+
+@pytest.mark.asyncio
+async def test_rate_limit_cooldown_follows_the_providers_retry_after(key_pool, key_repo, test_user):
+    key = await _create_key(key_pool, test_user.id, "k1")
+
+    await key_pool.record_rate_limited(key.id, test_user.id, ProviderType.GEMINI, retry_after_seconds=7)
+
+    stored = await key_repo.get(key.id, user_id=test_user.id)
+    remaining = (stored.cooldown_until.replace(tzinfo=UTC) - datetime.now(UTC)).total_seconds()
+    assert stored.status == KeyStatus.COOLDOWN
+    assert 5 <= remaining <= 7.5
+
+
+@pytest.mark.asyncio
+async def test_rate_limit_cooldown_without_retry_after_uses_the_default(key_pool, key_repo, test_user):
+    key = await _create_key(key_pool, test_user.id, "k1")
+
+    await key_pool.record_rate_limited(key.id, test_user.id, ProviderType.GEMINI)
+
+    stored = await key_repo.get(key.id, user_id=test_user.id)
+    remaining = (stored.cooldown_until.replace(tzinfo=UTC) - datetime.now(UTC)).total_seconds()
+    assert 58 <= remaining <= 60.5
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(("retry_after", "low", "high"), [(100000, 898, 900.5), (0, 0, 1.5)])
+async def test_retry_after_is_clamped_to_sane_bounds(key_pool, key_repo, test_user, retry_after, low, high):
+    key = await _create_key(key_pool, test_user.id, "k1")
+
+    await key_pool.record_rate_limited(key.id, test_user.id, ProviderType.GEMINI, retry_after_seconds=retry_after)
+
+    stored = await key_repo.get(key.id, user_id=test_user.id)
+    remaining = (stored.cooldown_until.replace(tzinfo=UTC) - datetime.now(UTC)).total_seconds()
+    assert low <= remaining <= high

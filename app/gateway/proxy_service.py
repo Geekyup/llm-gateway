@@ -16,7 +16,7 @@ from app.keys.schemas import APIKeyDTO
 from app.keys.service import KeyPoolService
 from app.monitoring.publisher import RequestEventPublisher
 from app.monitoring.schemas import RequestEvent
-from app.providers.base import Provider
+from app.providers.base import Provider, parse_retry_after
 from app.providers.registry import get_provider
 
 logger = logging.getLogger(__name__)
@@ -262,7 +262,9 @@ class GatewayService:
             return "exhausted"
 
         if provider.is_rate_limited(response):
-            await self._key_pool.record_rate_limited(dto.id, ctx.user_id, key_provider_type)
+            await self._key_pool.record_rate_limited(
+                dto.id, ctx.user_id, key_provider_type, retry_after_seconds=parse_retry_after(response)
+            )
             await self._emit_attempt(
                 ctx, outcome="rate_limited", upstream_status=response.status_code, latency_ms=latency_ms
             )

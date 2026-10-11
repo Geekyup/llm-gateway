@@ -1,6 +1,7 @@
 import asyncio
 import hashlib
 import logging
+import math
 import re
 from collections.abc import Collection, Sequence
 from datetime import UTC, datetime, timedelta
@@ -29,6 +30,7 @@ from app.providers.registry import get_provider
 logger = logging.getLogger(__name__)
 
 DEFAULT_COOLDOWN_SECONDS = 60
+MAX_COOLDOWN_SECONDS = 900
 
 
 class KeyPoolService:
@@ -39,11 +41,13 @@ class KeyPoolService:
         selector: KeySelector,
         *,
         cooldown_seconds: int = DEFAULT_COOLDOWN_SECONDS,
+        max_cooldown_seconds: int = MAX_COOLDOWN_SECONDS,
     ) -> None:
         self._repo = repository
         self._cache = cache
         self._selector = selector
         self._cooldown_seconds = cooldown_seconds
+        self._max_cooldown_seconds = max_cooldown_seconds
 
     async def create_key(self, user_id: int, payload: APIKeyCreate):
         encrypted = encrypt_key(payload.raw_key)
@@ -185,7 +189,16 @@ class KeyPoolService:
     async def _active_keys(self, user_id: int, provider: ProviderType) -> list[APIKeyDTO]:
         active = await self._cache.get_active(user_id, provider.value)
         if active is None:
+            now = datetime.now(UTC)
+            revived = await self._repo.clear_expired_cooldowns(now, user_id=user_id, provider=provider)
+            if revived:
+                logger.info(
+                    "revived %d key(s) whose cooldown expired",
+                    len(revived),
+                    extra={"user_id": user_id, "provider": provider.value},
+                )
             rows = await self._repo.list_active(user_id=user_id, provider=provider)
+            next_release = await self._repo.next_cooldown_expiry(user_id=user_id, provider=provider, now=now)
             active = [
                 APIKeyDTO(
                     id=row.id,
@@ -200,8 +213,18 @@ class KeyPoolService:
                 )
                 for row in rows
             ]
-            await self._cache.set_active(user_id, provider.value, active)
+            await self._cache.set_active(
+                user_id, provider.value, active, ttl_seconds=self._seconds_until(next_release, now)
+            )
         return active
+
+    @staticmethod
+    def _seconds_until(moment: datetime | None, now: datetime) -> int | None:
+        if moment is None:
+            return None
+        if moment.tzinfo is None:
+            moment = moment.replace(tzinfo=UTC)
+        return max(1, math.ceil((moment - now).total_seconds()))
 
     async def get_candidate_keys(
         self,
@@ -262,8 +285,17 @@ class KeyPoolService:
         await self._cache.invalidate(user_id, provider.value)
         return key
 
-    async def record_rate_limited(self, key_id: int, user_id: int, provider: ProviderType):
-        cooldown_until = datetime.now(UTC) + timedelta(seconds=self._cooldown_seconds)
+    async def record_rate_limited(
+        self,
+        key_id: int,
+        user_id: int,
+        provider: ProviderType,
+        retry_after_seconds: int | None = None,
+    ):
+        seconds = self._cooldown_seconds
+        if retry_after_seconds is not None:
+            seconds = min(max(retry_after_seconds, 1), self._max_cooldown_seconds)
+        cooldown_until = datetime.now(UTC) + timedelta(seconds=seconds)
         key = await self._repo.mark_status(
             key_id, KeyStatus.COOLDOWN, user_id=user_id, cooldown_until=cooldown_until
         )

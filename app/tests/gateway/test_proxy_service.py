@@ -1,3 +1,5 @@
+import datetime
+
 import httpx
 import pytest
 from prometheus_client import REGISTRY
@@ -8,7 +10,7 @@ from app.core.request_context import request_id_var
 from app.core.security import encrypt_key
 from app.gateway.proxy_service import GatewayService, UpstreamRequestSpec
 from app.keys.cache import KeyStatusCache
-from app.keys.enums import ProviderType
+from app.keys.enums import KeyStatus, ProviderType
 from app.keys.selector import RoundRobinSelector
 from app.keys.service import KeyPoolService
 from app.monitoring.models import RequestEventRecord
@@ -36,7 +38,7 @@ async def _recent_events(session, redis, user_id: int, limit: int = 10) -> list[
 
 
 class ScriptedProvider(Provider):
-    def __init__(self, status_codes: list[int | Exception]) -> None:
+    def __init__(self, status_codes: list[int | tuple[int, dict[str, str]] | Exception]) -> None:
         self._status_codes = iter(status_codes)
         self.calls: list[str] = []
 
@@ -45,7 +47,10 @@ class ScriptedProvider(Provider):
         status = next(self._status_codes)
         if isinstance(status, Exception):
             raise status
-        return httpx.Response(status_code=status, json={"ok": status == 200})
+        headers: dict[str, str] = {}
+        if isinstance(status, tuple):
+            status, headers = status
+        return httpx.Response(status_code=status, json={"ok": status == 200}, headers=headers)
 
     def is_rate_limited(self, response: httpx.Response) -> bool:
         return response.status_code == 429
@@ -788,3 +793,53 @@ async def test_exhausted_pool_is_counted_as_an_attempt_without_latency(key_pool,
         )
 
     assert _sample("gateway_upstream_attempts_total", provider="gemini", outcome="no_keys") - before == 1
+
+
+@pytest.mark.asyncio
+async def test_429_cooldown_uses_the_retry_after_header(key_pool, key_repo, test_user, _patch_registry):
+    await _create_active_key(key_pool, test_user.id, "k1")
+    await _create_active_key(key_pool, test_user.id, "k2")
+    _patch_registry(ScriptedProvider([(429, {"retry-after": "11"}), 200]))
+    gateway = GatewayService(key_pool, max_attempts=3)
+
+    await gateway.proxy_request(
+        user_id=test_user.id, build_request=_build_request(), provider_type=ProviderType.GEMINI
+    )
+
+    cooling = [k for k in await key_repo.list_all(user_id=test_user.id) if k.status.value == "cooldown"]
+    assert len(cooling) == 1
+    cooldown_until = cooling[0].cooldown_until.replace(tzinfo=datetime.UTC)
+    remaining = (cooldown_until - datetime.datetime.now(datetime.UTC)).total_seconds()
+    assert 9 <= remaining <= 11.5
+
+
+@pytest.mark.asyncio
+async def test_key_returns_to_rotation_after_its_cooldown_without_waiting_for_the_cron(
+    key_pool, key_repo, test_user, _patch_registry
+):
+    key = await _create_active_key(key_pool, test_user.id, "k1")
+    _patch_registry(ScriptedProvider([(429, {"retry-after": "1"}), 200]))
+    gateway = GatewayService(key_pool, max_attempts=3)
+
+    with pytest.raises(UpstreamExhaustedError):
+        await gateway.proxy_request(
+            user_id=test_user.id, build_request=_build_request(), provider_type=ProviderType.GEMINI
+        )
+    with pytest.raises(NoAvailableKeysError):
+        await gateway.proxy_request(
+            user_id=test_user.id, build_request=_build_request(), provider_type=ProviderType.GEMINI
+        )
+
+    await key_repo.mark_status(
+        key.id,
+        KeyStatus.COOLDOWN,
+        user_id=test_user.id,
+        cooldown_until=datetime.datetime.now(datetime.UTC) - datetime.timedelta(seconds=1),
+    )
+    await key_pool._cache.invalidate(test_user.id, ProviderType.GEMINI.value)
+
+    response, _ = await gateway.proxy_request(
+        user_id=test_user.id, build_request=_build_request(), provider_type=ProviderType.GEMINI
+    )
+
+    assert response.status_code == 200
