@@ -190,7 +190,7 @@ export function KeyDetailDrawer({
                         contentStyle={{ background: "var(--field)", border: "1px solid color-mix(in srgb, var(--ink) 8.4%, transparent)", borderRadius: 8, fontSize: 11, fontFamily: "JetBrains Mono, monospace" }}
                         labelStyle={{ color: "var(--ink-3)" }}
                         itemStyle={{ color: s.color }}
-                        formatter={(v: number) => [v.toLocaleString(), "req"]}
+                        formatter={(v) => [Number(v).toLocaleString(), "req"]}
                       />
                       <Area type="monotone" dataKey="r" stroke={s.color} strokeWidth={1.5} fill="url(#agrad)" dot={false} />
                     </AreaChart>
@@ -222,11 +222,12 @@ export function KeyDetailDrawer({
                     <Tooltip
                       contentStyle={{ background: "var(--field)", border: "1px solid color-mix(in srgb, var(--ink) 8.4%, transparent)", borderRadius: 8, fontSize: 11, fontFamily: "JetBrains Mono, monospace" }}
                       labelStyle={{ color: "var(--ink-3)" }}
-                      formatter={(v: number, name: string, p: { payload?: { prompt: number; completion: number } }) => {
-                        if (name !== "r") return [v, name];
-                        const pt = p.payload;
+                      formatter={(v, name, item): [string, string] => {
+                        const value = Number(v);
+                        if (name !== "r") return [value.toLocaleString(), String(name)];
+                        const pt = item.payload as { prompt: number; completion: number } | undefined;
                         return [
-                          pt ? `${v.toLocaleString()} (${pt.prompt.toLocaleString()} in / ${pt.completion.toLocaleString()} out)` : v.toLocaleString(),
+                          pt ? `${value.toLocaleString()} (${pt.prompt.toLocaleString()} in / ${pt.completion.toLocaleString()} out)` : value.toLocaleString(),
                           "tokens",
                         ];
                       }}

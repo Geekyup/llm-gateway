@@ -15,7 +15,7 @@ export function TopBar({
   onLogout: () => void;
   userEmail?: string | null;
   onMenu: () => void;
-  title: string;
+  title?: string;
 }) {
   return (
     <header
@@ -26,7 +26,7 @@ export function TopBar({
         <button onClick={onMenu} className="md:hidden p-1.5 -ml-1.5 rounded-lg transition-colors hover:bg-ink/5 shrink-0">
           <Menu size={18} color="var(--ink-2)" />
         </button>
-        <h1 className="text-[15px] font-semibold text-ink leading-none">{title}</h1>
+        {title && <h1 className="text-[15px] font-semibold text-ink leading-none">{title}</h1>}
         <span
           className="inline-flex items-center gap-1.5 ml-2 px-2 py-1 rounded-full text-[12px] font-mono leading-none"
           style={{

@@ -100,7 +100,7 @@ export function LatencyPercentilesChart({ buckets, loading }: { buckets: Latency
               contentStyle={tooltipStyle()}
               labelStyle={{ color: MUTED, marginBottom: 2 }}
               itemStyle={{ color: "var(--ink)" }}
-              formatter={(v: number) => [`${Math.round(v)} ms`, ""]}
+              formatter={(v) => [`${Math.round(Number(v))} ms`, ""]}
               cursor={{ stroke: "color-mix(in srgb, var(--ink) 10.2%, transparent)" }}
             />
             <Line type="monotone" dataKey="p50" stroke={P50_COLOR} strokeWidth={1.5} dot={false} name="p50" connectNulls />
@@ -188,7 +188,7 @@ export function TopModelsChart({ models, loading }: { models: TopModelEntry[]; l
               contentStyle={tooltipStyle()}
               labelStyle={{ color: MUTED, marginBottom: 2 }}
               itemStyle={{ color: "var(--ink)" }}
-              formatter={(v: number) => [`${v} req`, ""]}
+              formatter={(v) => [`${Number(v)} req`, ""]}
               cursor={{ fill: "color-mix(in srgb, var(--ink) 3%, transparent)" }}
             />
             <Bar dataKey="requests" fill="#5B9BFF" radius={[0, 2, 2, 0]} maxBarSize={16} />
