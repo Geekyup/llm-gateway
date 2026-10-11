@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { Check, Copy } from "lucide-react";
+import { useCopyToClipboard } from "../lib/useCopyToClipboard";
 
 const AMBER = "var(--warn)";
 
@@ -51,7 +52,7 @@ function CodeToken({
   );
 }
 
-function buildSnippet(lang: Lang, baseUrl: string, token: string): { pre: string; post: string } {
+function buildSnippet(lang: Lang, baseUrl: string): { pre: string; post: string } {
   switch (lang) {
     case "python":
       return {
@@ -126,17 +127,10 @@ export function CodeSnippetTabs({
   baseUrl: string;
 }) {
   const [active, setActive] = useState<Lang>("python");
-  const [copied, setCopied] = useState(false);
+  const { copied, copy } = useCopyToClipboard();
 
-  const { pre, post } = buildSnippet(active, baseUrl, token);
+  const { pre, post } = buildSnippet(active, baseUrl);
   const fullSnippet = pre + token + post;
-
-  function copy() {
-    navigator.clipboard.writeText(fullSnippet).then(() => {
-      setCopied(true);
-      setTimeout(() => setCopied(false), 1500);
-    });
-  }
 
   return (
     <div className="mt-3 rounded-lg overflow-hidden" style={{ background: "var(--sidebar)", border: "1px solid color-mix(in srgb, var(--ink) 12%, transparent)" }}>
@@ -165,7 +159,7 @@ export function CodeSnippetTabs({
         </div>
 
         <button
-          onClick={copy}
+          onClick={() => copy(fullSnippet)}
           className="flex items-center justify-center gap-1.5 px-2.5 py-1.5 rounded-md text-[12px] font-medium transition-colors shrink-0 sm:ml-auto"
           style={{ background: copied ? "color-mix(in srgb, var(--ok) 15%, transparent)" : "color-mix(in srgb, var(--ink) 8.4%, transparent)", color: copied ? "var(--ok)" : "var(--ink-2)" }}
         >

@@ -1,7 +1,9 @@
 import { useCallback, useEffect, useState } from "react";
-import { Ban, Plus, Loader2, AlertTriangle, CheckCircle2, Trash2, X } from "lucide-react";
-import { api, ApiError, API_BASE_URL, type GatewayTokenRead, type GatewayTokenCreated } from "../../lib/api";
+import { Ban, Plus, Loader2, CheckCircle2, Trash2, X } from "lucide-react";
+import { api, errorMessage, API_BASE_URL, type GatewayTokenRead, type GatewayTokenCreated } from "../../lib/api";
 import { CodeSnippetTabs } from "../CodeSnippetTabs";
+import { FormError } from "../shared/FormError";
+import { useCopyToClipboard } from "../../lib/useCopyToClipboard";
 
 export function GatewayAccessPanel() {
   const [tokens, setTokens] = useState<GatewayTokenRead[]>([]);
@@ -9,7 +11,7 @@ export function GatewayAccessPanel() {
   const [creating, setCreating] = useState(false);
   const [label, setLabel] = useState("");
   const [freshToken, setFreshToken] = useState<GatewayTokenCreated | null>(null);
-  const [copied, setCopied] = useState(false);
+  const { copied, copy } = useCopyToClipboard();
   const [error, setError] = useState<string | null>(null);
 
   const refresh = useCallback(async () => {
@@ -17,7 +19,7 @@ export function GatewayAccessPanel() {
       const data = await api.listGatewayTokens();
       setTokens(data);
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : "Failed to load tokens");
+      setError(errorMessage(err, "Failed to load tokens"));
     } finally {
       setLoading(false);
     }
@@ -35,7 +37,7 @@ export function GatewayAccessPanel() {
       setLabel("");
       await refresh();
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : "Failed to create token");
+      setError(errorMessage(err, "Failed to create token"));
     } finally {
       setCreating(false);
     }
@@ -58,13 +60,6 @@ export function GatewayAccessPanel() {
     } catch {
       await refresh();
     }
-  }
-
-  function copy(text: string) {
-    navigator.clipboard.writeText(text).then(() => {
-      setCopied(true);
-      setTimeout(() => setCopied(false), 1500);
-    });
   }
 
   return (
@@ -104,11 +99,7 @@ export function GatewayAccessPanel() {
           Name it after the app that will use it, like <span className="font-mono">web-app</span> or <span className="font-mono">ios-client</span>.
         </p>
 
-        {error && (
-          <div className="mt-3 flex items-center gap-2 px-3 py-2 rounded-lg text-xs" style={{ background: "color-mix(in srgb, var(--bad) 8%, transparent)", color: "var(--bad)", border: "1px solid color-mix(in srgb, var(--bad) 20%, transparent)" }}>
-            <AlertTriangle size={13} className="shrink-0" /> {error}
-          </div>
-        )}
+        {error && <FormError message={error} className="mt-3" />}
 
         {freshToken && (
           <div className="mt-4 p-3 rounded-lg" style={{ background: "color-mix(in srgb, var(--ok) 7%, transparent)", border: "1px solid color-mix(in srgb, var(--ok) 35%, transparent)" }}>

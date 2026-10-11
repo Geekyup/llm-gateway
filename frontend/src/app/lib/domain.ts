@@ -20,16 +20,16 @@ export function toAK(k: ApiKeyRead): AK {
   };
 }
 
-export const STATUS_META: Record<Status, { text: string; color: string; bg: string; bd: string }> = {
-  active:    { text: "Active",    color: "var(--ok)", bg: "color-mix(in srgb, var(--ok) 8%, transparent)",  bd: "color-mix(in srgb, var(--ok) 22%, transparent)"  },
-  cooldown:  { text: "Cooldown",  color: "var(--warn)", bg: "color-mix(in srgb, var(--warn) 8%, transparent)", bd: "color-mix(in srgb, var(--warn) 22%, transparent)" },
-  exhausted: { text: "Exhausted", color: "var(--bad)", bg: "color-mix(in srgb, var(--bad) 8%, transparent)",  bd: "color-mix(in srgb, var(--bad) 22%, transparent)"  },
-  disabled:  { text: "Disabled",  color: "var(--ink-4)", bg: "color-mix(in srgb, var(--ink-4) 8%, transparent)",   bd: "color-mix(in srgb, var(--ink-4) 18%, transparent)"   },
-};
-
 export function alpha(color: string, percent: number): string {
   return `color-mix(in srgb, ${color} ${percent}%, transparent)`;
 }
+
+export const STATUS_META: Record<Status, { text: string; color: string; bg: string; bd: string }> = {
+  active:    { text: "Active",    color: "var(--ok)",    bg: alpha("var(--ok)", 8),    bd: alpha("var(--ok)", 22)    },
+  cooldown:  { text: "Cooldown",  color: "var(--warn)",  bg: alpha("var(--warn)", 8),  bd: alpha("var(--warn)", 22)  },
+  exhausted: { text: "Exhausted", color: "var(--bad)",   bg: alpha("var(--bad)", 8),   bd: alpha("var(--bad)", 22)   },
+  disabled:  { text: "Disabled",  color: "var(--ink-4)", bg: alpha("var(--ink-4)", 8), bd: alpha("var(--ink-4)", 18) },
+};
 
 export function pingMeta(ms: number | undefined): { text: string; color: string } {
   if (ms === undefined) return { text: "—", color: "var(--ink-4)" };
@@ -46,32 +46,28 @@ export const PROVIDER_META: Record<string, { name: string; color: string; bg: st
 };
 
 export function providerMeta(provider: string) {
-  return PROVIDER_META[provider] ?? { name: provider, color: "var(--ink-3)", bg: "color-mix(in srgb, var(--ink-3) 10%, transparent)" };
+  return PROVIDER_META[provider] ?? { name: provider, color: "var(--ink-3)", bg: alpha("var(--ink-3)", 10) };
 }
 
-export const PROVIDER_NAMES: Record<Provider, { name: string }> = {
-  gemini:     { name: "Gemini"     },
-  openrouter: { name: "OpenRouter" },
-  groq:       { name: "Groq"       },
-};
+export const PROVIDERS = Object.keys(PROVIDER_META) as Provider[];
 
 export function defaultKeyLabel(provider: Provider, model: string | null | undefined): string {
-  const name = PROVIDER_NAMES[provider].name;
+  const name = PROVIDER_META[provider].name;
   const trimmed = model?.trim();
   return trimmed ? `${name} · ${trimmed}` : name;
 }
 
 export const OUTCOME_META: Record<string, { text: string; color: string; bg: string }> = {
-  success:            { text: "success",            color: "var(--ok)", bg: "color-mix(in srgb, var(--ok) 10%, transparent)" },
-  rate_limited:       { text: "rate limited",        color: "var(--warn)", bg: "color-mix(in srgb, var(--warn) 10%, transparent)" },
-  exhausted:          { text: "exhausted",           color: "var(--warn)", bg: "color-mix(in srgb, var(--warn) 10%, transparent)" },
-  no_keys:            { text: "no keys",             color: "var(--bad)", bg: "color-mix(in srgb, var(--bad) 10%, transparent)" },
-  upstream_exhausted: { text: "upstream exhausted",  color: "var(--bad)", bg: "color-mix(in srgb, var(--bad) 10%, transparent)" },
-  error:              { text: "error",               color: "var(--bad)", bg: "color-mix(in srgb, var(--bad) 10%, transparent)" },
+  success:            { text: "success",            color: "var(--ok)",   bg: alpha("var(--ok)", 10)   },
+  rate_limited:       { text: "rate limited",       color: "var(--warn)", bg: alpha("var(--warn)", 10) },
+  exhausted:          { text: "exhausted",          color: "var(--warn)", bg: alpha("var(--warn)", 10) },
+  no_keys:            { text: "no keys",            color: "var(--bad)",  bg: alpha("var(--bad)", 10)  },
+  upstream_exhausted: { text: "upstream exhausted", color: "var(--bad)",  bg: alpha("var(--bad)", 10)  },
+  error:              { text: "error",              color: "var(--bad)",  bg: alpha("var(--bad)", 10)  },
 };
 
 export function outcomeMeta(outcome: string) {
-  return OUTCOME_META[outcome] ?? { text: outcome, color: "var(--ink-3)", bg: "color-mix(in srgb, var(--ink-3) 10%, transparent)" };
+  return OUTCOME_META[outcome] ?? { text: outcome, color: "var(--ink-3)", bg: alpha("var(--ink-3)", 10) };
 }
 
 export function rel(ts: number, now: number): string {

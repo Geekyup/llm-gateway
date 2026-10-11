@@ -1,6 +1,7 @@
-import { useEffect, useRef, useState } from "react";
+import { useRef, useState } from "react";
 import { ChevronDown, CheckCircle2 } from "lucide-react";
-import { PROVIDER_NAMES } from "../../lib/domain";
+import { providerMeta } from "../../lib/domain";
+import { useClickOutside } from "../../lib/useClickOutside";
 import { ProviderIcon as ProvIcon } from "../shared/ProviderIcon";
 import type { Provider } from "../../types";
 
@@ -22,13 +23,7 @@ export function ModelPill({
   const [open, setOpen] = useState<"provider" | "model" | null>(null);
   const ref = useRef<HTMLDivElement>(null);
 
-  useEffect(() => {
-    function onDocClick(e: MouseEvent) {
-      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(null);
-    }
-    document.addEventListener("mousedown", onDocClick);
-    return () => document.removeEventListener("mousedown", onDocClick);
-  }, []);
+  useClickOutside(ref, () => setOpen(null));
 
   return (
     <div className="flex items-center gap-1.5 min-w-0" ref={ref}>
@@ -39,7 +34,7 @@ export function ModelPill({
           style={{ background: open === "provider" ? "color-mix(in srgb, var(--ink) 9%, transparent)" : "color-mix(in srgb, var(--ink) 4.8%, transparent)", border: "1px solid color-mix(in srgb, var(--ink) 8.4%, transparent)", color: "var(--ink-2)" }}
         >
           <ProvIcon provider={provider} size={13} />
-          {PROVIDER_NAMES[provider].name}
+          {providerMeta(provider).name}
           <ChevronDown size={11} color="var(--ink-3)" style={{ transform: open === "provider" ? "rotate(180deg)" : "none", transition: "transform 0.15s ease" }} />
         </button>
         {open === "provider" && (
@@ -57,7 +52,7 @@ export function ModelPill({
                   style={{ background: active ? "color-mix(in srgb, var(--ink) 4.2%, transparent)" : "transparent" }}
                 >
                   <ProvIcon provider={p} size={12} />
-                  <span className="flex-1" style={{ color: active ? "var(--ink)" : "var(--ink-2)" }}>{PROVIDER_NAMES[p].name}</span>
+                  <span className="flex-1" style={{ color: active ? "var(--ink)" : "var(--ink-2)" }}>{providerMeta(p).name}</span>
                   {active && <CheckCircle2 size={12} color="var(--ink)" />}
                 </button>
               );

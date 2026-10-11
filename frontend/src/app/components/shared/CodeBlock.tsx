@@ -1,5 +1,6 @@
-import { useState, type HTMLAttributes, type ReactNode } from "react";
+import type { HTMLAttributes, ReactNode } from "react";
 import { Check, Copy } from "lucide-react";
+import { useCopyToClipboard } from "../../lib/useCopyToClipboard";
 
 function extractText(node: ReactNode): string {
   if (typeof node === "string") return node;
@@ -17,25 +18,15 @@ function extractLang(className?: string): string {
 }
 
 export function CodeBlock({ children, className }: HTMLAttributes<HTMLElement> & { children?: ReactNode }) {
-  const [copied, setCopied] = useState(false);
+  const { copied, copy } = useCopyToClipboard();
   const lang = extractLang(className);
   const text = extractText(children).replace(/\n$/, "");
-
-  async function copy() {
-    try {
-      await navigator.clipboard.writeText(text);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 1500);
-    } catch {
-      // clipboard unavailable — ignore
-    }
-  }
 
   return (
     <div className="code-block">
       <div className="code-block-header">
         <span className="code-block-lang">{lang || "text"}</span>
-        <button onClick={copy} className="code-block-copy" type="button">
+        <button onClick={() => copy(text)} className="code-block-copy" type="button">
           {copied ? <Check size={12} color="var(--ok)" /> : <Copy size={12} />}
           {copied ? "Copied" : "Copy"}
         </button>

@@ -1,5 +1,5 @@
-import { useState } from "react";
 import { Check, Copy, RotateCcw } from "lucide-react";
+import { useCopyToClipboard } from "../../lib/useCopyToClipboard";
 
 export function MessageActions({
   content,
@@ -10,21 +10,11 @@ export function MessageActions({
   onRegenerate?: () => void;
   className?: string;
 }) {
-  const [copied, setCopied] = useState(false);
-
-  async function copy() {
-    try {
-      await navigator.clipboard.writeText(content);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 1200);
-    } catch {
-      // clipboard unavailable — ignore
-    }
-  }
+  const { copied, copy } = useCopyToClipboard(1200);
 
   return (
     <div className={`message-actions ${className ?? ""}`}>
-      <button onClick={copy} title="Copy" type="button" className="message-action-btn">
+      <button onClick={() => copy(content)} title="Copy" type="button" className="message-action-btn">
         {copied ? <Check size={12} color="var(--ok)" /> : <Copy size={12} />}
       </button>
       {onRegenerate && (

@@ -25,6 +25,7 @@ import {
   EmptyChart,
   LoadingChart,
 } from "../shared/chartHelpers";
+import { formatCompact } from "../../lib/format";
 
 const SUCCESS_COLOR = "var(--ok)";
 const RATE_LIMITED_COLOR = "var(--warn)";
@@ -199,10 +200,4 @@ export function TopModelsChart({ models, loading }: { models: TopModelEntry[]; l
       )}
     </ChartCard>
   );
-}
-
-function formatCompact(n: number): string {
-  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
-  if (n >= 1_000) return `${(n / 1_000).toFixed(1)}K`;
-  return String(n);
 }

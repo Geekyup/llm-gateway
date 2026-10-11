@@ -1,11 +1,13 @@
+# llm-gateway frontend
 
-  # LLM Key Pool Manager
+React + TypeScript + Vite dashboard for the gateway.
 
-  This is a code bundle for LLM Key Pool Manager. The original project is available at https://www.figma.com/design/FJSMrQRUhIuWhmhqZRQroz/LLM-Key-Pool-Manager.
+```
+npm ci
+cp .env.example .env
+npm run dev
+npm run typecheck
+npm run build
+```
 
-  ## Running the code
-
-  Run `npm i` to install the dependencies.
-
-  Run `npm run dev` to start the development server.
-  
+`VITE_API_URL` is the backend base URL and is baked in at build time.

@@ -5,7 +5,7 @@ import type { AK, PF, SF } from "../../types";
 import { StatusBadge } from "../shared/StatusBadge";
 import { ProviderBadge } from "../shared/ProviderBadge";
 import { UsageBar } from "../shared/UsageBar";
-import { ProviderFilterDropdown } from "./ProviderFilterDropdown";
+import { ProviderFilterDropdown } from "../shared/ProviderFilterDropdown";
 import { StatusFilterDropdown } from "./StatusFilterDropdown";
 import { ProviderGroupHeader } from "./ProviderGroupHeader";
 import { useFlipAnimation } from "../../lib/useFlipAnimation";
@@ -88,7 +88,7 @@ export function KeysTable({
               style={{ color: "var(--ink)", background: "color-mix(in srgb, var(--ink) 6%, transparent)", border: "1px solid color-mix(in srgb, var(--ink) 8.4%, transparent)" }}
             />
           </div>
-          <ProviderFilterDropdown filter={filter} onFilter={onFilter} />
+          <ProviderFilterDropdown value={filter} onChange={(v) => onFilter(v as PF)} allValue="all" />
           <StatusFilterDropdown filter={statusFilter} onFilter={onStatusFilter} />
           <button
             onClick={() => setGrouped((g) => !g)}

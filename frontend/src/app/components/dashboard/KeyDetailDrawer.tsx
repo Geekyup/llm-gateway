@@ -3,6 +3,7 @@ import { AreaChart, Area, XAxis, Tooltip, ResponsiveContainer } from "recharts";
 import { X, Loader2, Stethoscope, RefreshCw, Power, Trash2 } from "lucide-react";
 import { api } from "../../lib/api";
 import { usePolling } from "../../lib/usePolling";
+import { useEscapeKey } from "../../lib/useEscapeKey";
 import { STATUS_META, PROVIDER_META, rel, cd } from "../../lib/domain";
 import type { AK } from "../../types";
 import { StatusBadge } from "../shared/StatusBadge";
@@ -37,11 +38,7 @@ export function KeyDetailDrawer({
   const [tokenData, setTokenData] = useState<{ h: string; r: number; prompt: number; completion: number }[] | null>(null);
   const [tokenError, setTokenError] = useState(false);
 
-  useEffect(() => {
-    const h = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
-    window.addEventListener("keydown", h);
-    return () => window.removeEventListener("keydown", h);
-  }, [onClose]);
+  useEscapeKey(onClose);
 
   useEffect(() => {
     const prev = document.body.style.overflow;

@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useState } from "react";
 import { Loader2, AlertTriangle, CheckCircle2 } from "lucide-react";
-import { api, ApiError, type UserRead } from "./lib/api";
+import { api, ApiError, errorMessage, type UserRead } from "./lib/api";
 import { defaultKeyLabel, toAK } from "./lib/domain";
 import { usePolling } from "./lib/usePolling";
+import { useIdSet } from "./lib/useIdSet";
 import type { AK, FormState, PF, SF, View } from "./types";
 import { Sidebar } from "./components/layout/Sidebar";
 import { MobileSidebarDrawer } from "./components/layout/MobileSidebarDrawer";
@@ -32,8 +33,8 @@ export function Dashboard({ user, onLogout }: { user: UserRead | null; onLogout:
   const [formError, setFormError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [now, setNow] = useState(Date.now());
-  const [checkingIds, setCheckingIds] = useState<Set<string>>(new Set());
-  const [resettingIds, setResettingIds] = useState<Set<string>>(new Set());
+  const checking = useIdSet();
+  const resetting = useIdSet();
   const [checkResults, setCheckResults] = useState<{ toastId: string; keyId: string; ok: boolean; detail: string | null }[]>([]);
 
   useEffect(() => {
@@ -47,7 +48,7 @@ export function Dashboard({ user, onLogout }: { user: UserRead | null; onLogout:
       setKeys(data.map(toAK));
       setLoadError(null);
     } catch (err) {
-      setLoadError(err instanceof ApiError ? err.message : "Failed to reach the API");
+      setLoadError(errorMessage(err, "Failed to reach the API"));
       if (err instanceof ApiError && err.status === 401) onLogout();
     } finally {
       setLoading(false);
@@ -92,7 +93,7 @@ export function Dashboard({ user, onLogout }: { user: UserRead | null; onLogout:
       }
       await refreshKeys();
     } catch (err) {
-      setFormError(err instanceof ApiError ? err.message : "Request failed");
+      setFormError(errorMessage(err, "Request failed"));
     } finally {
       setSaving(false);
     }
@@ -111,17 +112,13 @@ export function Dashboard({ user, onLogout }: { user: UserRead | null; onLogout:
   }
 
   async function resetCooldown(id: string) {
-    setResettingIds((prev) => new Set(prev).add(id));
+    resetting.add(id);
     try {
       await api.resetCooldown(Number(id));
       await refreshKeys();
     } catch {
     } finally {
-      setResettingIds((prev) => {
-        const next = new Set(prev);
-        next.delete(id);
-        return next;
-      });
+      resetting.remove(id);
     }
   }
 
@@ -136,7 +133,7 @@ export function Dashboard({ user, onLogout }: { user: UserRead | null; onLogout:
   }
 
   async function checkKey(id: string) {
-    setCheckingIds((prev) => new Set(prev).add(id));
+    checking.add(id);
     const toastId = `${id}-${Date.now()}`;
     try {
       const result = await api.checkKey(Number(id));
@@ -145,14 +142,10 @@ export function Dashboard({ user, onLogout }: { user: UserRead | null; onLogout:
     } catch (err) {
       setCheckResults((prev) => [
         ...prev,
-        { toastId, keyId: id, ok: false, detail: err instanceof ApiError ? err.message : "Check failed — couldn't reach the API" },
+        { toastId, keyId: id, ok: false, detail: errorMessage(err, "Check failed — couldn't reach the API") },
       ]);
     } finally {
-      setCheckingIds((prev) => {
-        const next = new Set(prev);
-        next.delete(id);
-        return next;
-      });
+      checking.remove(id);
       setTimeout(() => setCheckResults((prev) => prev.filter((r) => r.toastId !== toastId)), 5000);
     }
   }
@@ -193,7 +186,7 @@ export function Dashboard({ user, onLogout }: { user: UserRead | null; onLogout:
                     onEdit={(id) => { setEditId(id); setSelectedId(null); }}
                     onToggle={toggleKey}
                     onCheck={checkKey}
-                    checkingIds={checkingIds}
+                    checkingIds={checking.ids}
                   />
                   <DashboardInsights now={now} onOpenActivity={() => setView("activity")} />
                 </div>
@@ -260,8 +253,8 @@ export function Dashboard({ user, onLogout }: { user: UserRead | null; onLogout:
           onReset={() => resetCooldown(selectedKey.id)}
           onDelete={() => deleteKey(selectedKey.id)}
           onCheck={() => checkKey(selectedKey.id)}
-          checking={checkingIds.has(selectedKey.id)}
-          resetting={resettingIds.has(selectedKey.id)}
+          checking={checking.ids.has(selectedKey.id)}
+          resetting={resetting.ids.has(selectedKey.id)}
         />
       )}
     </div>

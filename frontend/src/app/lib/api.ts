@@ -1,5 +1,6 @@
-export const API_BASE_URL: string =
-  (import.meta as any).env?.VITE_API_URL ?? "http://localhost:8000";
+import type { Provider, Status } from "../types";
+
+export const API_BASE_URL: string = import.meta.env.VITE_API_URL ?? "http://localhost:8000";
 
 const ACCESS_TOKEN_KEY = "llm_gateway_access_token";
 const REFRESH_TOKEN_KEY = "llm_gateway_refresh_token";
@@ -26,14 +27,11 @@ export function startGoogleLogin(): void {
   window.location.href = `${API_BASE_URL}/auth/google/login`;
 }
 
-export type ApiKeyStatus = "active" | "cooldown" | "exhausted" | "disabled";
-export type ApiProvider = "gemini" | "openrouter" | "groq";
-
 export interface ApiKeyRead {
   id: number;
   label: string;
-  provider: ApiProvider;
-  status: ApiKeyStatus;
+  provider: Provider;
+  status: Status;
   requests_today: number;
   daily_limit: number;
   model: string | null;
@@ -47,14 +45,14 @@ export interface ApiKeyRead {
 
 export interface ApiKeyCreate {
   label: string;
-  provider: ApiProvider;
+  provider: Provider;
   raw_key: string;
   daily_limit: number;
   model?: string | null;
 }
 
 export interface ApiKeyBulkCreate {
-  provider: ApiProvider;
+  provider: Provider;
   raw_keys: string;
   label_prefix: string;
   daily_limit: number;
@@ -74,7 +72,7 @@ export interface ApiKeyBulkCreateResult {
 
 export interface ApiKeyUpdate {
   label?: string;
-  status?: ApiKeyStatus;
+  status?: Status;
   daily_limit?: number;
   model?: string | null;
 }
@@ -222,6 +220,10 @@ export class ApiError extends Error {
   }
 }
 
+export function errorMessage(err: unknown, fallback: string): string {
+  return err instanceof ApiError ? err.message : fallback;
+}
+
 let refreshInFlight: Promise<boolean> | null = null;
 
 async function tryRefresh(): Promise<boolean> {
@@ -279,6 +281,19 @@ async function request<T>(path: string, init?: RequestInit, _retried = false): P
   return res.json() as Promise<T>;
 }
 
+interface ActivityLogParams {
+  range: ActivityRange;
+  provider?: string | null;
+  outcome?: string | null;
+}
+
+function activityLogQuery(params: ActivityLogParams): URLSearchParams {
+  const q = new URLSearchParams({ range: params.range });
+  if (params.provider) q.set("provider", params.provider);
+  if (params.outcome) q.set("outcome", params.outcome);
+  return q;
+}
+
 export const api = {
   async listKeys(): Promise<ApiKeyRead[]> {
     return request<ApiKeyRead[]>("/me/keys");
@@ -298,7 +313,7 @@ export const api = {
     });
   },
 
-  async listModels(provider: ApiProvider, rawKey: string): Promise<ModelOption[]> {
+  async listModels(provider: Provider, rawKey: string): Promise<ModelOption[]> {
     const res = await request<{ models: ModelOption[] }>("/me/keys/list-models", {
       method: "POST",
       body: JSON.stringify({ provider, raw_key: rawKey }),
@@ -364,26 +379,15 @@ export const api = {
     return request<TopModelsResponse>(`/me/activity/top-models?range=${range}&limit=${limit}`);
   },
 
-  async activityLog(params: {
-    range: ActivityRange;
-    page?: number;
-    pageSize?: number;
-    provider?: string | null;
-    outcome?: string | null;
-  }): Promise<ActivityLogResponse> {
-    const q = new URLSearchParams({ range: params.range });
+  async activityLog(params: ActivityLogParams & { page?: number; pageSize?: number }): Promise<ActivityLogResponse> {
+    const q = activityLogQuery(params);
     if (params.page) q.set("page", String(params.page));
     if (params.pageSize) q.set("page_size", String(params.pageSize));
-    if (params.provider) q.set("provider", params.provider);
-    if (params.outcome) q.set("outcome", params.outcome);
     return request<ActivityLogResponse>(`/me/activity/log?${q.toString()}`);
   },
 
-  activityLogExportCsvUrl(params: { range: ActivityRange; provider?: string | null; outcome?: string | null }): string {
-    const q = new URLSearchParams({ range: params.range });
-    if (params.provider) q.set("provider", params.provider);
-    if (params.outcome) q.set("outcome", params.outcome);
-    return `${API_BASE_URL}/me/activity/log/export.csv?${q.toString()}`;
+  activityLogExportCsvUrl(params: ActivityLogParams): string {
+    return `${API_BASE_URL}/me/activity/log/export.csv?${activityLogQuery(params).toString()}`;
   },
 
   async listGatewayTokens(): Promise<GatewayTokenRead[]> {

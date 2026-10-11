@@ -1,8 +1,8 @@
 import { useEffect, useState } from "react";
 import { ChevronLeft, ChevronRight, Download, Loader2, ListX } from "lucide-react";
-import { api, ApiError, getAccessToken, type ActivityLogEntry, type ActivityRange } from "../../lib/api";
+import { api, errorMessage, getAccessToken, type ActivityLogEntry, type ActivityRange } from "../../lib/api";
 import { providerMeta, outcomeMeta } from "../../lib/domain";
-import { ActivityProviderFilterDropdown } from "./ActivityProviderFilterDropdown";
+import { ProviderFilterDropdown } from "../shared/ProviderFilterDropdown";
 import { ActivityOutcomeFilterDropdown } from "./ActivityOutcomeFilterDropdown";
 
 const PAGE_SIZE = 20;
@@ -46,7 +46,7 @@ export function ActivityLogTable({ range, refreshSignal = 0 }: { range: Activity
       })
       .catch((err) => {
         if (cancelled) return;
-        setError(err instanceof ApiError ? err.message : "Failed to load activity log");
+        setError(errorMessage(err, "Failed to load activity log"));
       })
       .finally(() => {
         if (!cancelled) setLoading(false);
@@ -106,7 +106,7 @@ export function ActivityLogTable({ range, refreshSignal = 0 }: { range: Activity
       >
         <span className="text-xs font-medium text-ink-2 shrink-0">Request log</span>
         <div className="flex items-center gap-2 flex-wrap">
-          <ActivityProviderFilterDropdown value={provider} onChange={setProvider} />
+          <ProviderFilterDropdown value={provider} onChange={setProvider} />
           <ActivityOutcomeFilterDropdown value={outcome} onChange={setOutcome} />
           <button
             onClick={handleExport}

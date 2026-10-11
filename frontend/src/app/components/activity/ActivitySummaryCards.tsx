@@ -1,5 +1,6 @@
 import { ArrowDown, ArrowUp, Minus } from "lucide-react";
 import type { ActivitySummary } from "../../lib/api";
+import { formatCompact } from "../../lib/format";
 
 function Delta({ curr, prev, invert = false }: { curr: number; prev: number; invert?: boolean }) {
   if (prev === 0 && curr === 0) {
@@ -87,10 +88,4 @@ export function ActivitySummaryCards({ summary }: { summary: ActivitySummary | n
       ))}
     </div>
   );
-}
-
-function formatCompact(n: number): string {
-  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
-  if (n >= 1_000) return `${(n / 1_000).toFixed(1)}K`;
-  return String(n);
 }
