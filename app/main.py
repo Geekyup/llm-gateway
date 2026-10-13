@@ -28,10 +28,12 @@ configure_logging(debug=settings.DEBUG, fmt=settings.LOG_FORMAT)
 
 @asynccontextmanager
 async def lifespan(_: FastAPI):
-    yield
-    await close_shared_client()
-    await get_redis_pool().disconnect()
-    await get_engine().dispose()
+    try:
+        yield
+    finally:
+        await close_shared_client()
+        await get_redis_pool().disconnect()
+        await get_engine().dispose()
 
 
 _is_prod = settings.ENV == "production"
@@ -49,6 +51,9 @@ app = FastAPI(
     version="0.1.0",
 )
 
+app.add_middleware(BodySizeLimitMiddleware, max_bytes=settings.MAX_REQUEST_BODY_BYTES)
+app.add_middleware(SessionMiddleware, secret_key=settings.SESSION_SECRET_KEY, same_site="lax")
+app.add_middleware(RequestContextMiddleware)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.CORS_ORIGINS,
@@ -57,9 +62,6 @@ app.add_middleware(
     allow_headers=["*"],
     expose_headers=[REQUEST_ID_HEADER],
 )
-app.add_middleware(BodySizeLimitMiddleware, max_bytes=settings.MAX_REQUEST_BODY_BYTES)
-app.add_middleware(SessionMiddleware, secret_key=settings.SESSION_SECRET_KEY, same_site="lax")
-app.add_middleware(RequestContextMiddleware)
 
 
 @app.exception_handler(LLMGatewayError)
