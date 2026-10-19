@@ -17,7 +17,7 @@ dependencies = [
     "httpx>=0.28.1",
     "sse-starlette>=3.5.0",
     "PyJWT>=2.15.1",
-    "Authlib>=1.8.0",
+    "Authlib>=1.9.1",
     "itsdangerous>=2.2.0",
     "prometheus-client>=0.21.0",
 ]
