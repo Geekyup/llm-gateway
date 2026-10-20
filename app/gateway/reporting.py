@@ -1,71 +1,97 @@
+import logging
 from datetime import UTC, datetime
 
+import httpx
+
 from app.core.metrics import observe_attempt
-from app.gateway.attempts import NO_USAGE, AttemptContext, Outcome, TokenUsage, provider_label
+from app.gateway.attempts import NO_USAGE, Attempt, TokenUsage, provider_label
 from app.keys.enums import ProviderType
 from app.monitoring.publisher import RequestEventPublisher
 from app.monitoring.schemas import RequestEvent
+
+logger = logging.getLogger(__name__)
+
+NO_KEYS = "no_keys"
+UPSTREAM_EXHAUSTED = "upstream_exhausted"
+
+
+def extract_usage(response: httpx.Response) -> TokenUsage:
+    try:
+        body = response.json()
+        if "usageMetadata" in body:
+            return _from_gemini(body["usageMetadata"] or {})
+        return _from_openai(body.get("usage") or {})
+    except Exception:
+        logger.warning("failed to parse usage data for token accounting", exc_info=True)
+        return NO_USAGE
+
+
+def _from_gemini(metadata: dict) -> TokenUsage:
+    return TokenUsage(
+        prompt=metadata.get("promptTokenCount"),
+        completion=metadata.get("candidatesTokenCount"),
+        total=metadata.get("totalTokenCount"),
+    )
+
+
+def _from_openai(usage: dict) -> TokenUsage:
+    return TokenUsage(
+        prompt=usage.get("prompt_tokens"),
+        completion=usage.get("completion_tokens"),
+        total=usage.get("total_tokens"),
+    )
 
 
 class AttemptReporter:
     def __init__(self, publisher: RequestEventPublisher | None = None) -> None:
         self._publisher = publisher
 
-    async def attempt(
-        self,
-        ctx: AttemptContext,
-        outcome: Outcome,
-        *,
-        upstream_status: int | None,
-        latency_ms: int | None,
-        error_detail: str | None = None,
-        usage: TokenUsage = NO_USAGE,
-    ) -> None:
+    async def report(self, attempt: Attempt, usage: TokenUsage = NO_USAGE) -> None:
         await self._dispatch(
             RequestEvent(
-                user_id=ctx.user_id,
-                request_id=ctx.request_id,
-                attempt=ctx.attempt,
+                user_id=attempt.user_id,
+                request_id=attempt.request_id,
+                attempt=attempt.number,
                 timestamp=datetime.now(UTC),
-                provider=ctx.provider_type.value,
-                path=ctx.spec.path,
-                method=ctx.spec.method,
-                key_id=ctx.key.id,
-                key_label=ctx.key.label,
-                model=ctx.effective_model,
-                upstream_status=upstream_status,
-                outcome=outcome.value,
-                latency_ms=latency_ms,
-                is_retry=ctx.is_retry,
-                error_detail=error_detail,
+                provider=attempt.provider_type.value,
+                path=attempt.spec.path,
+                method=attempt.spec.method,
+                key_id=attempt.key.id,
+                key_label=attempt.key.label,
+                model=attempt.model,
+                upstream_status=attempt.status_code,
+                outcome=attempt.verdict.label,
+                latency_ms=attempt.latency_ms,
+                is_retry=attempt.is_retry,
+                error_detail=attempt.error_detail,
                 prompt_tokens=usage.prompt,
                 completion_tokens=usage.completion,
                 total_tokens=usage.total,
             )
         )
 
-    async def pool_empty(
+    async def report_pool_empty(
         self,
         *,
         user_id: int,
         request_id: str,
-        attempt: int,
+        number: int,
         provider_type: ProviderType | None,
         model: str | None,
-        outcome: Outcome,
+        gave_up: bool,
     ) -> None:
         await self._dispatch(
             RequestEvent(
                 user_id=user_id,
                 request_id=request_id,
-                attempt=attempt,
+                attempt=number,
                 timestamp=datetime.now(UTC),
                 provider=provider_label(provider_type),
                 path="",
                 method="POST",
                 model=model,
-                outcome=outcome.value,
-                is_retry=attempt > 1,
+                outcome=UPSTREAM_EXHAUSTED if gave_up else NO_KEYS,
+                is_retry=number > 1,
             )
         )
 

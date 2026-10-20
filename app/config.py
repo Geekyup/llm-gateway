@@ -73,6 +73,7 @@ class Settings(BaseSettings):
     KEY_STATUS_CACHE_TTL_SECONDS: int = 30
     GATEWAY_MAX_RETRY_ATTEMPTS: int = 3
     GATEWAY_RATE_LIMIT_PER_MINUTE: int = Field(default=120, ge=0)
+    GATEWAY_TOKEN_CACHE_TTL_SECONDS: int = Field(default=60, ge=0)
     MAX_REQUEST_BODY_BYTES: int = Field(default=10 * 1024 * 1024, ge=1)
     DEFAULT_DAILY_LIMIT: int = 1_000
 

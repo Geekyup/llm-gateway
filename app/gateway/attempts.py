@@ -1,6 +1,8 @@
+import time
 from collections.abc import Awaitable, Callable
-from dataclasses import dataclass
-from enum import Enum, StrEnum
+from dataclasses import dataclass, field
+from enum import Enum
+from typing import NamedTuple
 
 import httpx
 
@@ -22,8 +24,7 @@ RequestSpecBuilder = Callable[[APIKeyDTO], UpstreamRequestSpec]
 TokenRecorder = Callable[[int | None, int | None, int | None], Awaitable[None]]
 
 
-@dataclass(frozen=True, slots=True)
-class TokenUsage:
+class TokenUsage(NamedTuple):
     prompt: int | None = None
     completion: int | None = None
     total: int | None = None
@@ -32,27 +33,19 @@ class TokenUsage:
 NO_USAGE = TokenUsage()
 
 
-class Outcome(StrEnum):
-    SUCCESS = "success"
-    INVALID = "invalid"
-    EXHAUSTED = "exhausted"
-    RATE_LIMITED = "rate_limited"
-    ERROR = "error"
-    NO_KEYS = "no_keys"
-    UPSTREAM_EXHAUSTED = "upstream_exhausted"
-
-
 class Verdict(Enum):
-    SUCCESS = (Outcome.SUCCESS, False)
-    KEY_INVALID = (Outcome.INVALID, True)
-    KEY_EXHAUSTED = (Outcome.EXHAUSTED, True)
-    RATE_LIMITED = (Outcome.RATE_LIMITED, True)
-    SERVER_ERROR = (Outcome.ERROR, True)
-    CLIENT_ERROR = (Outcome.ERROR, False)
+    SUCCESS = ("success", False, "success")
+    KEY_INVALID = ("invalid", True, "key invalid")
+    KEY_EXHAUSTED = ("exhausted", True, "key exhausted")
+    RATE_LIMITED = ("rate_limited", True, "rate limited")
+    SERVER_ERROR = ("error", True, "upstream server error")
+    CLIENT_ERROR = ("error", False, "client error")
+    NETWORK_ERROR = ("error", True, "network error")
 
-    def __init__(self, outcome: Outcome, retryable: bool) -> None:
-        self.outcome = outcome
+    def __init__(self, label: str, retryable: bool, description: str) -> None:
+        self.label = label
         self.retryable = retryable
+        self.description = description
 
 
 def classify_response(provider: Provider, response: httpx.Response) -> Verdict:
@@ -69,15 +62,20 @@ def classify_response(provider: Provider, response: httpx.Response) -> Verdict:
     return Verdict.SUCCESS
 
 
-@dataclass(frozen=True, slots=True)
-class AttemptContext:
+@dataclass(slots=True)
+class Attempt:
     user_id: int
     request_id: str
-    attempt: int
+    number: int
     key: APIKeyDTO
     provider: Provider
     spec: UpstreamRequestSpec
-    effective_model: str | None
+    model: str | None
+    started_at: float = field(default_factory=time.monotonic)
+    verdict: Verdict | None = None
+    response: httpx.Response | None = None
+    latency_ms: int | None = None
+    error_detail: str | None = None
 
     @property
     def provider_type(self) -> ProviderType:
@@ -85,7 +83,26 @@ class AttemptContext:
 
     @property
     def is_retry(self) -> bool:
-        return self.attempt > 1
+        return self.number > 1
+
+    @property
+    def status_code(self) -> int | None:
+        return self.response.status_code if self.response is not None else None
+
+    def finish(
+        self,
+        verdict: Verdict,
+        *,
+        response: httpx.Response | None = None,
+        error: Exception | None = None,
+    ) -> None:
+        self.latency_ms = int((time.monotonic() - self.started_at) * 1000)
+        self.verdict = verdict
+        self.response = response
+        if error is not None:
+            self.error_detail = type(error).__name__
+        elif verdict in (Verdict.SERVER_ERROR, Verdict.CLIENT_ERROR):
+            self.error_detail = f"HTTP {response.status_code}"
 
 
 def provider_label(provider_type: ProviderType | None) -> str:

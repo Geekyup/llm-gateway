@@ -1,9 +1,10 @@
 import httpx
 import pytest
 
-from app.gateway.attempts import NO_USAGE, Outcome, TokenUsage, Verdict, classify_response
-from app.gateway.proxy_service import _scope
-from app.gateway.usage import extract_usage
+from app.core.exceptions import NoAvailableKeysError
+from app.gateway.attempts import NO_USAGE, Attempt, TokenUsage, Verdict, classify_response
+from app.gateway.proxy_service import GatewayService
+from app.gateway.reporting import extract_usage
 from app.keys.enums import ProviderType
 from app.providers.base import Provider
 
@@ -46,25 +47,64 @@ def test_provider_key_checks_take_precedence_over_generic_status_ranges():
 
 
 @pytest.mark.parametrize(
-    ("verdict", "outcome", "retryable"),
+    ("verdict", "label", "retryable"),
     [
-        (Verdict.SUCCESS, Outcome.SUCCESS, False),
-        (Verdict.KEY_INVALID, Outcome.INVALID, True),
-        (Verdict.KEY_EXHAUSTED, Outcome.EXHAUSTED, True),
-        (Verdict.RATE_LIMITED, Outcome.RATE_LIMITED, True),
-        (Verdict.SERVER_ERROR, Outcome.ERROR, True),
-        (Verdict.CLIENT_ERROR, Outcome.ERROR, False),
+        (Verdict.SUCCESS, "success", False),
+        (Verdict.KEY_INVALID, "invalid", True),
+        (Verdict.KEY_EXHAUSTED, "exhausted", True),
+        (Verdict.RATE_LIMITED, "rate_limited", True),
+        (Verdict.SERVER_ERROR, "error", True),
+        (Verdict.NETWORK_ERROR, "error", True),
+        (Verdict.CLIENT_ERROR, "error", False),
     ],
 )
-def test_verdict_maps_to_reported_outcome_and_retry_policy(verdict, outcome, retryable):
-    assert verdict.outcome is outcome
+def test_verdict_carries_persisted_label_and_retry_policy(verdict, label, retryable):
+    assert verdict.label == label
     assert verdict.retryable is retryable
 
 
-def test_outcome_values_are_the_persisted_labels():
-    assert {o.value for o in Outcome} == {
-        "success", "invalid", "exhausted", "rate_limited", "error", "no_keys", "upstream_exhausted",
-    }
+def test_every_verdict_is_a_distinct_member():
+    assert len(list(Verdict)) == 7
+
+
+def _attempt() -> Attempt:
+    return Attempt(
+        user_id=1,
+        request_id="r1",
+        number=2,
+        key=None,
+        provider=_StatusProvider(),
+        spec=None,
+        model=None,
+    )
+
+
+def test_finish_records_latency_status_and_http_error_detail():
+    attempt = _attempt()
+
+    attempt.finish(Verdict.SERVER_ERROR, response=httpx.Response(503))
+
+    assert attempt.verdict is Verdict.SERVER_ERROR
+    assert attempt.status_code == 503
+    assert attempt.error_detail == "HTTP 503"
+    assert attempt.latency_ms is not None and attempt.latency_ms >= 0
+    assert attempt.is_retry is True
+
+
+def test_finish_records_exception_name_for_network_errors():
+    attempt = _attempt()
+
+    attempt.finish(Verdict.NETWORK_ERROR, error=httpx.ConnectError("boom"))
+
+    assert attempt.status_code is None
+    assert attempt.error_detail == "ConnectError"
+
+
+def test_finish_leaves_error_detail_empty_on_success_and_key_problems():
+    for verdict, status in ((Verdict.SUCCESS, 200), (Verdict.RATE_LIMITED, 429)):
+        attempt = _attempt()
+        attempt.finish(verdict, response=httpx.Response(status))
+        assert attempt.error_detail is None
 
 
 def test_extract_usage_reads_gemini_usage_metadata():
@@ -96,7 +136,29 @@ def test_extract_usage_never_raises_and_falls_back_to_no_usage(response):
     assert extract_usage(response) == NO_USAGE
 
 
-def test_scope_names_the_model_only_when_one_was_requested():
-    assert _scope(ProviderType.GEMINI, None) == "gemini"
-    assert _scope(None, None) == "any"
-    assert _scope(ProviderType.GEMINI, "flash") == "gemini' for model 'flash"
+class _EmptyPool:
+    async def select_key(self, *args, **kwargs):
+        return None
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("provider_type", "model", "expected"),
+    [
+        (ProviderType.GEMINI, "flash", "gemini' for model 'flash'"),
+        (ProviderType.GEMINI, None, "gemini'"),
+        (None, None, "any'"),
+    ],
+)
+async def test_no_keys_error_names_provider_and_requested_model(provider_type, model, expected):
+    service = GatewayService(_EmptyPool(), max_attempts=3)
+
+    with pytest.raises(NoAvailableKeysError) as exc_info:
+        await service.proxy_request(
+            user_id=1,
+            build_request=lambda key: None,
+            provider_type=provider_type,
+            model=model,
+        )
+
+    assert expected in str(exc_info.value)

@@ -14,6 +14,7 @@ from app.keys.repository import APIKeyRepository
 from app.keys.service import KeyPoolService
 from app.monitoring.cache import ActivityCache
 from app.monitoring.publisher import RequestEventPublisher
+from app.tokens.cache import TokenAuthCache
 from app.tokens.repository import GatewayTokenRepository
 from app.tokens.service import GatewayTokenService
 
@@ -28,8 +29,12 @@ def get_gateway_token_repository(session: Annotated[AsyncSession, Depends(get_db
 
 def get_gateway_token_service(
     repository: Annotated[GatewayTokenRepository, Depends(get_gateway_token_repository)],
+    redis: Annotated[Redis, Depends(get_redis)],
+    settings: Annotated[Settings, Depends(get_settings)],
 ) -> GatewayTokenService:
-    return GatewayTokenService(repository)
+    ttl_seconds = settings.GATEWAY_TOKEN_CACHE_TTL_SECONDS
+    auth_cache = TokenAuthCache(redis, ttl_seconds) if ttl_seconds > 0 else None
+    return GatewayTokenService(repository, auth_cache)
 
 
 def get_key_pool_service(
